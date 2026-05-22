@@ -729,10 +729,6 @@ namespace SpaceServices
             }
 
             __result = true;
-            if (SpaceServicesMod.Settings != null && SpaceServicesMod.Settings.debugLogging)
-            {
-                Log.Message("[Space Services] allowed service incident on eligible space map: " + (incident == null ? "unknown" : incident.defName));
-            }
         }
     }
 
@@ -761,7 +757,9 @@ namespace SpaceServices
             }
             if (HospitalIncidents.Contains(incidentDefName))
             {
-                return (SpaceServicesMod.Settings == null || SpaceServicesMod.Settings.enableHospital) && HasRequiredPad(map, ServiceUse.Patient);
+                return (SpaceServicesMod.Settings == null || SpaceServicesMod.Settings.enableHospital) &&
+                    HasRequiredPad(map, ServiceUse.Patient) &&
+                    HospitalIncidentGate.CanAcceptHospitalIncident(incidentDefName, map);
             }
             if (HospitalityIncidents.Contains(incidentDefName))
             {
@@ -777,6 +775,102 @@ namespace SpaceServices
                 return true;
             }
             return ServicePadUtility.TryFindServicePad(map, use) != null;
+        }
+    }
+
+    public static class HospitalIncidentGate
+    {
+        public static bool CanAcceptHospitalIncident(string incidentDefName, Map map)
+        {
+            object hospital = FindHospitalComponent(map);
+            if (hospital == null)
+            {
+                return false;
+            }
+            if (!CallBool(hospital, "IsOpen", true))
+            {
+                return false;
+            }
+            if (incidentDefName == "MassCasualtyEvent" && !Reflect.BoolMember(hospital, "MassCasualties", true))
+            {
+                return false;
+            }
+            int freeBeds = CallInt(hospital, "FreeMedicalBeds", -1);
+            if (freeBeds == 0 || CallBool(hospital, "IsFull", false))
+            {
+                return false;
+            }
+            if (!Reflect.BoolMember(hospital, "AcceptDanger", false) && HospitalDangersOnMap(map))
+            {
+                return false;
+            }
+            return true;
+        }
+
+        private static object FindHospitalComponent(Map map)
+        {
+            if (map == null || map.components == null)
+            {
+                return null;
+            }
+            return map.components.FirstOrDefault(comp => comp != null && (comp.GetType().FullName ?? "") == "Hospital.HospitalMapComponent");
+        }
+
+        private static bool HospitalDangersOnMap(Map map)
+        {
+            Type patientUtility = AccessTools.TypeByName("Hospital.Utilities.PatientUtility");
+            MethodInfo method = patientUtility == null ? null : AccessTools.Method(patientUtility, "DangersOnMap");
+            if (method == null)
+            {
+                return GenHostility.AnyHostileActiveThreatToPlayer(map, true);
+            }
+
+            object[] args = { map, null };
+            try
+            {
+                object result = method.Invoke(null, args);
+                return result is bool && (bool)result;
+            }
+            catch
+            {
+                return GenHostility.AnyHostileActiveThreatToPlayer(map, true);
+            }
+        }
+
+        private static bool CallBool(object target, string methodName, bool fallback)
+        {
+            MethodInfo method = AccessTools.Method(target.GetType(), methodName);
+            if (method == null)
+            {
+                return fallback;
+            }
+            try
+            {
+                object result = method.Invoke(target, null);
+                return result is bool ? (bool)result : fallback;
+            }
+            catch
+            {
+                return fallback;
+            }
+        }
+
+        private static int CallInt(object target, string methodName, int fallback)
+        {
+            MethodInfo method = AccessTools.Method(target.GetType(), methodName);
+            if (method == null)
+            {
+                return fallback;
+            }
+            try
+            {
+                object result = method.Invoke(target, null);
+                return result is int ? (int)result : fallback;
+            }
+            catch
+            {
+                return fallback;
+            }
         }
     }
 
@@ -1083,8 +1177,13 @@ namespace SpaceServices
 
         public static bool BoolMember(object obj, string name)
         {
+            return BoolMember(obj, name, false);
+        }
+
+        public static bool BoolMember(object obj, string name, bool fallback)
+        {
             object value = GetMember(obj, name);
-            return value is bool && (bool)value;
+            return value is bool ? (bool)value : fallback;
         }
 
         public static bool BoolFromNested(object root, params string[] path)
