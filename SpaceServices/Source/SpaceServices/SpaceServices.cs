@@ -807,7 +807,23 @@ namespace SpaceServices
             return true;
         }
 
-        private static object FindHospitalComponent(Map map)
+        public static string ReadinessReport(string incidentDefName, Map map)
+        {
+            object hospital = FindHospitalComponent(map);
+            if (hospital == null)
+            {
+                return "no HospitalMapComponent";
+            }
+            return "open=" + CallBool(hospital, "IsOpen", true) +
+                ", freeBeds=" + CallInt(hospital, "FreeMedicalBeds", -1) +
+                ", bedCount=" + CallInt(hospital, "BedCount", -1) +
+                ", full=" + CallBool(hospital, "IsFull", false) +
+                ", massCasualties=" + Reflect.BoolMember(hospital, "MassCasualties", true) +
+                ", acceptDanger=" + Reflect.BoolMember(hospital, "AcceptDanger", false) +
+                ", danger=" + HospitalDangersOnMap(map);
+        }
+
+        public static object FindHospitalComponent(Map map)
         {
             if (map == null || map.components == null)
             {
@@ -962,6 +978,11 @@ namespace SpaceServices
                 MethodInfo landing = patientUtility.GetMethods(AccessTools.all).FirstOrDefault(m => m.Name == "TryFindSafeLandingSpotCloseToColony" && m.ReturnType == typeof(IntVec3));
                 PatchIfExists(harmony, landing, postfix: nameof(OptionalPatchHandlers.HospitalLandingSpotPostfix));
             }
+            Type patientArrival = AccessTools.TypeByName("Hospital.IncidentWorker_PatientArrives");
+            if (patientArrival != null)
+            {
+                PatchIfExists(harmony, AccessTools.Method(patientArrival, "TryExecuteWorker"), postfix: nameof(OptionalPatchHandlers.HospitalPatientArrivesTryExecutePostfix));
+            }
         }
 
         private static void TryPatchHospitality(Harmony harmony)
@@ -1090,6 +1111,32 @@ namespace SpaceServices
             }
         }
 
+        public static void HospitalPatientArrivesTryExecutePostfix(object __instance, IncidentParms parms, ref bool __result)
+        {
+            if (__result || __instance == null || parms == null)
+            {
+                return;
+            }
+            Map map = parms.target as Map;
+            if (map == null || !SpaceServiceMapDetector.IsServiceEligible(map))
+            {
+                return;
+            }
+            if (!HospitalIncidentGate.CanAcceptHospitalIncident("PatientArrives", map))
+            {
+                Log.Message("[Space Services] Hospital PatientArrives returned false; fallback blocked: " + HospitalIncidentGate.ReadinessReport("PatientArrives", map));
+                return;
+            }
+            try
+            {
+                __result = HospitalPatientFallback.TryExecutePatientArrival(__instance, parms, map);
+            }
+            catch (Exception ex)
+            {
+                Log.Warning("[Space Services] Hospital patient fallback failed: " + ex);
+            }
+        }
+
         private static bool HasBlockingLandingCondition(Map map)
         {
             if (map == null)
@@ -1157,6 +1204,109 @@ namespace SpaceServices
         }
     }
 
+    public static class HospitalPatientFallback
+    {
+        public static bool TryExecutePatientArrival(object worker, IncidentParms parms, Map map)
+        {
+            List<Pawn> pawns = ResolvePatientPawns(worker, parms, map);
+            if (pawns.Count == 0)
+            {
+                Log.Message("[Space Services] Hospital fallback could not generate a patient pawn.");
+                return false;
+            }
+
+            IntVec3 cell;
+            if (!ServicePadUtility.TryFindServicePadCell(map, ServiceUse.Patient, out cell))
+            {
+                cell = CellFinder.RandomClosewalkCellNear(map.Center, map, 12);
+            }
+
+            foreach (Pawn pawn in pawns)
+            {
+                VacSuitUtility.SuitPawnForVacuum(pawn);
+                object patientData = CallSpawnPatient(worker, map, pawn);
+                if (!pawn.Spawned && pawn.ParentHolder == null)
+                {
+                    GenSpawn.Spawn(pawn, cell, map);
+                }
+                if (patientData == null)
+                {
+                    RegisterPatientWithHospital(map, pawn);
+                }
+            }
+
+            object lordJob = CallCreateLordJob(worker, parms, pawns);
+            if (lordJob is LordJob)
+            {
+                LordMaker.MakeNewLord(parms.faction, (LordJob)lordJob, map, pawns);
+            }
+
+            ServiceLifecycleUtility.RegisterPawns(map, "hospital", pawns);
+            SendPatientArrivalNotice(pawns[0]);
+            Log.Message("[Space Services] Hospital fallback spawned patient arrival pawns=" + pawns.Count);
+            return true;
+        }
+
+        private static List<Pawn> ResolvePatientPawns(object worker, IncidentParms parms, Map map)
+        {
+            MethodInfo tryResolve = AccessTools.Method(typeof(IncidentWorker_NeutralGroup), "TryResolveParms");
+            MethodInfo spawnPawns = AccessTools.Method(typeof(IncidentWorker_NeutralGroup), "SpawnPawns");
+            if (tryResolve != null && spawnPawns != null)
+            {
+                object resolved = tryResolve.Invoke(worker, new object[] { parms });
+                if (resolved is bool && (bool)resolved)
+                {
+                    List<Pawn> pawns = spawnPawns.Invoke(worker, new object[] { parms }) as List<Pawn>;
+                    if (pawns != null && pawns.Count > 0)
+                    {
+                        return pawns;
+                    }
+                }
+            }
+
+            PawnKindDef kind = parms.pawnKind ?? PawnKindDefOf.Villager;
+            Faction faction = parms.faction ?? Find.FactionManager.FirstFactionOfDef(FactionDefOf.OutlanderCivil);
+            Pawn pawn = PawnGenerator.GeneratePawn(kind, faction, map.Tile);
+            return pawn == null ? new List<Pawn>() : new List<Pawn> { pawn };
+        }
+
+        private static object CallSpawnPatient(object worker, Map map, Pawn pawn)
+        {
+            MethodInfo method = AccessTools.Method(worker.GetType(), "SpawnPatient", new[] { typeof(Map), typeof(Pawn) });
+            return method == null ? null : method.Invoke(worker, new object[] { map, pawn });
+        }
+
+        private static object CallCreateLordJob(object worker, IncidentParms parms, List<Pawn> pawns)
+        {
+            MethodInfo method = AccessTools.Method(worker.GetType(), "CreateLordJob");
+            return method == null ? null : method.Invoke(worker, new object[] { parms, pawns });
+        }
+
+        private static void RegisterPatientWithHospital(Map map, Pawn pawn)
+        {
+            object hospital = HospitalIncidentGate.FindHospitalComponent(map);
+            MethodInfo method = hospital == null ? null : AccessTools.Method(hospital.GetType(), "PatientArrived");
+            if (method == null)
+            {
+                return;
+            }
+            Type patientDataType = AccessTools.TypeByName("Hospital.PatientData");
+            object patientData = patientDataType == null ? null : Activator.CreateInstance(patientDataType);
+            if (patientData != null)
+            {
+                Reflect.SetMember(patientData, "ArrivedAtTick", Find.TickManager.TicksGame);
+                Reflect.SetMember(patientData, "InitialMarketValue", pawn.MarketValue);
+                Reflect.SetMember(patientData, "InitialMood", pawn.needs == null || pawn.needs.mood == null ? 0f : pawn.needs.mood.CurLevel);
+            }
+            method.Invoke(hospital, new[] { pawn, patientData });
+        }
+
+        private static void SendPatientArrivalNotice(Pawn pawn)
+        {
+            Messages.Message("Space Services: patient arrived", pawn, MessageTypeDefOf.NeutralEvent, false);
+        }
+    }
+
     public static class Reflect
     {
         public static object GetMember(object obj, string name)
@@ -1205,6 +1355,26 @@ namespace SpaceServices
             }
             object value = GetMember(obj, "defName");
             return value == null ? "" : Convert.ToString(value);
+        }
+
+        public static void SetMember(object obj, string name, object value)
+        {
+            if (obj == null || string.IsNullOrEmpty(name))
+            {
+                return;
+            }
+            Type type = obj.GetType();
+            PropertyInfo property = AccessTools.Property(type, name);
+            if (property != null && property.CanWrite)
+            {
+                property.SetValue(obj, value, null);
+                return;
+            }
+            FieldInfo field = AccessTools.Field(type, name);
+            if (field != null)
+            {
+                field.SetValue(obj, value);
+            }
         }
     }
 }
