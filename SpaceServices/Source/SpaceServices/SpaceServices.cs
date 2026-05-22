@@ -706,6 +706,80 @@ namespace SpaceServices
         }
     }
 
+    [HarmonyPatch(typeof(IncidentWorker), "CanFireNow")]
+    public static class ServiceIncidentCanFireNowPatch
+    {
+        public static void Postfix(IncidentWorker __instance, IncidentParms parms, ref bool __result)
+        {
+            if (__result || __instance == null || parms == null)
+            {
+                return;
+            }
+
+            Map map = parms.target as Map ?? Find.CurrentMap;
+            if (map == null || !SpaceServiceMapDetector.IsServiceEligible(map))
+            {
+                return;
+            }
+
+            IncidentDef incident = Reflect.GetMember(__instance, "def") as IncidentDef;
+            if (!ServiceIncidentUtility.ShouldForceAllow(incident == null ? null : incident.defName, map))
+            {
+                return;
+            }
+
+            __result = true;
+            if (SpaceServicesMod.Settings != null && SpaceServicesMod.Settings.debugLogging)
+            {
+                Log.Message("[Space Services] allowed service incident on eligible space map: " + (incident == null ? "unknown" : incident.defName));
+            }
+        }
+    }
+
+    public static class ServiceIncidentUtility
+    {
+        private static readonly HashSet<string> HospitalIncidents = new HashSet<string>
+        {
+            "PatientArrives",
+            "MassCasualtyEvent"
+        };
+
+        private static readonly HashSet<string> HospitalityIncidents = new HashSet<string>
+        {
+            "VisitorGroup",
+            "VisitorGroupMax",
+            "VisitorGroupSelectFaction",
+            "VisitorGroupSpacerCruise",
+            "VisitorGroupSpacerLuxury"
+        };
+
+        public static bool ShouldForceAllow(string incidentDefName, Map map)
+        {
+            if (string.IsNullOrEmpty(incidentDefName))
+            {
+                return false;
+            }
+            if (HospitalIncidents.Contains(incidentDefName))
+            {
+                return (SpaceServicesMod.Settings == null || SpaceServicesMod.Settings.enableHospital) && HasRequiredPad(map, ServiceUse.Patient);
+            }
+            if (HospitalityIncidents.Contains(incidentDefName))
+            {
+                return (SpaceServicesMod.Settings == null || SpaceServicesMod.Settings.enableHospitality) && HasRequiredPad(map, ServiceUse.Guest);
+            }
+            return false;
+        }
+
+        private static bool HasRequiredPad(Map map, ServiceUse use)
+        {
+            if (SpaceServicesMod.Settings == null || !SpaceServicesMod.Settings.requireServicePadForArrivals)
+            {
+                return true;
+            }
+            return ServicePadUtility.TryFindServicePad(map, use) != null;
+        }
+    }
+
     [HarmonyPatch(typeof(DesignationCategoryDef), "ResolveReferences")]
     public static class ArchitectMenuPatch
     {
@@ -774,6 +848,7 @@ namespace SpaceServices
             PatchIfExists(harmony, AccessTools.Method(utils, "IsMapInSpace"), postfix: nameof(OptionalPatchHandlers.SpaceportsIsMapInSpacePostfix));
             PatchIfExists(harmony, AccessTools.Method(utils, "SuitUpPawns"), prefix: nameof(OptionalPatchHandlers.SpaceportsSuitUpPawnsPrefix));
             PatchIfExists(harmony, AccessTools.Method(utils, "HospitalityShuttleCheck"), postfix: nameof(OptionalPatchHandlers.SpaceportsHospitalityShuttleCheckPostfix));
+            PatchIfExists(harmony, AccessTools.Method(utils, "CheckIfClearForLanding"), postfix: nameof(OptionalPatchHandlers.SpaceportsCheckIfClearForLandingPostfix));
             Log.Message("[Space Services] Spaceports bridge patches installed.");
         }
 
@@ -865,6 +940,27 @@ namespace SpaceServices
             __result = true;
         }
 
+        public static void SpaceportsCheckIfClearForLandingPostfix(Map map, int typeVal, ref bool __result)
+        {
+            if (__result || SpaceServicesMod.Settings == null || !SpaceServicesMod.Settings.enableSpaceportsBridge || !SpaceServiceMapDetector.IsServiceEligible(map))
+            {
+                return;
+            }
+            if (typeVal != 1 && typeVal != 3)
+            {
+                return;
+            }
+            if (!SpaceServicesMod.Settings.enableHospitality || ServicePadUtility.TryFindServicePad(map, ServiceUse.Guest) == null)
+            {
+                return;
+            }
+            if (HasBlockingLandingCondition(map))
+            {
+                return;
+            }
+            __result = true;
+        }
+
         public static void HospitalLandingSpotPostfix(object[] __args, ref IntVec3 __result)
         {
             Map map = FindMap(__args);
@@ -898,6 +994,24 @@ namespace SpaceServices
                     ServiceLifecycleUtility.RegisterPawns(map, "hospitality", pawns);
                 }
             }
+        }
+
+        private static bool HasBlockingLandingCondition(Map map)
+        {
+            if (map == null)
+            {
+                return true;
+            }
+            GameConditionDef kessler = DefDatabase<GameConditionDef>.GetNamedSilentFail("Spaceports_KesslerSyndrome");
+            if (kessler != null && map.gameConditionManager.ConditionIsActive(kessler))
+            {
+                return true;
+            }
+            if (GenHostility.AnyHostileActiveThreatToPlayer(map, true))
+            {
+                return true;
+            }
+            return false;
         }
 
         private static IEnumerable<Pawn> PawnsFromArgs(object[] args)
