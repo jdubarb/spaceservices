@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LanguageData>
+  <MLT_SpaceServices_Settings_DebugLogging>Debug logging</MLT_SpaceServices_Settings_DebugLogging>
+  <MLT_SpaceServices_Settings_AutoExtract>Auto-extract fallback</MLT_SpaceServices_Settings_AutoExtract>
+  <MLT_SpaceServices_Settings_Hospital>Hospital support</MLT_SpaceServices_Settings_Hospital>
+  <MLT_SpaceServices_Settings_Hospitality>Hospitality support</MLT_SpaceServices_Settings_Hospitality>
+  <MLT_SpaceServices_Settings_Spaceports>Spaceports bridge</MLT_SpaceServices_Settings_Spaceports>
+  <MLT_SpaceServices_Settings_RequirePad>Require service pad for arrivals</MLT_SpaceServices_Settings_RequirePad>
+  <MLT_SpaceServices_Settings_SealedNoSuit>Allow sealed non-vacsuit arrivals</MLT_SpaceServices_Settings_SealedNoSuit>
+
+  <MLT_SpaceServices_Gizmo_AllowGuests>Allow guests</MLT_SpaceServices_Gizmo_AllowGuests>
+  <MLT_SpaceServices_Gizmo_AllowPatients>Allow patients</MLT_SpaceServices_Gizmo_AllowPatients>
+  <MLT_SpaceServices_Gizmo_AllowEmergency>Allow emergency arrivals</MLT_SpaceServices_Gizmo_AllowEmergency>
+  <MLT_SpaceServices_Gizmo_RequireVacRoof>Require vac-safe roof</MLT_SpaceServices_Gizmo_RequireVacRoof>
+  <MLT_SpaceServices_Gizmo_PreferShuttle>Prefer shuttle</MLT_SpaceServices_Gizmo_PreferShuttle>
+  <MLT_SpaceServices_Gizmo_RequirePower>Require power</MLT_SpaceServices_Gizmo_RequirePower>
+  <MLT_SpaceServices_Gizmo_ReportMap>Report service map status</MLT_SpaceServices_Gizmo_ReportMap>
+  <MLT_SpaceServices_Gizmo_ReportMapDesc>Write the current map's Space Services eligibility reasons to the log.</MLT_SpaceServices_Gizmo_ReportMapDesc>
+</LanguageData>

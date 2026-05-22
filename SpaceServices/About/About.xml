@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ModMetaData>
+  <name>Space Services</name>
+  <author>mlt</author>
+  <packageId>mlt.spaceservices.onesix</packageId>
+  <supportedVersions>
+    <li>1.6</li>
+  </supportedVersions>
+  <modDependencies>
+    <li>
+      <packageId>brrainz.harmony</packageId>
+      <displayName>Harmony</displayName>
+      <steamWorkshopUrl>steam://url/CommunityFilePage/2009463077</steamWorkshopUrl>
+    </li>
+    <li>
+      <packageId>Ludeon.RimWorld.Odyssey</packageId>
+      <displayName>Odyssey</displayName>
+    </li>
+  </modDependencies>
+  <loadAfter>
+    <li>brrainz.harmony</li>
+    <li>Ludeon.RimWorld.Odyssey</li>
+    <li>Adamas.Hospital</li>
+    <li>Orion.Hospitality</li>
+    <li>zal.spaceports</li>
+    <li>Nebulae.SimplyMoreRoofs</li>
+  </loadAfter>
+  <description>
+Adds infrastructure for running Hospital and Hospitality-style services on stationary Odyssey asteroid, orbit, moon, and station maps. Actual gravships are intentionally blocked.
+  </description>
+</ModMetaData>
