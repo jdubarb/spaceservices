@@ -761,7 +761,7 @@ namespace SpaceServices
                     records.RemoveAt(i);
                     continue;
                 }
-                record.pawns = record.pawns == null ? new List<Pawn>() : record.pawns.Where(p => p != null && !p.Destroyed).Distinct().ToList();
+                record.pawns = ActiveTrackedPawns(map, record);
                 if (record.pawns.Count == 0)
                 {
                     ReleaseRecord(record);
@@ -794,6 +794,24 @@ namespace SpaceServices
                     BeginDeparture(map, record, "service visit timeout");
                 }
             }
+        }
+
+        private static List<Pawn> ActiveTrackedPawns(Map map, ServiceGroupRecord record)
+        {
+            List<Pawn> pawns = record == null || record.pawns == null ? new List<Pawn>() : record.pawns.Where(p => p != null && !p.Destroyed).Distinct().ToList();
+            if (record == null || record.serviceKind != "hospital" || pawns.Count == 0)
+            {
+                return pawns;
+            }
+
+            object hospital = HospitalIncidentGate.FindHospitalComponent(map);
+            IDictionary hospitalPatients = hospital == null ? null : Reflect.GetMember(hospital, "Patients") as IDictionary;
+            if (hospitalPatients == null)
+            {
+                return pawns;
+            }
+
+            return pawns.Where(pawn => pawn.Spawned || hospitalPatients.Contains(pawn)).ToList();
         }
 
         private static void BeginDeparture(Map map, ServiceGroupRecord record, string reason)
