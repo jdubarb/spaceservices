@@ -1249,21 +1249,6 @@ namespace SpaceServices
 
         private static List<Pawn> ResolvePatientPawns(object worker, IncidentParms parms, Map map)
         {
-            MethodInfo tryResolve = AccessTools.Method(typeof(IncidentWorker_NeutralGroup), "TryResolveParms");
-            MethodInfo spawnPawns = AccessTools.Method(typeof(IncidentWorker_NeutralGroup), "SpawnPawns");
-            if (tryResolve != null && spawnPawns != null)
-            {
-                object resolved = tryResolve.Invoke(worker, new object[] { parms });
-                if (resolved is bool && (bool)resolved)
-                {
-                    List<Pawn> pawns = spawnPawns.Invoke(worker, new object[] { parms }) as List<Pawn>;
-                    if (pawns != null && pawns.Count > 0)
-                    {
-                        return pawns;
-                    }
-                }
-            }
-
             PawnKindDef kind = parms.pawnKind ?? PawnKindDefOf.Villager;
             Faction faction = parms.faction ?? Find.FactionManager.FirstFactionOfDef(FactionDefOf.OutlanderCivil);
             Pawn pawn = PawnGenerator.GeneratePawn(kind, faction, map.Tile);
