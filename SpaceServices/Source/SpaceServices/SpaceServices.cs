@@ -337,6 +337,11 @@ namespace SpaceServices
         {
             return AllServicePads(map, use).FirstOrDefault();
         }
+
+        public static int CountServicePads(Map map, ServiceUse use)
+        {
+            return AllServicePads(map, use).Count();
+        }
     }
 
     public sealed class SpaceServiceEligibility
@@ -679,10 +684,67 @@ namespace SpaceServices
             {
                 return false;
             }
-            ReleaseRecord(record);
-            record.state = "completed";
+            BeginDeparture(map, record, reason);
             Log.Message("[Space Services] Released service group " + groupId + ": " + reason);
             return true;
+        }
+
+        public static bool RequestDepartureForPawn(Pawn pawn, string reason)
+        {
+            Map map;
+            ServiceGroupRecord record;
+            if (!TryFindRecordForPawn(pawn, out map, out record))
+            {
+                return false;
+            }
+            BeginDeparture(map, record, reason);
+            return true;
+        }
+
+        public static bool ReleasePawn(Pawn pawn, string reason)
+        {
+            Map map;
+            ServiceGroupRecord record;
+            if (!TryFindRecordForPawn(pawn, out map, out record))
+            {
+                return false;
+            }
+            ReleaseRecord(record);
+            record.state = "completed";
+            Log.Message("[Space Services] Released service group " + record.id + ": " + reason);
+            return true;
+        }
+
+        private static bool TryFindRecordForPawn(Pawn pawn, out Map map, out ServiceGroupRecord record)
+        {
+            map = null;
+            record = null;
+            if (pawn == null)
+            {
+                return false;
+            }
+            IEnumerable<Map> maps = Find.Maps ?? Enumerable.Empty<Map>();
+            Map heldMap = pawn.MapHeld;
+            if (heldMap != null)
+            {
+                maps = new[] { heldMap }.Concat(maps.Where(candidate => candidate != heldMap));
+            }
+            foreach (Map candidate in maps)
+            {
+                SpaceServicesMapComponent comp = candidate == null ? null : candidate.GetComponent<SpaceServicesMapComponent>();
+                ServiceGroupRecord found = comp == null || comp.serviceGroups == null ? null : comp.serviceGroups.FirstOrDefault(group =>
+                    group != null &&
+                    group.state != "completed" &&
+                    group.pawns != null &&
+                    group.pawns.Contains(pawn));
+                if (found != null)
+                {
+                    map = candidate;
+                    record = found;
+                    return true;
+                }
+            }
+            return false;
         }
 
         public static void Tick(Map map, List<ServiceGroupRecord> records)
@@ -708,21 +770,102 @@ namespace SpaceServices
                 }
                 if (record.state == "departing")
                 {
+                    if (ReadyForExtraction(record))
+                    {
+                        DepartureUtility.CompleteDeparture(map, record, "service pawns reached departure pad");
+                    }
+                    else
+                    {
+                        GuideDepartingPawnsToPad(record);
+                    }
                     if (Find.TickManager.TicksGame > record.departureRequestedTick + GenDate.TicksPerHour)
                     {
                         DepartureUtility.CompleteDeparture(map, record, "departure timeout fallback");
                     }
                     continue;
                 }
-                if (record.pawns.Any(IsTryingToLeave))
+                if (record.serviceKind != "hospital" && record.pawns.Any(IsTryingToLeave))
                 {
-                    DepartureUtility.CompleteDeparture(map, record, "service lord entered departure state");
+                    BeginDeparture(map, record, "service lord entered departure state");
                     continue;
                 }
                 if (Find.TickManager.TicksGame > record.timeoutTick)
                 {
-                    DepartureUtility.CompleteDeparture(map, record, "service visit timeout");
+                    BeginDeparture(map, record, "service visit timeout");
                 }
+            }
+        }
+
+        private static void BeginDeparture(Map map, ServiceGroupRecord record, string reason)
+        {
+            if (record == null || record.state == "completed")
+            {
+                return;
+            }
+            if (record.reservedPad == null || ReadyForExtraction(record))
+            {
+                DepartureUtility.CompleteDeparture(map, record, reason);
+                return;
+            }
+            if (record.state != "departing")
+            {
+                record.state = "departing";
+                record.departureRequestedTick = Find.TickManager.TicksGame;
+                Log.Message("[Space Services] Routing " + record.serviceKind + " service group " + record.id + " to departure pad: " + reason);
+            }
+            GuideDepartingPawnsToPad(record);
+        }
+
+        private static bool ReadyForExtraction(ServiceGroupRecord record)
+        {
+            if (record == null || record.pawns == null || record.pawns.Count == 0)
+            {
+                return false;
+            }
+            IntVec3 cell = record.reservedPad == null ? IntVec3.Invalid : record.reservedPad.Position;
+            if (!cell.IsValid)
+            {
+                return true;
+            }
+            foreach (Pawn pawn in record.pawns)
+            {
+                if (pawn == null || pawn.Destroyed)
+                {
+                    continue;
+                }
+                if (pawn.Spawned && !pawn.Position.InHorDistOf(cell, 3f))
+                {
+                    return false;
+                }
+            }
+            return true;
+        }
+
+        private static void GuideDepartingPawnsToPad(ServiceGroupRecord record)
+        {
+            if (record == null || record.pawns == null || record.reservedPad == null)
+            {
+                return;
+            }
+            IntVec3 cell = record.reservedPad.Position;
+            Map map = record.reservedPad.Map;
+            if (map == null)
+            {
+                return;
+            }
+            foreach (Pawn pawn in record.pawns)
+            {
+                if (pawn == null || !pawn.Spawned || pawn.Downed || pawn.Position.InHorDistOf(cell, 3f))
+                {
+                    continue;
+                }
+                if (!pawn.CanReach(cell, PathEndMode.OnCell, Danger.Deadly))
+                {
+                    continue;
+                }
+                Job job = JobMaker.MakeJob(JobDefOf.Goto, cell);
+                job.locomotionUrgency = LocomotionUrgency.Jog;
+                pawn.jobs.TryTakeOrderedJob(job, JobTag.Misc);
             }
         }
 
@@ -986,6 +1129,10 @@ namespace SpaceServices
             {
                 return false;
             }
+            if (SpaceServiceMapDetector.IsServiceEligible(map) && ServicePadUtility.CountServicePads(map, ServiceUse.Patient) <= 0)
+            {
+                return false;
+            }
             return true;
         }
 
@@ -1000,6 +1147,7 @@ namespace SpaceServices
                 ", freeBeds=" + CallInt(hospital, "FreeMedicalBeds", -1) +
                 ", bedCount=" + CallInt(hospital, "BedCount", -1) +
                 ", full=" + CallBool(hospital, "IsFull", false) +
+                ", freePatientPads=" + ServicePadUtility.CountServicePads(map, ServiceUse.Patient) +
                 ", massCasualties=" + Reflect.BoolMember(hospital, "MassCasualties", true) +
                 ", acceptDanger=" + Reflect.BoolMember(hospital, "AcceptDanger", false) +
                 ", danger=" + HospitalDangersOnMap(map);
@@ -1170,16 +1318,25 @@ namespace SpaceServices
             Type patientArrival = AccessTools.TypeByName("Hospital.IncidentWorker_PatientArrives");
             if (patientArrival != null)
             {
-                PatchIfExists(harmony, AccessTools.Method(patientArrival, "TryExecuteWorker"), postfix: nameof(OptionalPatchHandlers.HospitalPatientArrivesTryExecutePostfix));
+                PatchIfExists(harmony, AccessTools.Method(patientArrival, "TryExecuteWorker"), prefix: nameof(OptionalPatchHandlers.HospitalPatientArrivesTryExecutePrefix), postfix: nameof(OptionalPatchHandlers.HospitalPatientArrivesTryExecutePostfix));
                 PatchIfExists(harmony, AccessTools.Method(patientArrival, "SpawnPatient"), prefix: nameof(OptionalPatchHandlers.HospitalSpawnPatientPrefix), postfix: nameof(OptionalPatchHandlers.HospitalSpawnPatientPostfix));
             }
             Type massCasualty = AccessTools.TypeByName("Hospital.IncidentWorker_MassCasualtyEvent");
             if (massCasualty != null)
             {
+                PatchIfExists(harmony, AccessTools.Method(massCasualty, "TryExecuteWorker"), prefix: nameof(OptionalPatchHandlers.HospitalPatientArrivesTryExecutePrefix));
                 foreach (MethodInfo method in massCasualty.GetMethods(AccessTools.all).Where(m => m.Name == "SpawnPatient"))
                 {
                     PatchIfExists(harmony, method, prefix: nameof(OptionalPatchHandlers.HospitalSpawnPatientPrefix), postfix: nameof(OptionalPatchHandlers.HospitalSpawnPatientPostfix));
                 }
+            }
+            Type hospitalComponent = AccessTools.TypeByName("Hospital.HospitalMapComponent");
+            if (hospitalComponent != null)
+            {
+                PatchIfExists(harmony, AccessTools.Method(hospitalComponent, "PatientLeaves"), postfix: nameof(OptionalPatchHandlers.HospitalPatientDeparturePostfix));
+                PatchIfExists(harmony, AccessTools.Method(hospitalComponent, "DismissPatient"), postfix: nameof(OptionalPatchHandlers.HospitalPatientDeparturePostfix));
+                PatchIfExists(harmony, AccessTools.Method(hospitalComponent, "PatientLeftTheMap"), postfix: nameof(OptionalPatchHandlers.HospitalPatientGonePostfix));
+                PatchIfExists(harmony, AccessTools.Method(hospitalComponent, "PatientDied"), postfix: nameof(OptionalPatchHandlers.HospitalPatientGonePostfix));
             }
             PatchIfExists(harmony, AccessTools.Method(typeof(DropPodUtility), "MakeDropPodAt", new[] { typeof(IntVec3), typeof(Map), typeof(ActiveTransporterInfo), typeof(Faction) }), prefix: nameof(OptionalPatchHandlers.HospitalDropPodAtPrefix));
             if (incidentHelper != null || patientArrival != null || massCasualty != null)
@@ -1290,19 +1447,32 @@ namespace SpaceServices
 
         public static void HospitalCanSpawnPatientPostfix(Map map, ref bool __result)
         {
-            if (__result || map == null || !SpaceServiceMapDetector.IsServiceEligible(map))
+            if (map == null || !SpaceServiceMapDetector.IsServiceEligible(map))
             {
                 return;
             }
-            if (ServiceIncidentUtility.ShouldForceAllow("PatientArrives", map))
+            __result = ServiceIncidentUtility.ShouldForceAllow("PatientArrives", map);
+        }
+
+        public static bool HospitalPatientArrivesTryExecutePrefix(IncidentParms parms, ref bool __result)
+        {
+            Map map = parms == null ? null : parms.target as Map;
+            if (map == null || !SpaceServiceMapDetector.IsServiceEligible(map))
             {
-                __result = true;
+                return true;
             }
+            if (HospitalIncidentGate.CanAcceptHospitalIncident("PatientArrives", map))
+            {
+                return true;
+            }
+            Log.Message("[Space Services] Hospital patient incident blocked: " + HospitalIncidentGate.ReadinessReport("PatientArrives", map));
+            __result = false;
+            return false;
         }
 
         public static void HospitalTryFindEntryCellPostfix(Map map, ref IntVec3 cell, ref bool __result)
         {
-            if (__result || map == null || !SpaceServiceMapDetector.IsServiceEligible(map))
+            if (map == null || !SpaceServiceMapDetector.IsServiceEligible(map))
             {
                 return;
             }
@@ -1379,6 +1549,16 @@ namespace SpaceServices
                 }
                 VacSuitUtility.SuitPawnsForVacuum(pawns);
             }
+        }
+
+        public static void HospitalPatientDeparturePostfix(Pawn pawn)
+        {
+            ServiceLifecycleUtility.RequestDepartureForPawn(pawn, "Hospital requested patient departure");
+        }
+
+        public static void HospitalPatientGonePostfix(Pawn pawn)
+        {
+            ServiceLifecycleUtility.ReleasePawn(pawn, "Hospital removed patient from map");
         }
 
         public static void SuitPawnsInArgsPostfix(MethodBase __originalMethod, object[] __args)
