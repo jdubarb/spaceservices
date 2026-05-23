@@ -228,6 +228,11 @@ namespace SpaceServices
             }
         }
 
+        public void ForceRelease()
+        {
+            reservedForGroup = null;
+        }
+
         public override IEnumerable<Gizmo> CompGetGizmosExtra()
         {
             foreach (Gizmo gizmo in base.CompGetGizmosExtra())
@@ -251,6 +256,29 @@ namespace SpaceServices
                     Messages.Message(eligibility.allowed ? "Space Services: map eligible" : "Space Services: map blocked", parent, MessageTypeDefOf.NeutralEvent, false);
                 }
             };
+            if (Prefs.DevMode)
+            {
+                yield return new Command_Action
+                {
+                    defaultLabel = "DEV: Clear service reservation",
+                    action = delegate
+                    {
+                        string oldReservation = reservedForGroup;
+                        ForceRelease();
+                        ServiceLifecycleUtility.ReleaseGroup(parent.MapHeld, oldReservation, "dev cleared pad reservation");
+                        Messages.Message("Space Services: pad reservation cleared", parent, MessageTypeDefOf.NeutralEvent, false);
+                    }
+                };
+                yield return new Command_Action
+                {
+                    defaultLabel = "DEV: Spawn patient here",
+                    action = delegate
+                    {
+                        bool spawned = HospitalPatientFallback.TryExecutePatientArrival(null, ServiceDebugUtility.PatientArrivalParms(parent.MapHeld), parent.MapHeld, parent.Position);
+                        Messages.Message(spawned ? "Space Services: dev patient spawned" : "Space Services: dev patient spawn failed", parent, MessageTypeDefOf.NeutralEvent, false);
+                    }
+                };
+            }
         }
 
         private static Command_Toggle Toggle(string labelKey, Func<bool> getter, Action<bool> setter)
@@ -629,6 +657,28 @@ namespace SpaceServices
 
             comp.serviceGroups.Add(record);
             Log.Message("[Space Services] Registered " + kind + " service group " + record.id + " pawns=" + list.Count + " padReserved=" + (record.reservedPad != null));
+        }
+
+        public static bool ReleaseGroup(Map map, string groupId, string reason)
+        {
+            if (map == null || string.IsNullOrEmpty(groupId))
+            {
+                return false;
+            }
+            SpaceServicesMapComponent comp = map.GetComponent<SpaceServicesMapComponent>();
+            if (comp == null || comp.serviceGroups == null)
+            {
+                return false;
+            }
+            ServiceGroupRecord record = comp.serviceGroups.FirstOrDefault(group => group != null && group.id == groupId);
+            if (record == null)
+            {
+                return false;
+            }
+            ReleaseRecord(record);
+            record.state = "completed";
+            Log.Message("[Space Services] Released service group " + groupId + ": " + reason);
+            return true;
         }
 
         public static void Tick(Map map, List<ServiceGroupRecord> records)
@@ -1224,7 +1274,7 @@ namespace SpaceServices
             }
             try
             {
-                __result = HospitalPatientFallback.TryExecutePatientArrival(__instance, parms, map);
+                __result = HospitalPatientFallback.TryExecutePatientArrival(__instance, parms, map, IntVec3.Invalid);
             }
             catch (Exception ex)
             {
@@ -1301,7 +1351,7 @@ namespace SpaceServices
 
     public static class HospitalPatientFallback
     {
-        public static bool TryExecutePatientArrival(object worker, IncidentParms parms, Map map)
+        public static bool TryExecutePatientArrival(object worker, IncidentParms parms, Map map, IntVec3 forcedCell)
         {
             List<Pawn> pawns = ResolvePatientPawns(worker, parms, map);
             if (pawns.Count == 0)
@@ -1310,8 +1360,8 @@ namespace SpaceServices
                 return false;
             }
 
-            IntVec3 cell;
-            if (!ServicePadUtility.TryFindServicePadCell(map, ServiceUse.Patient, out cell))
+            IntVec3 cell = forcedCell.IsValid ? forcedCell : IntVec3.Invalid;
+            if (!cell.IsValid && !ServicePadUtility.TryFindServicePadCell(map, ServiceUse.Patient, out cell))
             {
                 cell = CellFinder.RandomClosewalkCellNear(map.Center, map, 12);
             }
@@ -1393,6 +1443,18 @@ namespace SpaceServices
         private static void SendPatientArrivalNotice(Pawn pawn)
         {
             Messages.Message("Space Services: patient arrived", pawn, MessageTypeDefOf.NeutralEvent, false);
+        }
+    }
+
+    public static class ServiceDebugUtility
+    {
+        public static IncidentParms PatientArrivalParms(Map map)
+        {
+            IncidentParms parms = StorytellerUtility.DefaultParmsNow(IncidentCategoryDefOf.Misc, map);
+            parms.target = map;
+            parms.pawnKind = PawnKindDefOf.Villager;
+            parms.faction = Find.FactionManager.FirstFactionOfDef(FactionDefOf.OutlanderCivil);
+            return parms;
         }
     }
 
