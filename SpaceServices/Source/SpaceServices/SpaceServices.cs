@@ -1,6 +1,7 @@
 using HarmonyLib;
 using RimWorld;
 using System;
+using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
@@ -85,6 +86,7 @@ namespace SpaceServices
         public List<ServiceGroupRecord> serviceGroups = new List<ServiceGroupRecord>();
         private int nextDebugTick;
         private int nextLifecycleTick;
+        private bool staleReferenceCleanupDone;
 
         public SpaceServicesMapComponent(Map map) : base(map)
         {
@@ -97,6 +99,7 @@ namespace SpaceServices
             {
                 serviceGroups = new List<ServiceGroupRecord>();
             }
+            Scribe_Values.Look(ref staleReferenceCleanupDone, "staleReferenceCleanupDone", false);
         }
 
         public override void MapComponentTick()
@@ -105,6 +108,11 @@ namespace SpaceServices
             if (Find.TickManager.TicksGame >= nextLifecycleTick)
             {
                 nextLifecycleTick = Find.TickManager.TicksGame + 250;
+                if (!staleReferenceCleanupDone)
+                {
+                    staleReferenceCleanupDone = true;
+                    StaleReferenceCleanupUtility.CleanupAfterLoad(map);
+                }
                 ServiceLifecycleUtility.Tick(map, serviceGroups);
             }
             if (Find.TickManager.TicksGame < nextDebugTick)
@@ -703,6 +711,93 @@ namespace SpaceServices
             {
                 pad.Release(record.id);
             }
+        }
+    }
+
+    public static class StaleReferenceCleanupUtility
+    {
+        public static void CleanupAfterLoad(Map map)
+        {
+            if (map == null)
+            {
+                return;
+            }
+
+            int removedHospitalPatients = CleanupHospitalPatients(map);
+            int removedLordPawns = CleanupLordPawnLists(map);
+            int removedServicePawns = CleanupServiceGroups(map);
+
+            if (removedHospitalPatients > 0 || removedLordPawns > 0 || removedServicePawns > 0)
+            {
+                Log.Message("[Space Services] cleaned stale service references: hospitalPatients=" + removedHospitalPatients + ", lordPawns=" + removedLordPawns + ", servicePawns=" + removedServicePawns);
+            }
+        }
+
+        private static int CleanupHospitalPatients(Map map)
+        {
+            object hospital = HospitalIncidentGate.FindHospitalComponent(map);
+            IDictionary patients = hospital == null ? null : Reflect.GetMember(hospital, "Patients") as IDictionary;
+            if (patients == null)
+            {
+                return 0;
+            }
+
+            List<object> removeKeys = new List<object>();
+            foreach (object key in patients.Keys)
+            {
+                Pawn pawn = key as Pawn;
+                if (pawn == null || pawn.Destroyed)
+                {
+                    removeKeys.Add(key);
+                }
+            }
+
+            foreach (object key in removeKeys)
+            {
+                patients.Remove(key);
+            }
+            return removeKeys.Count;
+        }
+
+        private static int CleanupLordPawnLists(Map map)
+        {
+            if (map.lordManager == null || map.lordManager.lords == null)
+            {
+                return 0;
+            }
+
+            int removed = 0;
+            foreach (Lord lord in map.lordManager.lords)
+            {
+                if (lord == null || lord.ownedPawns == null)
+                {
+                    continue;
+                }
+                removed += lord.ownedPawns.RemoveAll(pawn => pawn == null);
+            }
+            return removed;
+        }
+
+        private static int CleanupServiceGroups(Map map)
+        {
+            SpaceServicesMapComponent comp = map.GetComponent<SpaceServicesMapComponent>();
+            if (comp == null || comp.serviceGroups == null)
+            {
+                return 0;
+            }
+
+            int removed = 0;
+            foreach (ServiceGroupRecord record in comp.serviceGroups)
+            {
+                if (record == null || record.pawns == null)
+                {
+                    continue;
+                }
+                int before = record.pawns.Count;
+                record.pawns = record.pawns.Where(pawn => pawn != null && !pawn.Destroyed).Distinct().ToList();
+                removed += before - record.pawns.Count;
+            }
+            return removed;
         }
     }
 
