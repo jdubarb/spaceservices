@@ -1224,21 +1224,11 @@ namespace SpaceServices
             foreach (Pawn pawn in pawns)
             {
                 VacSuitUtility.SuitPawnForVacuum(pawn);
-                object patientData = CallSpawnPatient(worker, map, pawn);
-                if (!pawn.Spawned && pawn.ParentHolder == null)
+                if (!pawn.Spawned)
                 {
                     GenSpawn.Spawn(pawn, cell, map);
                 }
-                if (patientData == null)
-                {
-                    RegisterPatientWithHospital(map, pawn);
-                }
-            }
-
-            object lordJob = CallCreateLordJob(worker, parms, pawns);
-            if (lordJob is LordJob)
-            {
-                LordMaker.MakeNewLord(parms.faction, (LordJob)lordJob, map, pawns);
+                RegisterPatientWithHospital(map, pawn);
             }
 
             ServiceLifecycleUtility.RegisterPawns(map, "hospital", pawns);
@@ -1255,18 +1245,6 @@ namespace SpaceServices
             return pawn == null ? new List<Pawn>() : new List<Pawn> { pawn };
         }
 
-        private static object CallSpawnPatient(object worker, Map map, Pawn pawn)
-        {
-            MethodInfo method = AccessTools.Method(worker.GetType(), "SpawnPatient", new[] { typeof(Map), typeof(Pawn) });
-            return method == null ? null : method.Invoke(worker, new object[] { map, pawn });
-        }
-
-        private static object CallCreateLordJob(object worker, IncidentParms parms, List<Pawn> pawns)
-        {
-            MethodInfo method = AccessTools.Method(worker.GetType(), "CreateLordJob");
-            return method == null ? null : method.Invoke(worker, new object[] { parms, pawns });
-        }
-
         private static void RegisterPatientWithHospital(Map map, Pawn pawn)
         {
             object hospital = HospitalIncidentGate.FindHospitalComponent(map);
@@ -1275,15 +1253,46 @@ namespace SpaceServices
             {
                 return;
             }
+            object patientData = CreatePatientData(pawn);
+            TryDamagePatient(pawn, patientData, hospital);
+            method.Invoke(hospital, new[] { pawn, patientData });
+        }
+
+        private static object CreatePatientData(Pawn pawn)
+        {
             Type patientDataType = AccessTools.TypeByName("Hospital.PatientData");
             object patientData = patientDataType == null ? null : Activator.CreateInstance(patientDataType);
-            if (patientData != null)
+            if (patientData == null)
             {
-                Reflect.SetMember(patientData, "ArrivedAtTick", Find.TickManager.TicksGame);
-                Reflect.SetMember(patientData, "InitialMarketValue", pawn.MarketValue);
-                Reflect.SetMember(patientData, "InitialMood", pawn.needs == null || pawn.needs.mood == null ? 0f : pawn.needs.mood.CurLevel);
+                return null;
             }
-            method.Invoke(hospital, new[] { pawn, patientData });
+            Reflect.SetMember(patientData, "ArrivedAtTick", Find.TickManager.TicksGame);
+            Reflect.SetMember(patientData, "InitialMarketValue", pawn.MarketValue);
+            Reflect.SetMember(patientData, "InitialMood", pawn.needs == null || pawn.needs.mood == null ? 0f : pawn.needs.mood.CurLevel);
+            Reflect.SetMember(patientData, "Diagnosis", "wounds");
+            Reflect.SetMember(patientData, "Cure", "tend to wounds");
+            return patientData;
+        }
+
+        private static void TryDamagePatient(Pawn pawn, object patientData, object hospital)
+        {
+            Type patientUtility = AccessTools.TypeByName("Hospital.Utilities.PatientUtility");
+            MethodInfo method = patientUtility == null ? null : patientUtility.GetMethods(AccessTools.all).FirstOrDefault(candidate =>
+                candidate.Name == "DamagePawn" &&
+                candidate.GetParameters().Length == 3 &&
+                candidate.GetParameters()[0].ParameterType == typeof(Pawn));
+            if (method == null || patientData == null || hospital == null)
+            {
+                return;
+            }
+            try
+            {
+                method.Invoke(null, new[] { pawn, patientData, hospital });
+            }
+            catch (Exception ex)
+            {
+                Log.Warning("[Space Services] Hospital fallback could not apply patient injury data: " + ex.Message);
+            }
         }
 
         private static void SendPatientArrivalNotice(Pawn pawn)
