@@ -84,7 +84,7 @@ namespace SpaceServices
     public sealed class SpaceServicesMapComponent : MapComponent
     {
         public List<ServiceGroupRecord> serviceGroups = new List<ServiceGroupRecord>();
-        private const int StaleReferenceCleanupVersion = 2;
+        private const int StaleReferenceCleanupVersion = 3;
         private int nextDebugTick;
         private int nextLifecycleTick;
         private bool staleReferenceCleanupDone;
@@ -336,6 +336,23 @@ namespace SpaceServices
         public static Thing TryFindServicePad(Map map, ServiceUse use)
         {
             return AllServicePads(map, use).FirstOrDefault();
+        }
+
+        public static Thing TryReserveServicePad(Map map, ServiceUse use, string groupId)
+        {
+            if (string.IsNullOrEmpty(groupId))
+            {
+                return null;
+            }
+            foreach (Thing pad in AllServicePads(map, use))
+            {
+                CompSpaceServicePad comp = pad.TryGetComp<CompSpaceServicePad>();
+                if (comp != null && comp.TryReserve(groupId))
+                {
+                    return pad;
+                }
+            }
+            return null;
         }
 
         public static int CountServicePads(Map map, ServiceUse use)
@@ -643,7 +660,6 @@ namespace SpaceServices
                 return;
             }
 
-            ServiceUse use = kind == "hospital" ? ServiceUse.Patient : ServiceUse.Guest;
             ServiceGroupRecord record = new ServiceGroupRecord
             {
                 id = "SS-" + Find.UniqueIDsManager.GetNextThingID(),
@@ -654,11 +670,11 @@ namespace SpaceServices
                 pawns = list
             };
 
-            Thing pad = ServicePadUtility.TryFindServicePad(map, use);
-            if (pad != null)
+            if (kind != "hospital")
             {
-                CompSpaceServicePad padComp = pad.TryGetComp<CompSpaceServicePad>();
-                if (padComp != null && padComp.TryReserve(record.id))
+                ServiceUse use = kind == "hospitality" ? ServiceUse.Guest : ServiceUse.Patient;
+                Thing pad = ServicePadUtility.TryReserveServicePad(map, use, record.id);
+                if (pad != null)
                 {
                     record.reservedPad = pad;
                 }
@@ -770,6 +786,10 @@ namespace SpaceServices
                 }
                 if (record.state == "departing")
                 {
+                    if (record.serviceKind == "hospital" && record.reservedPad == null)
+                    {
+                        BeginHospitalDeparture(map, record, "waiting for free departure pad");
+                    }
                     if (ReadyForExtraction(record))
                     {
                         DepartureUtility.CompleteDeparture(map, record, "service pawns reached departure pad");
@@ -820,6 +840,11 @@ namespace SpaceServices
             {
                 return;
             }
+            if (record.serviceKind == "hospital")
+            {
+                BeginHospitalDeparture(map, record, reason);
+                return;
+            }
             if (record.reservedPad == null || ReadyForExtraction(record))
             {
                 DepartureUtility.CompleteDeparture(map, record, reason);
@@ -834,6 +859,36 @@ namespace SpaceServices
             GuideDepartingPawnsToPad(record);
         }
 
+        private static void BeginHospitalDeparture(Map map, ServiceGroupRecord record, string reason)
+        {
+            if (record.reservedPad == null)
+            {
+                record.reservedPad = ServicePadUtility.TryReserveServicePad(map, ServiceUse.Patient, record.id);
+            }
+            if (record.reservedPad == null)
+            {
+                if (record.state != "departing")
+                {
+                    record.state = "departing";
+                    record.departureRequestedTick = Find.TickManager.TicksGame;
+                    Log.Message("[Space Services] Hospital patient waiting for free departure pad: " + reason);
+                }
+                return;
+            }
+            if (ReadyForExtraction(record))
+            {
+                DepartureUtility.CompleteDeparture(map, record, reason);
+                return;
+            }
+            if (record.state != "departing")
+            {
+                record.state = "departing";
+                record.departureRequestedTick = Find.TickManager.TicksGame;
+                Log.Message("[Space Services] Routing hospital patient to departure pad: " + reason);
+            }
+            GuideDepartingPawnsToPad(record);
+        }
+
         private static bool ReadyForExtraction(ServiceGroupRecord record)
         {
             if (record == null || record.pawns == null || record.pawns.Count == 0)
@@ -843,7 +898,7 @@ namespace SpaceServices
             IntVec3 cell = record.reservedPad == null ? IntVec3.Invalid : record.reservedPad.Position;
             if (!cell.IsValid)
             {
-                return true;
+                return record.serviceKind != "hospital";
             }
             foreach (Pawn pawn in record.pawns)
             {
@@ -1020,6 +1075,11 @@ namespace SpaceServices
                 if (record == null || record.pawns == null)
                 {
                     continue;
+                }
+                if (record.serviceKind == "hospital" && record.state != "departing" && record.reservedPad != null)
+                {
+                    ReleaseServiceRecord(record);
+                    record.reservedPad = null;
                 }
                 int before = record.pawns.Count;
                 record.pawns = record.pawns.Where(pawn => pawn != null && !pawn.Destroyed).Distinct().ToList();
@@ -1472,18 +1532,20 @@ namespace SpaceServices
             __result = ServiceIncidentUtility.ShouldForceAllow("PatientArrives", map);
         }
 
-        public static bool HospitalPatientArrivesTryExecutePrefix(IncidentParms parms, ref bool __result)
+        public static bool HospitalPatientArrivesTryExecutePrefix(object __instance, IncidentParms parms, ref bool __result)
         {
             Map map = parms == null ? null : parms.target as Map;
             if (map == null || !SpaceServiceMapDetector.IsServiceEligible(map))
             {
                 return true;
             }
-            if (HospitalIncidentGate.CanAcceptHospitalIncident("PatientArrives", map))
+            IncidentDef incident = Reflect.GetMember(__instance, "def") as IncidentDef;
+            string incidentDefName = incident == null ? "PatientArrives" : incident.defName;
+            if (HospitalIncidentGate.CanAcceptHospitalIncident(incidentDefName, map))
             {
                 return true;
             }
-            Log.Message("[Space Services] Hospital patient incident blocked: " + HospitalIncidentGate.ReadinessReport("PatientArrives", map));
+            Log.Message("[Space Services] Hospital patient incident blocked: " + HospitalIncidentGate.ReadinessReport(incidentDefName, map));
             __result = false;
             return false;
         }
