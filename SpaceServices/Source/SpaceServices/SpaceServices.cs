@@ -84,9 +84,11 @@ namespace SpaceServices
     public sealed class SpaceServicesMapComponent : MapComponent
     {
         public List<ServiceGroupRecord> serviceGroups = new List<ServiceGroupRecord>();
+        private const int StaleReferenceCleanupVersion = 2;
         private int nextDebugTick;
         private int nextLifecycleTick;
         private bool staleReferenceCleanupDone;
+        private int staleReferenceCleanupVersion;
 
         public SpaceServicesMapComponent(Map map) : base(map)
         {
@@ -100,6 +102,7 @@ namespace SpaceServices
                 serviceGroups = new List<ServiceGroupRecord>();
             }
             Scribe_Values.Look(ref staleReferenceCleanupDone, "staleReferenceCleanupDone", false);
+            Scribe_Values.Look(ref staleReferenceCleanupVersion, "staleReferenceCleanupVersion", 0);
         }
 
         public override void MapComponentTick()
@@ -108,9 +111,10 @@ namespace SpaceServices
             if (Find.TickManager.TicksGame >= nextLifecycleTick)
             {
                 nextLifecycleTick = Find.TickManager.TicksGame + 250;
-                if (!staleReferenceCleanupDone)
+                if (!staleReferenceCleanupDone || staleReferenceCleanupVersion < StaleReferenceCleanupVersion)
                 {
                     staleReferenceCleanupDone = true;
+                    staleReferenceCleanupVersion = StaleReferenceCleanupVersion;
                     StaleReferenceCleanupUtility.CleanupAfterLoad(map);
                 }
                 ServiceLifecycleUtility.Tick(map, serviceGroups);
@@ -796,7 +800,8 @@ namespace SpaceServices
             foreach (object key in patients.Keys)
             {
                 Pawn pawn = key as Pawn;
-                if (pawn == null || pawn.Destroyed)
+                object patientData = key == null ? null : patients[key];
+                if (pawn == null || pawn.Destroyed || IsSyntheticFallbackPatientData(patientData))
                 {
                     removeKeys.Add(key);
                 }
@@ -807,6 +812,16 @@ namespace SpaceServices
                 patients.Remove(key);
             }
             return removeKeys.Count;
+        }
+
+        private static bool IsSyntheticFallbackPatientData(object patientData)
+        {
+            if (patientData == null)
+            {
+                return false;
+            }
+            return string.Equals(Reflect.GetMember(patientData, "Diagnosis") as string, "wounds", StringComparison.OrdinalIgnoreCase) &&
+                string.Equals(Reflect.GetMember(patientData, "Cure") as string, "tend to wounds", StringComparison.OrdinalIgnoreCase);
         }
 
         private static int CleanupLordPawnLists(Map map)
@@ -836,6 +851,8 @@ namespace SpaceServices
                 return 0;
             }
 
+            object hospital = HospitalIncidentGate.FindHospitalComponent(map);
+            IDictionary hospitalPatients = hospital == null ? null : Reflect.GetMember(hospital, "Patients") as IDictionary;
             int removed = 0;
             foreach (ServiceGroupRecord record in comp.serviceGroups)
             {
@@ -846,8 +863,28 @@ namespace SpaceServices
                 int before = record.pawns.Count;
                 record.pawns = record.pawns.Where(pawn => pawn != null && !pawn.Destroyed).Distinct().ToList();
                 removed += before - record.pawns.Count;
+                if (record.serviceKind == "hospital" && hospitalPatients != null)
+                {
+                    before = record.pawns.Count;
+                    record.pawns = record.pawns.Where(pawn => hospitalPatients.Contains(pawn)).ToList();
+                    removed += before - record.pawns.Count;
+                    if (before > 0 && record.pawns.Count == 0)
+                    {
+                        ReleaseServiceRecord(record);
+                        record.state = "completed";
+                    }
+                }
             }
             return removed;
+        }
+
+        private static void ReleaseServiceRecord(ServiceGroupRecord record)
+        {
+            CompSpaceServicePad pad = record == null || record.reservedPad == null ? null : record.reservedPad.TryGetComp<CompSpaceServicePad>();
+            if (pad != null)
+            {
+                pad.Release(record.id);
+            }
         }
     }
 
@@ -1123,10 +1160,31 @@ namespace SpaceServices
                 MethodInfo landing = patientUtility.GetMethods(AccessTools.all).FirstOrDefault(m => m.Name == "TryFindSafeLandingSpotCloseToColony" && m.ReturnType == typeof(IntVec3));
                 PatchIfExists(harmony, landing, postfix: nameof(OptionalPatchHandlers.HospitalLandingSpotPostfix));
             }
+            Type incidentHelper = AccessTools.TypeByName("Hospital.IncidentHelper");
+            if (incidentHelper != null)
+            {
+                PatchIfExists(harmony, AccessTools.Method(incidentHelper, "CanSpawnPatient"), postfix: nameof(OptionalPatchHandlers.HospitalCanSpawnPatientPostfix));
+                PatchIfExists(harmony, AccessTools.Method(incidentHelper, "TryFindEntryCell"), postfix: nameof(OptionalPatchHandlers.HospitalTryFindEntryCellPostfix));
+                PatchIfExists(harmony, AccessTools.Method(incidentHelper, "SetUpNewPatient"), postfix: nameof(OptionalPatchHandlers.SuitPawnsInArgsPostfix));
+            }
             Type patientArrival = AccessTools.TypeByName("Hospital.IncidentWorker_PatientArrives");
             if (patientArrival != null)
             {
                 PatchIfExists(harmony, AccessTools.Method(patientArrival, "TryExecuteWorker"), postfix: nameof(OptionalPatchHandlers.HospitalPatientArrivesTryExecutePostfix));
+                PatchIfExists(harmony, AccessTools.Method(patientArrival, "SpawnPatient"), prefix: nameof(OptionalPatchHandlers.HospitalSpawnPatientPrefix), postfix: nameof(OptionalPatchHandlers.HospitalSpawnPatientPostfix));
+            }
+            Type massCasualty = AccessTools.TypeByName("Hospital.IncidentWorker_MassCasualtyEvent");
+            if (massCasualty != null)
+            {
+                foreach (MethodInfo method in massCasualty.GetMethods(AccessTools.all).Where(m => m.Name == "SpawnPatient"))
+                {
+                    PatchIfExists(harmony, method, prefix: nameof(OptionalPatchHandlers.HospitalSpawnPatientPrefix), postfix: nameof(OptionalPatchHandlers.HospitalSpawnPatientPostfix));
+                }
+            }
+            PatchIfExists(harmony, AccessTools.Method(typeof(DropPodUtility), "MakeDropPodAt", new[] { typeof(IntVec3), typeof(Map), typeof(ActiveTransporterInfo), typeof(Faction) }), prefix: nameof(OptionalPatchHandlers.HospitalDropPodAtPrefix));
+            if (incidentHelper != null || patientArrival != null || massCasualty != null)
+            {
+                Log.Message("[Space Services] Hospital bridge patches installed.");
             }
         }
 
@@ -1227,6 +1285,99 @@ namespace SpaceServices
             if (map != null && SpaceServiceMapDetector.IsServiceEligible(map) && ServicePadUtility.TryFindServicePadCell(map, ServiceUse.Patient, out IntVec3 cell))
             {
                 __result = cell;
+            }
+        }
+
+        public static void HospitalCanSpawnPatientPostfix(Map map, ref bool __result)
+        {
+            if (__result || map == null || !SpaceServiceMapDetector.IsServiceEligible(map))
+            {
+                return;
+            }
+            if (ServiceIncidentUtility.ShouldForceAllow("PatientArrives", map))
+            {
+                __result = true;
+            }
+        }
+
+        public static void HospitalTryFindEntryCellPostfix(Map map, ref IntVec3 cell, ref bool __result)
+        {
+            if (__result || map == null || !SpaceServiceMapDetector.IsServiceEligible(map))
+            {
+                return;
+            }
+            if (ServicePadUtility.TryFindServicePadCell(map, ServiceUse.Patient, out IntVec3 serviceCell))
+            {
+                cell = serviceCell;
+                __result = true;
+            }
+        }
+
+        public static void HospitalSpawnPatientPrefix(object[] __args)
+        {
+            Map map = FindMap(__args);
+            if (map == null || !SpaceServiceMapDetector.IsServiceEligible(map))
+            {
+                HospitalLandingRedirectContext.Push(null, IntVec3.Invalid);
+                return;
+            }
+
+            IntVec3 cell;
+            if (!HospitalLandingRedirectContext.TryGetForcedCell(map, out cell) &&
+                !ServicePadUtility.TryFindServicePadCell(map, ServiceUse.Patient, out cell))
+            {
+                cell = IntVec3.Invalid;
+            }
+            foreach (Pawn pawn in PawnsFromArgs(__args))
+            {
+                VacSuitUtility.SuitPawnForVacuum(pawn);
+            }
+            HospitalLandingRedirectContext.Push(map, cell);
+        }
+
+        public static void HospitalSpawnPatientPostfix(object[] __args)
+        {
+            try
+            {
+                Map map = FindMap(__args);
+                List<Pawn> pawns = PawnsFromArgs(__args).Distinct().ToList();
+                foreach (Pawn pawn in pawns)
+                {
+                    VacSuitUtility.SuitPawnForVacuum(pawn);
+                }
+                if (map != null && pawns.Count > 0 && SpaceServiceMapDetector.IsServiceEligible(map))
+                {
+                    ServiceLifecycleUtility.RegisterPawns(map, "hospital", pawns);
+                }
+            }
+            finally
+            {
+                HospitalLandingRedirectContext.Pop();
+            }
+        }
+
+        public static void HospitalDropPodAtPrefix(ref IntVec3 c, Map map, ActiveTransporterInfo info, Faction faction)
+        {
+            if (map == null || !SpaceServiceMapDetector.IsServiceEligible(map))
+            {
+                return;
+            }
+            if (HospitalLandingRedirectContext.TryGetActiveCell(map, out IntVec3 cell) && cell.IsValid)
+            {
+                c = cell;
+            }
+            if (info != null && info.innerContainer != null)
+            {
+                List<Pawn> pawns = new List<Pawn>();
+                foreach (Thing thing in info.innerContainer)
+                {
+                    Pawn pawn = thing as Pawn;
+                    if (pawn != null)
+                    {
+                        pawns.Add(pawn);
+                    }
+                }
+                VacSuitUtility.SuitPawnsForVacuum(pawns);
             }
         }
 
@@ -1349,10 +1500,80 @@ namespace SpaceServices
         }
     }
 
+    public static class HospitalLandingRedirectContext
+    {
+        private struct Request
+        {
+            public Map map;
+            public IntVec3 cell;
+            public bool forced;
+        }
+
+        private static readonly Stack<Request> Requests = new Stack<Request>();
+
+        public static void Push(Map map, IntVec3 cell)
+        {
+            Requests.Push(new Request { map = map, cell = cell, forced = false });
+        }
+
+        public static void PushForced(Map map, IntVec3 cell)
+        {
+            Requests.Push(new Request { map = map, cell = cell, forced = true });
+        }
+
+        public static void Pop()
+        {
+            if (Requests.Count > 0)
+            {
+                Requests.Pop();
+            }
+        }
+
+        public static bool TryGetActiveCell(Map map, out IntVec3 cell)
+        {
+            foreach (Request request in Requests)
+            {
+                if (request.map == map && request.cell.IsValid)
+                {
+                    cell = request.cell;
+                    return true;
+                }
+            }
+            cell = IntVec3.Invalid;
+            return false;
+        }
+
+        public static bool TryGetForcedCell(Map map, out IntVec3 cell)
+        {
+            foreach (Request request in Requests)
+            {
+                if (request.map == map && request.forced && request.cell.IsValid)
+                {
+                    cell = request.cell;
+                    return true;
+                }
+            }
+            cell = IntVec3.Invalid;
+            return false;
+        }
+    }
+
     public static class HospitalPatientFallback
     {
         public static bool TryExecutePatientArrival(object worker, IncidentParms parms, Map map, IntVec3 forcedCell)
         {
+            worker = ResolvePatientArrivalWorker(worker);
+            MethodInfo spawnPatient = worker == null ? null : worker.GetType().GetMethods(AccessTools.all).FirstOrDefault(method =>
+                method.Name == "SpawnPatient" &&
+                method.GetParameters().Length == 2 &&
+                method.GetParameters()[0].ParameterType == typeof(Map) &&
+                method.GetParameters()[1].ParameterType == typeof(Pawn));
+            if (worker == null || spawnPatient == null)
+            {
+                Log.Message("[Space Services] Hospital fallback could not find Hospital.IncidentWorker_PatientArrives.SpawnPatient.");
+                return false;
+            }
+
             List<Pawn> pawns = ResolvePatientPawns(worker, parms, map);
             if (pawns.Count == 0)
             {
@@ -1369,74 +1590,91 @@ namespace SpaceServices
             foreach (Pawn pawn in pawns)
             {
                 VacSuitUtility.SuitPawnForVacuum(pawn);
-                if (!pawn.Spawned)
+                HospitalLandingRedirectContext.PushForced(map, cell);
+                try
                 {
-                    GenSpawn.Spawn(pawn, cell, map);
+                    spawnPatient.Invoke(worker, new object[] { map, pawn });
                 }
-                RegisterPatientWithHospital(map, pawn);
+                finally
+                {
+                    HospitalLandingRedirectContext.Pop();
+                }
             }
 
+            TryCreateHospitalLord(worker, parms, map, pawns);
             ServiceLifecycleUtility.RegisterPawns(map, "hospital", pawns);
             SendPatientArrivalNotice(pawns[0]);
-            Log.Message("[Space Services] Hospital fallback spawned patient arrival pawns=" + pawns.Count);
+            Log.Message("[Space Services] Hospital fallback ran real patient arrival pawns=" + pawns.Count);
             return true;
+        }
+
+        private static object ResolvePatientArrivalWorker(object worker)
+        {
+            if (worker != null)
+            {
+                return worker;
+            }
+            IncidentDef def = DefDatabase<IncidentDef>.GetNamedSilentFail("PatientArrives");
+            worker = def == null ? null : def.Worker;
+            if (worker != null)
+            {
+                return worker;
+            }
+            Type type = AccessTools.TypeByName("Hospital.IncidentWorker_PatientArrives");
+            return type == null ? null : Activator.CreateInstance(type);
         }
 
         private static List<Pawn> ResolvePatientPawns(object worker, IncidentParms parms, Map map)
         {
-            PawnKindDef kind = parms.pawnKind ?? PawnKindDefOf.Villager;
             Faction faction = parms.faction ?? Find.FactionManager.FirstFactionOfDef(FactionDefOf.OutlanderCivil);
-            Pawn pawn = PawnGenerator.GeneratePawn(kind, faction, map.Tile);
+            parms.faction = faction;
+            Type helper = AccessTools.TypeByName("Hospital.IncidentHelper");
+            MethodInfo generatePawn = helper == null ? null : AccessTools.Method(helper, "GeneratePawn", new[] { typeof(Faction) });
+            Pawn pawn = null;
+            if (generatePawn != null)
+            {
+                try
+                {
+                    pawn = generatePawn.Invoke(null, new object[] { faction }) as Pawn;
+                }
+                catch (Exception ex)
+                {
+                    Log.Warning("[Space Services] Hospital fallback could not use IncidentHelper.GeneratePawn: " + ex.Message);
+                }
+            }
+            if (pawn == null)
+            {
+                PawnKindDef kind = parms.pawnKind ?? PawnKindDefOf.Villager;
+                pawn = PawnGenerator.GeneratePawn(kind, faction, map.Tile);
+            }
             return pawn == null ? new List<Pawn>() : new List<Pawn> { pawn };
         }
 
-        private static void RegisterPatientWithHospital(Map map, Pawn pawn)
+        private static void TryCreateHospitalLord(object worker, IncidentParms parms, Map map, List<Pawn> pawns)
         {
-            object hospital = HospitalIncidentGate.FindHospitalComponent(map);
-            MethodInfo method = hospital == null ? null : AccessTools.Method(hospital.GetType(), "PatientArrived");
-            if (method == null)
+            if (worker == null || parms == null || map == null || pawns == null || pawns.Count == 0)
             {
                 return;
             }
-            object patientData = CreatePatientData(pawn);
-            TryDamagePatient(pawn, patientData, hospital);
-            method.Invoke(hospital, new[] { pawn, patientData });
-        }
-
-        private static object CreatePatientData(Pawn pawn)
-        {
-            Type patientDataType = AccessTools.TypeByName("Hospital.PatientData");
-            object patientData = patientDataType == null ? null : Activator.CreateInstance(patientDataType);
-            if (patientData == null)
-            {
-                return null;
-            }
-            Reflect.SetMember(patientData, "ArrivedAtTick", Find.TickManager.TicksGame);
-            Reflect.SetMember(patientData, "InitialMarketValue", pawn.MarketValue);
-            Reflect.SetMember(patientData, "InitialMood", pawn.needs == null || pawn.needs.mood == null ? 0f : pawn.needs.mood.CurLevel);
-            Reflect.SetMember(patientData, "Diagnosis", "wounds");
-            Reflect.SetMember(patientData, "Cure", "tend to wounds");
-            return patientData;
-        }
-
-        private static void TryDamagePatient(Pawn pawn, object patientData, object hospital)
-        {
-            Type patientUtility = AccessTools.TypeByName("Hospital.Utilities.PatientUtility");
-            MethodInfo method = patientUtility == null ? null : patientUtility.GetMethods(AccessTools.all).FirstOrDefault(candidate =>
-                candidate.Name == "DamagePawn" &&
-                candidate.GetParameters().Length == 3 &&
-                candidate.GetParameters()[0].ParameterType == typeof(Pawn));
-            if (method == null || patientData == null || hospital == null)
+            MethodInfo createLordJob = worker.GetType().GetMethods(AccessTools.all).FirstOrDefault(method =>
+                method.Name == "CreateLordJob" &&
+                method.GetParameters().Length == 2 &&
+                method.GetParameters()[0].ParameterType == typeof(IncidentParms));
+            if (createLordJob == null)
             {
                 return;
             }
             try
             {
-                method.Invoke(null, new[] { pawn, patientData, hospital });
+                LordJob lordJob = createLordJob.Invoke(worker, new object[] { parms, pawns }) as LordJob;
+                if (lordJob != null)
+                {
+                    LordMaker.MakeNewLord(parms.faction, lordJob, map, pawns);
+                }
             }
             catch (Exception ex)
             {
-                Log.Warning("[Space Services] Hospital fallback could not apply patient injury data: " + ex.Message);
+                Log.Warning("[Space Services] Hospital fallback could not create patient lord: " + ex.Message);
             }
         }
 
