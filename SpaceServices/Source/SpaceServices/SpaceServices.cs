@@ -261,27 +261,139 @@ namespace SpaceServices
 
         public bool MeetsUseRequirements(ServiceUse use)
         {
+            string reason;
+            return MeetsUseRequirements(use, out reason);
+        }
+
+        public bool MeetsUseRequirements(ServiceUse use, out string reason)
+        {
+            reason = null;
+            if (parent == null || parent.Destroyed || parent.Map == null)
+            {
+                reason = "pad unavailable";
+                return false;
+            }
             if (requirePower)
             {
                 CompPowerTrader power = parent.TryGetComp<CompPowerTrader>();
                 if (power != null && !power.PowerOn)
                 {
+                    reason = "power is off";
                     return false;
                 }
             }
             if (use == ServiceUse.Patient && !allowPatients)
             {
+                reason = "patients are disabled";
                 return false;
             }
             if (use == ServiceUse.Guest && !allowGuests)
             {
+                reason = "guests are disabled";
                 return false;
             }
             if (use == ServiceUse.Emergency && !allowEmergency)
             {
+                reason = "emergency arrivals are disabled";
+                return false;
+            }
+            if (!ServiceEnvironmentUtility.IsRoofAccessible(parent, out reason))
+            {
+                return false;
+            }
+            if (requireVacSafeRoof && !ServiceEnvironmentUtility.HasFullFlyThroughRoof(parent, out reason))
+            {
                 return false;
             }
             return true;
+        }
+
+        public override string CompInspectStringExtra()
+        {
+            if (parent == null || parent.Map == null)
+            {
+                return null;
+            }
+
+            StringBuilder builder = new StringBuilder();
+            SpaceServiceEligibility eligibility = SpaceServiceMapDetector.Evaluate(parent.Map);
+            float vacuum = ServiceEnvironmentUtility.GetMaxVacuum(parent);
+            bool roofAccessible = ServiceEnvironmentUtility.IsRoofAccessible(parent, out string roofReason);
+            string vacRoofReason;
+            bool vacRoofOk = !requireVacSafeRoof || ServiceEnvironmentUtility.HasFullFlyThroughRoof(parent, out vacRoofReason);
+            bool usable = IsGenerallyUsable(out string usableReason);
+
+            builder.AppendLine("Space Services");
+            builder.AppendLine("Mode: " + ModeLabel());
+            builder.AppendLine("Reservation: " + (string.IsNullOrEmpty(reservedForGroup) ? "free" : "reserved"));
+            builder.AppendLine("Vacuum exposed: " + (vacuum > 0.001f ? "yes (" + vacuum.ToStringPercent() + ")" : "no"));
+            builder.AppendLine("Roof accessible: " + (roofAccessible ? "yes, " + ServiceEnvironmentUtility.RoofAccessReport(parent) : "no, " + roofReason));
+            if (requireVacSafeRoof)
+            {
+                builder.AppendLine("Vac-safe roof required: " + (vacRoofOk ? "satisfied" : "not satisfied"));
+            }
+            builder.AppendLine("Map: " + (eligibility.allowed ? "eligible" : "blocked"));
+            builder.Append("Overall: " + (usable ? "usable" : "not usable, " + usableReason));
+            return builder.ToString().TrimEnd();
+        }
+
+        private bool IsGenerallyUsable(out string reason)
+        {
+            if (!SpaceServiceMapDetector.IsServiceEligible(parent.Map))
+            {
+                reason = "map is not space-service eligible";
+                return false;
+            }
+            if (!string.IsNullOrEmpty(reservedForGroup))
+            {
+                reason = "reserved";
+                return false;
+            }
+            if (!allowGuests && !allowPatients && !allowEmergency)
+            {
+                reason = "all service modes disabled";
+                return false;
+            }
+
+            string firstReason = null;
+            string modeReason = null;
+            if (allowPatients && MeetsUseRequirements(ServiceUse.Patient, out modeReason))
+            {
+                reason = null;
+                return true;
+            }
+            firstReason = firstReason ?? modeReason;
+            if (allowGuests && MeetsUseRequirements(ServiceUse.Guest, out modeReason))
+            {
+                reason = null;
+                return true;
+            }
+            firstReason = firstReason ?? modeReason;
+            if (allowEmergency && MeetsUseRequirements(ServiceUse.Emergency, out modeReason))
+            {
+                reason = null;
+                return true;
+            }
+            reason = firstReason ?? "service settings block all modes";
+            return false;
+        }
+
+        private string ModeLabel()
+        {
+            List<string> modes = new List<string>();
+            if (allowPatients)
+            {
+                modes.Add("patients");
+            }
+            if (allowGuests)
+            {
+                modes.Add("guests");
+            }
+            if (allowEmergency)
+            {
+                modes.Add("emergency");
+            }
+            return modes.Count == 0 ? "disabled" : string.Join(", ", modes.ToArray());
         }
 
         public bool TryReserve(string groupId)
@@ -348,6 +460,11 @@ namespace SpaceServices
                     defaultLabel = "DEV: Spawn patient here",
                     action = delegate
                     {
+                        if (!MeetsUseRequirements(ServiceUse.Patient, out string reason))
+                        {
+                            Messages.Message("Space Services: dev patient spawn blocked, " + reason, parent, MessageTypeDefOf.RejectInput, false);
+                            return;
+                        }
                         bool spawned = HospitalPatientFallback.TryExecutePatientArrival(null, ServiceDebugUtility.PatientArrivalParms(parent.MapHeld), parent.MapHeld, parent.Position);
                         Messages.Message(spawned ? "Space Services: dev patient spawned" : "Space Services: dev patient spawn failed", parent, MessageTypeDefOf.NeutralEvent, false);
                     }
@@ -698,6 +815,11 @@ namespace SpaceServices
     public static class ServiceEnvironmentUtility
     {
         private const float Epsilon = 0.001f;
+        private static readonly HashSet<string> KnownFlyThroughRoofs = new HashSet<string>
+        {
+            "SMR_VacBarrierRoof",
+            "SMR_AdvancedVacBarrierRoof"
+        };
 
         public static float GetVacuum(IntVec3 cell, Map map)
         {
@@ -735,6 +857,110 @@ namespace SpaceServices
             return maxVacuum;
         }
 
+        public static bool IsRoofAccessible(Thing pad, out string reason)
+        {
+            reason = null;
+            Map map = pad == null ? null : pad.Map;
+            if (map == null || pad.Destroyed)
+            {
+                reason = "pad unavailable";
+                return false;
+            }
+
+            foreach (IntVec3 cell in pad.OccupiedRect().Cells)
+            {
+                if (!cell.InBounds(map))
+                {
+                    reason = "pad footprint reaches out of bounds at " + cell;
+                    return false;
+                }
+                RoofDef roof = map.roofGrid.RoofAt(cell);
+                if (roof != null && !IsFlyThroughRoof(roof))
+                {
+                    reason = "blocked by " + RoofLabel(roof) + " at " + cell;
+                    return false;
+                }
+            }
+            return true;
+        }
+
+        public static bool HasFullFlyThroughRoof(Thing pad, out string reason)
+        {
+            reason = null;
+            Map map = pad == null ? null : pad.Map;
+            if (map == null || pad.Destroyed)
+            {
+                reason = "pad unavailable";
+                return false;
+            }
+
+            foreach (IntVec3 cell in pad.OccupiedRect().Cells)
+            {
+                if (!cell.InBounds(map))
+                {
+                    reason = "pad footprint reaches out of bounds at " + cell;
+                    return false;
+                }
+                RoofDef roof = map.roofGrid.RoofAt(cell);
+                if (roof == null)
+                {
+                    reason = "missing fly-through roof at " + cell;
+                    return false;
+                }
+                if (!IsFlyThroughRoof(roof))
+                {
+                    reason = "blocked by " + RoofLabel(roof) + " at " + cell;
+                    return false;
+                }
+            }
+            return true;
+        }
+
+        public static string RoofAccessReport(Thing pad)
+        {
+            Map map = pad == null ? null : pad.Map;
+            if (map == null || pad.Destroyed)
+            {
+                return "pad unavailable";
+            }
+
+            int total = 0;
+            int clear = 0;
+            int flyThrough = 0;
+            int blocked = 0;
+            string firstBlocked = null;
+            foreach (IntVec3 cell in pad.OccupiedRect().Cells)
+            {
+                total++;
+                if (!cell.InBounds(map))
+                {
+                    blocked++;
+                    firstBlocked = firstBlocked ?? "out of bounds at " + cell;
+                    continue;
+                }
+                RoofDef roof = map.roofGrid.RoofAt(cell);
+                if (roof == null)
+                {
+                    clear++;
+                }
+                else if (IsFlyThroughRoof(roof))
+                {
+                    flyThrough++;
+                }
+                else
+                {
+                    blocked++;
+                    firstBlocked = firstBlocked ?? RoofLabel(roof) + " at " + cell;
+                }
+            }
+
+            if (blocked > 0)
+            {
+                return blocked + "/" + total + " blocked, first " + firstBlocked;
+            }
+            return total + "/" + total + " clear or fly-through (" + clear + " clear, " + flyThrough + " fly-through)";
+        }
+
         public static bool IsSafeForPawn(Pawn pawn, Map map, IntVec3 cell)
         {
             float vacuum = GetVacuum(cell, map);
@@ -764,6 +990,44 @@ namespace SpaceServices
                 }
             }
             return true;
+        }
+
+        private static bool IsFlyThroughRoof(RoofDef roof)
+        {
+            if (roof == null)
+            {
+                return true;
+            }
+            if (KnownFlyThroughRoofs.Contains(roof.defName))
+            {
+                return true;
+            }
+            if (Reflect.BoolMember(roof, "allowFlyThrough", false))
+            {
+                return true;
+            }
+
+            IEnumerable extensions = Reflect.GetMember(roof, "modExtensions") as IEnumerable;
+            if (extensions != null)
+            {
+                foreach (object extension in extensions)
+                {
+                    if (Reflect.BoolMember(extension, "allowFlyThrough", false))
+                    {
+                        return true;
+                    }
+                }
+            }
+            return false;
+        }
+
+        private static string RoofLabel(RoofDef roof)
+        {
+            if (roof == null)
+            {
+                return "no roof";
+            }
+            return string.IsNullOrEmpty(roof.label) ? roof.defName : roof.label;
         }
     }
 
@@ -1244,9 +1508,14 @@ namespace SpaceServices
                 return false;
             }
             CompSpaceServicePad comp = record.reservedPad.TryGetComp<CompSpaceServicePad>();
-            if (comp == null || !comp.MeetsUseRequirements(use))
+            if (comp == null)
             {
-                reason = "departure pad settings block this service";
+                reason = "departure pad is not a service pad";
+                return false;
+            }
+            if (!comp.MeetsUseRequirements(use, out reason))
+            {
+                reason = "departure pad blocked: " + (reason ?? "settings block this service");
                 return false;
             }
             return ServiceEnvironmentUtility.IsPadSafeForPawns(record.reservedPad, record.pawns, out reason);
