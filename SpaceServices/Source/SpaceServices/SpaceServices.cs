@@ -1757,7 +1757,7 @@ namespace SpaceServices
                     continue;
                 }
                 IntVec3 waitCell = DepartureWaitCell(record.reservedPad, pawn);
-                if (!waitCell.IsValid || pawn.Position.InHorDistOf(waitCell, 1f))
+                if (!waitCell.IsValid || pawn.Position == waitCell)
                 {
                     continue;
                 }
@@ -1789,7 +1789,7 @@ namespace SpaceServices
                     continue;
                 }
                 IntVec3 boardCell = PickupBoardingCell(record.reservedPad, pawn);
-                if (!boardCell.IsValid || pawn.Position.InHorDistOf(boardCell, 1f))
+                if (!boardCell.IsValid || pawn.Position == boardCell)
                 {
                     continue;
                 }
@@ -1814,7 +1814,7 @@ namespace SpaceServices
                 return false;
             }
             IntVec3 waitCell = DepartureWaitCell(pad, pawn);
-            return waitCell.IsValid && pawn.Position.InHorDistOf(waitCell, 1f);
+            return waitCell.IsValid && pawn.Position == waitCell;
         }
 
         private static bool PawnAtPickupShuttle(Pawn pawn, Thing pad)
@@ -1824,7 +1824,7 @@ namespace SpaceServices
                 return false;
             }
             IntVec3 boardCell = PickupBoardingCell(pad, pawn);
-            return boardCell.IsValid && pawn.Position.InHorDistOf(boardCell, 1f);
+            return boardCell.IsValid && pawn.Position == boardCell;
         }
 
         private static IntVec3 PickupBoardingCell(Thing pad, Pawn pawn)
@@ -1852,8 +1852,9 @@ namespace SpaceServices
                 return IntVec3.Invalid;
             }
             CellRect padRect = pad.OccupiedRect();
-            return padRect.ExpandedBy(1).Cells
-                .Where(cell => cell.InBounds(map) && !padRect.Contains(cell) && cell.Standable(map) && (cell.GetFirstPawn(map) == null || cell == pawn.Position))
+            CellRect noWaitRect = padRect.ExpandedBy(1);
+            return padRect.ExpandedBy(3).Cells
+                .Where(cell => cell.InBounds(map) && !noWaitRect.Contains(cell) && cell.Standable(map) && (cell.GetFirstPawn(map) == null || cell == pawn.Position))
                 .Where(cell => pawn.CanReach(cell, PathEndMode.OnCell, Danger.Deadly))
                 .OrderBy(cell => cell.DistanceToSquared(pawn.Position))
                 .ThenBy(cell => cell.DistanceToSquared(pad.Position))
