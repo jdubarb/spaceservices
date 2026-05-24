@@ -86,7 +86,7 @@ namespace SpaceServices
     {
         public List<ServiceGroupRecord> serviceGroups = new List<ServiceGroupRecord>();
         private readonly List<ScheduledServiceShuttleArrival> pendingShuttleArrivals = new List<ScheduledServiceShuttleArrival>();
-        private const int StaleReferenceCleanupVersion = 3;
+        private const int StaleReferenceCleanupVersion = 4;
         private int nextDebugTick;
         private int nextLifecycleTick;
         private bool staleReferenceCleanupDone;
@@ -1979,11 +1979,69 @@ namespace SpaceServices
             int removedHospitalPatients = CleanupHospitalPatients(map);
             int removedLordPawns = CleanupLordPawnLists(map);
             int removedServicePawns = CleanupServiceGroups(map);
+            int removedLegacyShuttles = CleanupLegacyPassengerShuttleSkyfallers(map);
 
-            if (removedHospitalPatients > 0 || removedLordPawns > 0 || removedServicePawns > 0)
+            if (removedHospitalPatients > 0 || removedLordPawns > 0 || removedServicePawns > 0 || removedLegacyShuttles > 0)
             {
-                Log.Message("[Space Services] cleaned stale service references: hospitalPatients=" + removedHospitalPatients + ", lordPawns=" + removedLordPawns + ", servicePawns=" + removedServicePawns);
+                Log.Message("[Space Services] cleaned stale service references: hospitalPatients=" + removedHospitalPatients + ", lordPawns=" + removedLordPawns + ", servicePawns=" + removedServicePawns + ", legacyPassengerShuttles=" + removedLegacyShuttles);
             }
+        }
+
+        private static int CleanupLegacyPassengerShuttleSkyfallers(Map map)
+        {
+            if (!SpaceServiceMapDetector.IsServiceEligible(map))
+            {
+                return 0;
+            }
+
+            HashSet<IntVec3> serviceCells = new HashSet<IntVec3>();
+            foreach (Thing pad in ServicePadUtility.AllServicePads(map, ServiceUse.Patient).Concat(ServicePadUtility.AllServicePads(map, ServiceUse.Guest)))
+            {
+                if (pad != null && pad.Spawned)
+                {
+                    serviceCells.Add(pad.Position);
+                }
+            }
+
+            SpaceServicesMapComponent comp = map.GetComponent<SpaceServicesMapComponent>();
+            if (comp != null && comp.serviceGroups != null)
+            {
+                foreach (ServiceGroupRecord record in comp.serviceGroups)
+                {
+                    if (record != null && record.reservedPad != null && record.reservedPad.Spawned)
+                    {
+                        serviceCells.Add(record.reservedPad.Position);
+                    }
+                }
+            }
+
+            if (serviceCells.Count == 0)
+            {
+                return 0;
+            }
+
+            int removed = 0;
+            removed += CleanupLegacyPassengerShuttleSkyfallerDef(map, "PassengerShuttleIncoming", serviceCells);
+            removed += CleanupLegacyPassengerShuttleSkyfallerDef(map, "PassengerShuttleLeaving", serviceCells);
+            return removed;
+        }
+
+        private static int CleanupLegacyPassengerShuttleSkyfallerDef(Map map, string defName, HashSet<IntVec3> serviceCells)
+        {
+            ThingDef def = DefDatabase<ThingDef>.GetNamedSilentFail(defName);
+            if (def == null)
+            {
+                return 0;
+            }
+
+            List<Thing> things = map.listerThings.ThingsOfDef(def)
+                .Where(thing => thing != null && !thing.Destroyed && serviceCells.Any(cell => thing.Position.InHorDistOf(cell, 10f)))
+                .ToList();
+            foreach (Thing thing in things)
+            {
+                thing.Destroy(DestroyMode.Vanish);
+            }
+            return things.Count;
         }
 
         private static int CleanupHospitalPatients(Map map)
