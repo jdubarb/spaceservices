@@ -166,6 +166,12 @@ namespace SpaceServices
 
     public class CompSpaceServicePad : ThingComp
     {
+        private const float OverlayDrawSize = 1.55f;
+        private static readonly Vector2 OverlaySize = new Vector2(OverlayDrawSize, OverlayDrawSize);
+        private static readonly Graphic HospitalOverlay = GraphicDatabase.Get<Graphic_Single>("Things/Building/SpaceServices/ServiceLandingPad_Hospital", ShaderDatabase.Cutout, OverlaySize, Color.white);
+        private static readonly Graphic HospitalityOverlay = GraphicDatabase.Get<Graphic_Single>("Things/Building/SpaceServices/ServiceLandingPad_Hospitality", ShaderDatabase.Cutout, OverlaySize, Color.white);
+        private static readonly Graphic TradeOverlay = GraphicDatabase.Get<Graphic_Single>("Things/Building/SpaceServices/ServiceLandingPad_Trade", ShaderDatabase.Cutout, OverlaySize, Color.white);
+
         public bool allowGuests = true;
         public bool allowPatients = true;
         public bool allowEmergency = true;
@@ -283,6 +289,36 @@ namespace SpaceServices
                     }
                 };
             }
+        }
+
+        public override void PostDraw()
+        {
+            base.PostDraw();
+            Graphic overlay = CurrentOverlay();
+            if (overlay == null || parent == null)
+            {
+                return;
+            }
+            Vector3 drawPos = parent.DrawPos;
+            drawPos.y = AltitudeLayer.MetaOverlays.AltitudeFor() + 0.15f;
+            overlay.Draw(drawPos, Rot4.North, parent);
+        }
+
+        private Graphic CurrentOverlay()
+        {
+            if (allowPatients && !allowGuests)
+            {
+                return HospitalOverlay;
+            }
+            if (allowGuests && !allowPatients)
+            {
+                return HospitalityOverlay;
+            }
+            if (!allowGuests && !allowPatients && allowEmergency)
+            {
+                return TradeOverlay;
+            }
+            return null;
         }
 
         private static Command_Toggle Toggle(string labelKey, Func<bool> getter, Action<bool> setter)
@@ -1402,7 +1438,7 @@ namespace SpaceServices
             Type massCasualty = AccessTools.TypeByName("Hospital.IncidentWorker_MassCasualtyEvent");
             if (massCasualty != null)
             {
-                PatchIfExists(harmony, AccessTools.Method(massCasualty, "TryExecuteWorker"), prefix: nameof(OptionalPatchHandlers.HospitalPatientArrivesTryExecutePrefix));
+                PatchIfExists(harmony, AccessTools.Method(massCasualty, "TryExecuteWorker"), prefix: nameof(OptionalPatchHandlers.HospitalPatientArrivesTryExecutePrefix), postfix: nameof(OptionalPatchHandlers.HospitalMassCasualtyTryExecutePostfix));
                 foreach (MethodInfo method in massCasualty.GetMethods(AccessTools.all).Where(m => m.Name == "SpawnPatient"))
                 {
                     PatchIfExists(harmony, method, prefix: nameof(OptionalPatchHandlers.HospitalSpawnPatientPrefix), postfix: nameof(OptionalPatchHandlers.HospitalSpawnPatientPostfix));
@@ -1540,9 +1576,10 @@ namespace SpaceServices
                 return true;
             }
             IncidentDef incident = Reflect.GetMember(__instance, "def") as IncidentDef;
-            string incidentDefName = incident == null ? "PatientArrives" : incident.defName;
+            string incidentDefName = incident == null ? (IsMassCasualtyIncident(__instance, null) ? "MassCasualtyEvent" : "PatientArrives") : incident.defName;
             if (HospitalIncidentGate.CanAcceptHospitalIncident(incidentDefName, map))
             {
+                HospitalArrivalIncidentContext.Push(map, IsMassCasualtyIncident(__instance, incidentDefName));
                 return true;
             }
             Log.Message("[Space Services] Hospital patient incident blocked: " + HospitalIncidentGate.ReadinessReport(incidentDefName, map));
@@ -1574,6 +1611,7 @@ namespace SpaceServices
 
             IntVec3 cell;
             if (!HospitalLandingRedirectContext.TryGetForcedCell(map, out cell) &&
+                !HospitalArrivalIncidentContext.TryGetNextArrivalCell(map, out cell) &&
                 !ServicePadUtility.TryFindServicePadCell(map, ServiceUse.Patient, out cell))
             {
                 cell = IntVec3.Invalid;
@@ -1669,28 +1707,40 @@ namespace SpaceServices
 
         public static void HospitalPatientArrivesTryExecutePostfix(object __instance, IncidentParms parms, ref bool __result)
         {
-            if (__result || __instance == null || parms == null)
-            {
-                return;
-            }
-            Map map = parms.target as Map;
-            if (map == null || !SpaceServiceMapDetector.IsServiceEligible(map))
-            {
-                return;
-            }
-            if (!HospitalIncidentGate.CanAcceptHospitalIncident("PatientArrives", map))
-            {
-                Log.Message("[Space Services] Hospital PatientArrives returned false; fallback blocked: " + HospitalIncidentGate.ReadinessReport("PatientArrives", map));
-                return;
-            }
             try
             {
-                __result = HospitalPatientFallback.TryExecutePatientArrival(__instance, parms, map, IntVec3.Invalid);
+                if (__result || __instance == null || parms == null)
+                {
+                    return;
+                }
+                Map map = parms.target as Map;
+                if (map == null || !SpaceServiceMapDetector.IsServiceEligible(map))
+                {
+                    return;
+                }
+                if (!HospitalIncidentGate.CanAcceptHospitalIncident("PatientArrives", map))
+                {
+                    Log.Message("[Space Services] Hospital PatientArrives returned false; fallback blocked: " + HospitalIncidentGate.ReadinessReport("PatientArrives", map));
+                    return;
+                }
+                try
+                {
+                    __result = HospitalPatientFallback.TryExecutePatientArrival(__instance, parms, map, IntVec3.Invalid);
+                }
+                catch (Exception ex)
+                {
+                    Log.Warning("[Space Services] Hospital patient fallback failed: " + ex);
+                }
             }
-            catch (Exception ex)
+            finally
             {
-                Log.Warning("[Space Services] Hospital patient fallback failed: " + ex);
+                HospitalArrivalIncidentContext.Pop();
             }
+        }
+
+        public static void HospitalMassCasualtyTryExecutePostfix()
+        {
+            HospitalArrivalIncidentContext.Pop();
         }
 
         private static bool HasBlockingLandingCondition(Map map)
@@ -1757,6 +1807,87 @@ namespace SpaceServices
                 }
             }
             return Find.CurrentMap;
+        }
+
+        private static bool IsMassCasualtyIncident(object worker, string incidentDefName)
+        {
+            if (incidentDefName == "MassCasualtyEvent")
+            {
+                return true;
+            }
+            string typeName = worker == null ? "" : worker.GetType().FullName ?? "";
+            return typeName.IndexOf("MassCasualty", StringComparison.OrdinalIgnoreCase) >= 0;
+        }
+    }
+
+    public static class HospitalArrivalIncidentContext
+    {
+        private sealed class Request
+        {
+            public Map map;
+            public List<IntVec3> cells = new List<IntVec3>();
+            public int nextIndex;
+        }
+
+        private static readonly Stack<Request> Requests = new Stack<Request>();
+
+        public static void Push(Map map, bool massCasualty)
+        {
+            Request request = new Request { map = map };
+            if (map != null && massCasualty)
+            {
+                request.cells = BuildArrivalCells(map);
+                if (SpaceServicesMod.Settings != null && SpaceServicesMod.Settings.debugLogging)
+                {
+                    Log.Message("[Space Services] Mass casualty arrival cells prepared=" + request.cells.Count);
+                }
+            }
+            Requests.Push(request);
+        }
+
+        public static void Pop()
+        {
+            if (Requests.Count > 0)
+            {
+                Requests.Pop();
+            }
+        }
+
+        public static bool TryGetNextArrivalCell(Map map, out IntVec3 cell)
+        {
+            foreach (Request request in Requests)
+            {
+                if (request.map != map || request.cells == null || request.cells.Count == 0)
+                {
+                    continue;
+                }
+                cell = request.cells[request.nextIndex % request.cells.Count];
+                request.nextIndex++;
+                return true;
+            }
+            cell = IntVec3.Invalid;
+            return false;
+        }
+
+        private static List<IntVec3> BuildArrivalCells(Map map)
+        {
+            Thing pad = ServicePadUtility.TryFindServicePad(map, ServiceUse.Patient);
+            if (pad == null)
+            {
+                return new List<IntVec3>();
+            }
+
+            IntVec3 center = pad.Position;
+            List<IntVec3> cells = pad.OccupiedRect().Cells
+                .Where(cell => cell.InBounds(map) && cell.Standable(map))
+                .OrderBy(cell => cell.DistanceToSquared(center))
+                .ToList();
+
+            if (cells.Count == 0)
+            {
+                cells.Add(center);
+            }
+            return cells;
         }
     }
 
