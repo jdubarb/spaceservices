@@ -326,6 +326,7 @@ namespace SpaceServices
             builder.AppendLine("Space Services");
             builder.AppendLine("Mode: " + ModeLabel());
             builder.AppendLine("Reservation: " + (string.IsNullOrEmpty(reservedForGroup) ? "free" : "reserved"));
+            builder.AppendLine("Damage: immune");
             builder.AppendLine("Vacuum exposed: " + (vacuum > 0.001f ? "yes (" + vacuum.ToStringPercent() + ")" : "no"));
             builder.AppendLine("Roof accessible: " + (roofAccessible ? "yes, " + ServiceEnvironmentUtility.RoofAccessReport(parent) : "no, " + roofReason));
             if (requireVacSafeRoof)
@@ -510,6 +511,20 @@ namespace SpaceServices
                 isActive = getter,
                 toggleAction = delegate { setter(!getter()); }
             };
+        }
+    }
+
+    [HarmonyPatch(typeof(Thing), nameof(Thing.TakeDamage))]
+    public static class SpaceServicePadDamagePatch
+    {
+        public static bool Prefix(Thing __instance, ref DamageWorker.DamageResult __result)
+        {
+            if (__instance != null && __instance.TryGetComp<CompSpaceServicePad>() != null)
+            {
+                __result = new DamageWorker.DamageResult();
+                return false;
+            }
+            return true;
         }
     }
 

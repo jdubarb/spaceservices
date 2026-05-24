@@ -17,14 +17,14 @@
     <scatterableOnMapGen>false</scatterableOnMapGen>
     <terrainAffordanceNeeded>Heavy</terrainAffordanceNeeded>
     <clearBuildingArea>true</clearBuildingArea>
-    <useHitPoints>true</useHitPoints>
+    <useHitPoints>false</useHitPoints>
     <canOverlapZones>true</canOverlapZones>
     <designationCategory>MLT_SpaceServices</designationCategory>
     <uiOrder>100</uiOrder>
     <statBases>
       <WorkToBuild>800</WorkToBuild>
       <MaxHitPoints>100</MaxHitPoints>
-      <Flammability>0.2</Flammability>
+      <Flammability>0</Flammability>
     </statBases>
     <costList>
       <Steel>25</Steel>
