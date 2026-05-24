@@ -1720,7 +1720,7 @@ namespace SpaceServices
                 {
                     continue;
                 }
-                if (pawn.Spawned && !PawnWaitingOutsidePad(pawn, record.reservedPad))
+                if (pawn.Spawned && !PawnSafelyStagedForPickup(pawn, record.reservedPad))
                 {
                     return false;
                 }
@@ -1769,6 +1769,10 @@ namespace SpaceServices
                 {
                     continue;
                 }
+                if (PawnSafelyStagedForPickup(pawn, record.reservedPad))
+                {
+                    continue;
+                }
                 IntVec3 waitCell = DepartureWaitCell(record.reservedPad, pawn);
                 if (!waitCell.IsValid || pawn.Position == waitCell)
                 {
@@ -1801,6 +1805,10 @@ namespace SpaceServices
                 {
                     continue;
                 }
+                if (PawnAtPickupShuttle(pawn, record.reservedPad))
+                {
+                    continue;
+                }
                 IntVec3 boardCell = PickupBoardingCell(record.reservedPad, pawn);
                 if (!boardCell.IsValid || pawn.Position == boardCell)
                 {
@@ -1816,18 +1824,18 @@ namespace SpaceServices
             }
         }
 
-        private static bool PawnWaitingOutsidePad(Pawn pawn, Thing pad)
+        private static bool PawnSafelyStagedForPickup(Pawn pawn, Thing pad)
         {
             if (pawn == null || !pawn.Spawned || pad == null || pad.Map == null)
             {
                 return false;
             }
-            if (pad.OccupiedRect().Contains(pawn.Position))
+            CellRect padRect = pad.OccupiedRect();
+            if (padRect.ExpandedBy(1).Contains(pawn.Position))
             {
                 return false;
             }
-            IntVec3 waitCell = DepartureWaitCell(pad, pawn);
-            return waitCell.IsValid && pawn.Position == waitCell;
+            return padRect.ExpandedBy(5).Contains(pawn.Position);
         }
 
         private static bool PawnAtPickupShuttle(Pawn pawn, Thing pad)
@@ -1836,8 +1844,7 @@ namespace SpaceServices
             {
                 return false;
             }
-            IntVec3 boardCell = PickupBoardingCell(pad, pawn);
-            return boardCell.IsValid && pawn.Position == boardCell;
+            return pad.OccupiedRect().Contains(pawn.Position);
         }
 
         private static IntVec3 PickupBoardingCell(Thing pad, Pawn pawn)
