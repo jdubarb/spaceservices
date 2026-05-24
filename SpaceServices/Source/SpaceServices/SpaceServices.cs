@@ -1956,7 +1956,8 @@ namespace SpaceServices
 
         private static CellRect PickupBoardingRect(Thing pad)
         {
-            return pad.OccupiedRect().ExpandedBy(1);
+            // Boarding is based on the shuttle's center, not the full service pad footprint.
+            return CellRect.CenteredOn(pad.Position, 3, 3);
         }
 
         private static IntVec3 DepartureWaitCell(Thing pad, Pawn pawn)
