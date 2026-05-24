@@ -134,7 +134,7 @@ namespace SpaceServices
             }
         }
 
-        public void ScheduleShuttleArrival(IntVec3 cell, List<Thing> things)
+        public void ScheduleShuttleArrival(IntVec3 cell, string shuttleThingDefName, List<Thing> things)
         {
             if (!cell.IsValid || things == null || things.Count == 0)
             {
@@ -144,6 +144,7 @@ namespace SpaceServices
             {
                 cell = cell,
                 touchdownTick = Find.TickManager.TicksGame + ServiceShuttleUtility.ArrivalTouchdownDelayTicks,
+                shuttleThingDefName = shuttleThingDefName,
                 things = things
             });
         }
@@ -153,6 +154,7 @@ namespace SpaceServices
     {
         public IntVec3 cell;
         public int touchdownTick;
+        public string shuttleThingDefName;
         public List<Thing> things = new List<Thing>();
     }
 
@@ -618,16 +620,16 @@ namespace SpaceServices
 
     public static class ServiceShuttleUtility
     {
-        public const int ArrivalTouchdownDelayTicks = 235;
+        public const int ArrivalTouchdownDelayTicks = 260;
 
         public static void SpawnArrival(Map map, IntVec3 cell)
         {
-            SpawnSkyfaller(map, cell, "PassengerShuttleIncoming", "ShuttleIncoming");
+            SpawnSkyfaller(map, cell, ShuttleVisual.Resolve(), true);
         }
 
         public static void SpawnDeparture(Map map, IntVec3 cell)
         {
-            SpawnSkyfaller(map, cell, "PassengerShuttleLeaving", "ShuttleLeaving");
+            SpawnSkyfaller(map, cell, ShuttleVisual.Resolve(), false);
         }
 
         public static bool TryReplaceDropPodWithArrivalShuttle(IntVec3 cell, Map map, ActiveTransporterInfo info, Faction faction)
@@ -648,6 +650,11 @@ namespace SpaceServices
             {
                 return false;
             }
+            ShuttleVisual visual = ShuttleVisual.Resolve();
+            if (visual == null)
+            {
+                return false;
+            }
             foreach (Thing thing in things)
             {
                 if (thing == null)
@@ -656,8 +663,8 @@ namespace SpaceServices
                 }
                 info.innerContainer.Remove(thing);
             }
-            SpawnArrival(map, cell);
-            comp.ScheduleShuttleArrival(cell, things);
+            SpawnSkyfaller(map, cell, visual, true);
+            comp.ScheduleShuttleArrival(cell, visual.shipThingDef.defName, things);
             return true;
         }
 
@@ -674,6 +681,7 @@ namespace SpaceServices
                 {
                     continue;
                 }
+                CleanupTouchdownShuttle(map, arrival.cell, arrival.shuttleThingDefName);
                 SpawnContents(map, arrival.cell, arrival.things);
                 SpawnDeparture(map, arrival.cell);
                 arrivals.RemoveAt(i);
@@ -694,21 +702,36 @@ namespace SpaceServices
             }
         }
 
-        private static void SpawnSkyfaller(Map map, IntVec3 cell, params string[] defNames)
+        private static void SpawnSkyfaller(Map map, IntVec3 cell, ShuttleVisual visual, bool incoming)
         {
-            if (map == null || !cell.IsValid)
+            if (map == null || !cell.IsValid || visual == null)
             {
                 return;
             }
-            for (int i = 0; i < defNames.Length; i++)
+
+            ThingDef skyfallerDef = incoming ? visual.incomingSkyfallerDef : visual.leavingSkyfallerDef;
+            ThingDef shipThingDef = visual.shipThingDef;
+            if (skyfallerDef == null || shipThingDef == null)
             {
-                ThingDef def = DefDatabase<ThingDef>.GetNamedSilentFail(defNames[i]);
-                if (def == null)
-                {
-                    continue;
-                }
-                SkyfallerMaker.SpawnSkyfaller(def, cell, map);
                 return;
+            }
+            Thing innerThing = ThingMaker.MakeThing(shipThingDef);
+            SkyfallerMaker.SpawnSkyfaller(skyfallerDef, innerThing, cell, map);
+        }
+
+        private static void CleanupTouchdownShuttle(Map map, IntVec3 cell, string shuttleThingDefName)
+        {
+            ThingDef shuttleDef = DefDatabase<ThingDef>.GetNamedSilentFail(shuttleThingDefName);
+            if (map == null || shuttleDef == null || !cell.IsValid)
+            {
+                return;
+            }
+            foreach (Thing thing in cell.GetThingList(map).ToList())
+            {
+                if (thing != null && thing.def == shuttleDef)
+                {
+                    thing.Destroy(DestroyMode.Vanish);
+                }
             }
         }
 
@@ -723,6 +746,43 @@ namespace SpaceServices
                 return center;
             }
             return cells[index % cells.Count];
+        }
+    }
+
+    public sealed class ShuttleVisual
+    {
+        public ThingDef shipThingDef;
+        public ThingDef incomingSkyfallerDef;
+        public ThingDef leavingSkyfallerDef;
+
+        public static ShuttleVisual Resolve()
+        {
+            ThingDef ship = DefDatabase<ThingDef>.GetNamedSilentFail("PassengerShuttle");
+            ThingDef incoming = DefDatabase<ThingDef>.GetNamedSilentFail("PassengerShuttleIncoming");
+            ThingDef leaving = DefDatabase<ThingDef>.GetNamedSilentFail("PassengerShuttleLeaving");
+            if (ship != null && incoming != null && leaving != null)
+            {
+                return new ShuttleVisual
+                {
+                    shipThingDef = ship,
+                    incomingSkyfallerDef = incoming,
+                    leavingSkyfallerDef = leaving
+                };
+            }
+
+            ship = DefDatabase<ThingDef>.GetNamedSilentFail("Shuttle");
+            incoming = DefDatabase<ThingDef>.GetNamedSilentFail("ShuttleIncoming");
+            leaving = DefDatabase<ThingDef>.GetNamedSilentFail("ShuttleLeaving");
+            if (ship == null || incoming == null || leaving == null)
+            {
+                return null;
+            }
+            return new ShuttleVisual
+            {
+                shipThingDef = ship,
+                incomingSkyfallerDef = incoming,
+                leavingSkyfallerDef = leaving
+            };
         }
     }
 
