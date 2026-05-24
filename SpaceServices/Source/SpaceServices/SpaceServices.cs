@@ -767,20 +767,8 @@ namespace SpaceServices
                 return null;
             }
 
-            ThingDef incoming = DefDatabase<ThingDef>.GetNamedSilentFail("PassengerShuttleIncoming");
-            ThingDef leaving = DefDatabase<ThingDef>.GetNamedSilentFail("PassengerShuttleLeaving");
-            if (incoming != null && leaving != null)
-            {
-                return new ShuttleVisual
-                {
-                    shipThingDef = payload,
-                    incomingSkyfallerDef = incoming,
-                    leavingSkyfallerDef = leaving
-                };
-            }
-
-            incoming = DefDatabase<ThingDef>.GetNamedSilentFail("ShuttleIncoming");
-            leaving = DefDatabase<ThingDef>.GetNamedSilentFail("ShuttleLeaving");
+            ThingDef incoming = DefDatabase<ThingDef>.GetNamedSilentFail("MLT_ServiceShuttleIncoming");
+            ThingDef leaving = DefDatabase<ThingDef>.GetNamedSilentFail("MLT_ServiceShuttleLeaving");
             if (incoming == null || leaving == null)
             {
                 return null;
