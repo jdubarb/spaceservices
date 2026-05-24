@@ -119,7 +119,7 @@ namespace SpaceServices
             ServiceShuttleUtility.TickPendingArrivals(map, pendingShuttleArrivals);
             if (Find.TickManager.TicksGame >= nextLifecycleTick)
             {
-                nextLifecycleTick = Find.TickManager.TicksGame + 250;
+                nextLifecycleTick = Find.TickManager.TicksGame + ServiceLifecycleUtility.NextTickInterval(serviceGroups);
                 RunStaleReferenceCleanup();
                 ServiceLifecycleUtility.Tick(map, serviceGroups);
             }
@@ -1354,6 +1354,15 @@ namespace SpaceServices
 
     public static class ServiceLifecycleUtility
     {
+        public static int NextTickInterval(List<ServiceGroupRecord> records)
+        {
+            if (records != null && records.Any(record => record != null && (record.state == "pickupInbound" || record.state == "boardingPickup" || record.state == "departing")))
+            {
+                return 30;
+            }
+            return 250;
+        }
+
         public static void RegisterPawns(Map map, string kind, IEnumerable<Pawn> pawns)
         {
             if (map == null || pawns == null || !SpaceServiceMapDetector.IsServiceEligible(map))
@@ -1948,8 +1957,8 @@ namespace SpaceServices
             return boardingRect.Cells
                 .Where(cell => cell.InBounds(map) && cell.Standable(map) && (cell.GetFirstPawn(map) == null || cell == pawn.Position))
                 .Where(cell => pawn.CanReach(cell, PathEndMode.OnCell, Danger.Deadly))
-                .OrderBy(cell => cell.DistanceToSquared(pad.Position))
-                .ThenBy(cell => cell.DistanceToSquared(pawn.Position))
+                .OrderBy(cell => cell.DistanceToSquared(pawn.Position))
+                .ThenBy(cell => cell.DistanceToSquared(pad.Position))
                 .DefaultIfEmpty(IntVec3.Invalid)
                 .First();
         }
