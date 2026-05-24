@@ -86,7 +86,7 @@ namespace SpaceServices
     {
         public List<ServiceGroupRecord> serviceGroups = new List<ServiceGroupRecord>();
         private readonly List<ScheduledServiceShuttleArrival> pendingShuttleArrivals = new List<ScheduledServiceShuttleArrival>();
-        private const int StaleReferenceCleanupVersion = 4;
+        private const int StaleReferenceCleanupVersion = 5;
         private int nextDebugTick;
         private int nextLifecycleTick;
         private bool staleReferenceCleanupDone;
@@ -2096,10 +2096,11 @@ namespace SpaceServices
             int removedLordPawns = CleanupLordPawnLists(map);
             int removedServicePawns = CleanupServiceGroups(map);
             int removedLegacyShuttles = CleanupLegacyPassengerShuttleSkyfallers(map);
+            int removedSocialMemories = CleanupBrokenSocialMemories(map);
 
-            if (removedHospitalPatients > 0 || removedLordPawns > 0 || removedServicePawns > 0 || removedLegacyShuttles > 0)
+            if (removedHospitalPatients > 0 || removedLordPawns > 0 || removedServicePawns > 0 || removedLegacyShuttles > 0 || removedSocialMemories > 0)
             {
-                Log.Message("[Space Services] cleaned stale service references: hospitalPatients=" + removedHospitalPatients + ", lordPawns=" + removedLordPawns + ", servicePawns=" + removedServicePawns + ", legacyPassengerShuttles=" + removedLegacyShuttles);
+                Log.Message("[Space Services] cleaned stale service references: hospitalPatients=" + removedHospitalPatients + ", lordPawns=" + removedLordPawns + ", servicePawns=" + removedServicePawns + ", legacyPassengerShuttles=" + removedLegacyShuttles + ", socialMemories=" + removedSocialMemories);
             }
         }
 
@@ -2212,6 +2213,39 @@ namespace SpaceServices
                     continue;
                 }
                 removed += lord.ownedPawns.RemoveAll(pawn => pawn == null);
+            }
+            return removed;
+        }
+
+        private static int CleanupBrokenSocialMemories(Map map)
+        {
+            if (map == null || map.mapPawns == null)
+            {
+                return 0;
+            }
+
+            int removed = 0;
+            foreach (Pawn pawn in map.mapPawns.AllPawnsSpawned)
+            {
+                if (pawn == null || pawn.needs == null || pawn.needs.mood == null || pawn.needs.mood.thoughts == null || pawn.needs.mood.thoughts.memories == null)
+                {
+                    continue;
+                }
+                List<Thought_Memory> memories = pawn.needs.mood.thoughts.memories.Memories;
+                if (memories == null)
+                {
+                    continue;
+                }
+                removed += memories.RemoveAll(memory =>
+                {
+                    Thought_MemorySocial social = memory as Thought_MemorySocial;
+                    if (social == null)
+                    {
+                        return false;
+                    }
+                    Pawn otherPawn = Reflect.GetMember(social, "otherPawn") as Pawn;
+                    return otherPawn == null || otherPawn.Destroyed;
+                });
             }
             return removed;
         }
@@ -2721,12 +2755,12 @@ namespace SpaceServices
             }
         }
 
-        public static void HospitalSpawnPatientPrefix(object[] __args)
+        public static void HospitalSpawnPatientPrefix(MethodBase __originalMethod, object[] __args)
         {
             Map map = FindMap(__args);
             if (map == null || !SpaceServiceMapDetector.IsServiceEligible(map))
             {
-                HospitalLandingRedirectContext.Push(null, IntVec3.Invalid);
+                HospitalLandingRedirectContext.Push(null, IntVec3.Invalid, null);
                 return;
             }
 
@@ -2741,7 +2775,8 @@ namespace SpaceServices
             {
                 VacSuitUtility.SuitPawnForEnvironment(pawn, map, cell);
             }
-            HospitalLandingRedirectContext.Push(map, cell);
+            Thing tempLandingSpot = IsMassCasualtySpawnPatient(__originalMethod, __args) ? HospitalLandingRedirectContext.CreateTemporaryPatientLandingSpot(map, cell) : null;
+            HospitalLandingRedirectContext.Push(map, cell, tempLandingSpot);
         }
 
         public static void HospitalSpawnPatientPostfix(object[] __args)
@@ -2949,6 +2984,12 @@ namespace SpaceServices
             string typeName = worker == null ? "" : worker.GetType().FullName ?? "";
             return typeName.IndexOf("MassCasualty", StringComparison.OrdinalIgnoreCase) >= 0;
         }
+
+        private static bool IsMassCasualtySpawnPatient(MethodBase method, object[] args)
+        {
+            string typeName = method == null || method.DeclaringType == null ? "" : method.DeclaringType.FullName ?? "";
+            return typeName.IndexOf("MassCasualty", StringComparison.OrdinalIgnoreCase) >= 0 || (args != null && args.Length >= 3);
+        }
     }
 
     public static class HospitalArrivalIncidentContext
@@ -3055,13 +3096,14 @@ namespace SpaceServices
             public Map map;
             public IntVec3 cell;
             public bool forced;
+            public Thing tempLandingSpot;
         }
 
         private static readonly Stack<Request> Requests = new Stack<Request>();
 
-        public static void Push(Map map, IntVec3 cell)
+        public static void Push(Map map, IntVec3 cell, Thing tempLandingSpot)
         {
-            Requests.Push(new Request { map = map, cell = cell, forced = false });
+            Requests.Push(new Request { map = map, cell = cell, forced = false, tempLandingSpot = tempLandingSpot });
         }
 
         public static void PushForced(Map map, IntVec3 cell)
@@ -3073,8 +3115,47 @@ namespace SpaceServices
         {
             if (Requests.Count > 0)
             {
-                Requests.Pop();
+                Request request = Requests.Pop();
+                if (request.tempLandingSpot != null && !request.tempLandingSpot.Destroyed)
+                {
+                    request.tempLandingSpot.Destroy(DestroyMode.Vanish);
+                }
             }
+        }
+
+        public static Thing CreateTemporaryPatientLandingSpot(Map map, IntVec3 preferredCell)
+        {
+            ThingDef def = DefDatabase<ThingDef>.GetNamedSilentFail("PatientLandingSpot");
+            if (map == null || def == null || map.listerBuildings.AllBuildingsColonistOfDef(def).Any())
+            {
+                return null;
+            }
+
+            IntVec3 cell = TemporaryLandingSpotCell(map, preferredCell);
+            if (!cell.IsValid)
+            {
+                return null;
+            }
+
+            Thing thing = ThingMaker.MakeThing(def);
+            thing.SetFactionDirect(Faction.OfPlayer);
+            // Hospital mass casualty code assumes at least one PatientLandingSpot exists before our drop redirect runs.
+            return GenSpawn.Spawn(thing, cell, map, WipeMode.Vanish);
+        }
+
+        private static IntVec3 TemporaryLandingSpotCell(Map map, IntVec3 preferredCell)
+        {
+            IEnumerable<IntVec3> cells = preferredCell.IsValid
+                ? GenRadial.RadialCellsAround(preferredCell, 8f, true)
+                : GenRadial.RadialCellsAround(map.Center, 12f, true);
+            foreach (IntVec3 cell in cells)
+            {
+                if (cell.InBounds(map) && cell.Standable(map) && cell.GetEdifice(map) == null)
+                {
+                    return cell;
+                }
+            }
+            return IntVec3.Invalid;
         }
 
         public static bool TryGetActiveCell(Map map, out IntVec3 cell)
