@@ -49,4 +49,18 @@
       <li>Electricity</li>
     </researchPrerequisites>
   </ThingDef>
+
+  <ThingDef>
+    <defName>MLT_VirtualServiceShuttle</defName>
+    <label>service shuttle</label>
+    <thingClass>SpaceServices.VirtualServiceShuttle</thingClass>
+    <category>Ethereal</category>
+    <useHitPoints>false</useHitPoints>
+    <selectable>false</selectable>
+    <tickerType>Normal</tickerType>
+    <drawerType>RealtimeOnly</drawerType>
+    <drawOffscreen>true</drawOffscreen>
+    <seeThroughFog>true</seeThroughFog>
+    <altitudeLayer>Skyfaller</altitudeLayer>
+  </ThingDef>
 </Defs>

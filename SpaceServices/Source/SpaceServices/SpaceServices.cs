@@ -10,6 +10,7 @@ using UnityEngine;
 using Verse;
 using Verse.AI;
 using Verse.AI.Group;
+using Verse.Sound;
 
 namespace SpaceServices
 {
@@ -593,6 +594,154 @@ namespace SpaceServices
         }
     }
 
+    public enum ServiceShuttleVisualMode
+    {
+        Arrival,
+        Departure
+    }
+
+    public sealed class VirtualServiceShuttle : Thing
+    {
+        private const int DurationTicks = 180;
+        private static readonly Vector2 ShuttleDrawSize = new Vector2(6f, 3f);
+        private static readonly Color ShuttleColor = new Color(0.635f, 0.643f, 0.584f);
+        private static readonly Graphic ShuttleGraphic = GraphicDatabase.Get<Graphic_Single>("Things/Building/Misc/Shuttle", ShaderDatabase.Cutout, ShuttleDrawSize, ShuttleColor);
+
+        private int ageTicks;
+        private ServiceShuttleVisualMode mode;
+
+        public void Configure(ServiceShuttleVisualMode visualMode)
+        {
+            mode = visualMode;
+            ageTicks = 0;
+        }
+
+        public override void ExposeData()
+        {
+            base.ExposeData();
+            Scribe_Values.Look(ref ageTicks, "ageTicks", 0);
+            Scribe_Values.Look(ref mode, "mode", ServiceShuttleVisualMode.Arrival);
+        }
+
+        protected override void Tick()
+        {
+            base.Tick();
+            ageTicks++;
+            if (ageTicks >= DurationTicks)
+            {
+                Destroy(DestroyMode.Vanish);
+            }
+        }
+
+        protected override void DrawAt(Vector3 drawLoc, bool flip = false)
+        {
+            Vector3 drawPos = drawLoc;
+            drawPos.y = AltitudeLayer.Skyfaller.AltitudeFor();
+            drawPos.z += ZOffset(Mathf.Clamp01(ageTicks / (float)DurationTicks));
+            ShuttleGraphic.Draw(drawPos, Rot4.North, this);
+        }
+
+        private float ZOffset(float progress)
+        {
+            if (mode == ServiceShuttleVisualMode.Departure)
+            {
+                if (progress < 0.2f)
+                {
+                    return 0f;
+                }
+                return Mathf.Lerp(0f, 5f, (progress - 0.2f) / 0.8f);
+            }
+            if (progress < 0.45f)
+            {
+                return Mathf.Lerp(5f, 0f, progress / 0.45f);
+            }
+            if (progress < 0.65f)
+            {
+                return 0f;
+            }
+            return Mathf.Lerp(0f, -5f, (progress - 0.65f) / 0.35f);
+        }
+    }
+
+    public static class VirtualShuttleUtility
+    {
+        public static void SpawnArrival(Map map, IntVec3 cell)
+        {
+            Spawn(map, cell, ServiceShuttleVisualMode.Arrival, "Shuttle_Landing");
+        }
+
+        public static void SpawnDeparture(Map map, IntVec3 cell)
+        {
+            Spawn(map, cell, ServiceShuttleVisualMode.Departure, "Shuttle_Leaving");
+        }
+
+        public static bool TryReplaceDropPodWithArrivalShuttle(IntVec3 cell, Map map, ActiveTransporterInfo info, Faction faction)
+        {
+            if (map == null || info == null || info.innerContainer == null || !cell.IsValid)
+            {
+                return false;
+            }
+
+            List<Thing> things = info.innerContainer.ToList();
+            if (things.Count == 0)
+            {
+                return false;
+            }
+
+            SpawnArrival(map, cell);
+            int index = 0;
+            foreach (Thing thing in things)
+            {
+                if (thing == null)
+                {
+                    continue;
+                }
+                info.innerContainer.Remove(thing);
+                IntVec3 spawnCell = FindSpawnCell(cell, map, index++);
+                GenSpawn.Spawn(thing, spawnCell, map);
+            }
+            return true;
+        }
+
+        private static void Spawn(Map map, IntVec3 cell, ServiceShuttleVisualMode mode, string soundDefName)
+        {
+            if (map == null || !cell.IsValid)
+            {
+                return;
+            }
+
+            ThingDef def = DefDatabase<ThingDef>.GetNamedSilentFail("MLT_VirtualServiceShuttle");
+            if (def != null)
+            {
+                VirtualServiceShuttle shuttle = ThingMaker.MakeThing(def) as VirtualServiceShuttle;
+                if (shuttle != null)
+                {
+                    shuttle.Configure(mode);
+                    GenSpawn.Spawn(shuttle, cell, map);
+                }
+            }
+
+            SoundDef sound = DefDatabase<SoundDef>.GetNamedSilentFail(soundDefName);
+            if (sound != null)
+            {
+                sound.PlayOneShot(new TargetInfo(cell, map));
+            }
+        }
+
+        private static IntVec3 FindSpawnCell(IntVec3 center, Map map, int index)
+        {
+            List<IntVec3> cells = GenRadial.RadialCellsAround(center, 3f, true)
+                .Where(cell => cell.InBounds(map) && cell.Standable(map) && cell.GetFirstPawn(map) == null)
+                .OrderBy(cell => cell.DistanceToSquared(center))
+                .ToList();
+            if (cells.Count == 0)
+            {
+                return center;
+            }
+            return cells[index % cells.Count];
+        }
+    }
+
     public sealed class SpaceServiceEligibility
     {
         public bool allowed;
@@ -1058,6 +1207,10 @@ namespace SpaceServices
             record.state = "departing";
             record.departureRequestedTick = Find.TickManager.TicksGame;
             Log.Message("[Space Services] Departing " + record.serviceKind + " service group " + record.id + ": " + reason);
+            if (record.reservedPad != null && record.reservedPad.Spawned)
+            {
+                VirtualShuttleUtility.SpawnDeparture(record.reservedPad.Map, record.reservedPad.Position);
+            }
 
             bool completed = TryAutoExtract(record.pawns, reason);
             if (completed)
@@ -2210,11 +2363,11 @@ namespace SpaceServices
             }
         }
 
-        public static void HospitalDropPodAtPrefix(ref IntVec3 c, Map map, ActiveTransporterInfo info, Faction faction)
+        public static bool HospitalDropPodAtPrefix(ref IntVec3 c, Map map, ActiveTransporterInfo info, Faction faction)
         {
             if (map == null || !SpaceServiceMapDetector.IsServiceEligible(map))
             {
-                return;
+                return true;
             }
             if (HospitalLandingRedirectContext.TryGetActiveCell(map, out IntVec3 cell) && cell.IsValid)
             {
@@ -2233,6 +2386,11 @@ namespace SpaceServices
                 }
                 VacSuitUtility.SuitPawnsForEnvironment(pawns, map, c);
             }
+            if (HospitalLandingRedirectContext.TryGetActiveCell(map, out IntVec3 activeCell) && activeCell.IsValid && VirtualShuttleUtility.TryReplaceDropPodWithArrivalShuttle(c, map, info, faction))
+            {
+                return false;
+            }
+            return true;
         }
 
         public static void HospitalPatientDeparturePostfix(Pawn pawn)
