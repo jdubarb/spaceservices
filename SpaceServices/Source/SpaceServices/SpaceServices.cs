@@ -2549,7 +2549,7 @@ namespace SpaceServices
                 return;
             }
 
-            Map map = parms.target as Map ?? Find.CurrentMap;
+            Map map = parms.target as Map;
             if (map == null || !SpaceServiceMapDetector.IsServiceEligible(map))
             {
                 return;
@@ -2596,7 +2596,8 @@ namespace SpaceServices
             }
             if (HospitalityIncidents.Contains(incidentDefName))
             {
-                return (SpaceServicesMod.Settings == null || SpaceServicesMod.Settings.enableHospitality) && HasRequiredPad(map, ServiceUse.Guest);
+                // Hospitality needs its own arrival/departure pipeline before natural space-map events are safe.
+                return false;
             }
             return false;
         }
