@@ -5,6 +5,7 @@ using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
+using System.Text;
 using UnityEngine;
 using Verse;
 using Verse.AI;
@@ -156,6 +157,64 @@ namespace SpaceServices
         }
     }
 
+    public sealed class ServiceDepartureBlock
+    {
+        public Map map;
+        public ServiceGroupRecord record;
+        public string reason;
+
+        public Thing Culprit
+        {
+            get
+            {
+                if (record == null)
+                {
+                    return null;
+                }
+                if (record.reservedPad != null && !record.reservedPad.Destroyed)
+                {
+                    return record.reservedPad;
+                }
+                return record.pawns == null ? null : record.pawns.FirstOrDefault(pawn => pawn != null && !pawn.Destroyed);
+            }
+        }
+    }
+
+    public class Alert_SpaceServicesDepartureBlocked : Alert
+    {
+        public Alert_SpaceServicesDepartureBlocked()
+        {
+            defaultLabel = "Space Services: departure blocked";
+        }
+
+        public override TaggedString GetExplanation()
+        {
+            List<ServiceDepartureBlock> blocks = ServiceLifecycleUtility.BlockedDepartures();
+            StringBuilder builder = new StringBuilder();
+            builder.AppendLine("Service visitors are ready to leave, but Space Services cannot safely extract them yet.");
+            builder.AppendLine();
+            foreach (ServiceDepartureBlock block in blocks)
+            {
+                string serviceKind = block.record == null ? "service" : block.record.serviceKind ?? "service";
+                string mapLabel = block.map == null ? "unknown map" : "map " + block.map.uniqueID;
+                builder.AppendLine("- " + serviceKind + " on " + mapLabel + ": " + (block.reason ?? "departure blocked"));
+            }
+            builder.AppendLine();
+            builder.Append("Fix the service pad or restore a safe atmosphere at the pad.");
+            return builder.ToString();
+        }
+
+        public override AlertReport GetReport()
+        {
+            List<Thing> culprits = ServiceLifecycleUtility.BlockedDepartures()
+                .Select(block => block.Culprit)
+                .Where(thing => thing != null)
+                .Distinct()
+                .ToList();
+            return culprits.Count == 0 ? AlertReport.Inactive : AlertReport.CulpritsAre(culprits);
+        }
+    }
+
     public class CompProperties_SpaceServicePad : CompProperties
     {
         public CompProperties_SpaceServicePad()
@@ -197,6 +256,11 @@ namespace SpaceServices
             {
                 return false;
             }
+            return MeetsUseRequirements(use);
+        }
+
+        public bool MeetsUseRequirements(ServiceUse use)
+        {
             if (requirePower)
             {
                 CompPowerTrader power = parent.TryGetComp<CompPowerTrader>();
@@ -525,6 +589,7 @@ namespace SpaceServices
     {
         private static readonly string[] AdultSuitDefs = { "Apparel_Vacsuit", "Apparel_VacsuitHelmet" };
         private static readonly string[] ChildSuitDefs = { "Apparel_VacsuitChildren", "Apparel_VacsuitHelmet" };
+        private static StatDef vacuumResistance;
 
         public static void SuitPawnsForVacuum(IEnumerable<Pawn> pawns)
         {
@@ -535,6 +600,52 @@ namespace SpaceServices
             foreach (Pawn pawn in pawns)
             {
                 SuitPawnForVacuum(pawn);
+            }
+        }
+
+        public static void SuitPawnsForEnvironment(IEnumerable<Pawn> pawns, Map map, IntVec3 cell)
+        {
+            if (pawns == null)
+            {
+                return;
+            }
+            foreach (Pawn pawn in pawns)
+            {
+                SuitPawnForEnvironment(pawn, map, cell);
+            }
+        }
+
+        public static void SuitPawnForEnvironment(Pawn pawn, Map map, IntVec3 cell)
+        {
+            if (pawn == null || map == null || !cell.IsValid)
+            {
+                return;
+            }
+            float vacuum = ServiceEnvironmentUtility.GetVacuum(cell, map);
+            if (VacuumResistance(pawn) + 0.001f < vacuum)
+            {
+                SuitPawnForVacuum(pawn);
+            }
+        }
+
+        public static float VacuumResistance(Pawn pawn)
+        {
+            if (pawn == null)
+            {
+                return 0f;
+            }
+            StatDef stat = VacuumResistanceDef;
+            if (stat == null)
+            {
+                return 0f;
+            }
+            try
+            {
+                return pawn.GetStatValue(stat);
+            }
+            catch
+            {
+                return 0f;
             }
         }
 
@@ -569,6 +680,90 @@ namespace SpaceServices
                 return;
             }
             pawn.apparel.Wear(newApparel, false, true);
+        }
+
+        private static StatDef VacuumResistanceDef
+        {
+            get
+            {
+                if (vacuumResistance == null)
+                {
+                    vacuumResistance = DefDatabase<StatDef>.GetNamedSilentFail("VacuumResistance");
+                }
+                return vacuumResistance;
+            }
+        }
+    }
+
+    public static class ServiceEnvironmentUtility
+    {
+        private const float Epsilon = 0.001f;
+
+        public static float GetVacuum(IntVec3 cell, Map map)
+        {
+            if (map == null || !cell.IsValid || !cell.InBounds(map))
+            {
+                return 0f;
+            }
+            try
+            {
+                return Mathf.Clamp01(VacuumUtility.GetVacuum(cell, map));
+            }
+            catch
+            {
+                TerrainDef terrain = cell.GetTerrain(map);
+                if (terrain != null && terrain.exposesToVacuum && !cell.Roofed(map))
+                {
+                    return 1f;
+                }
+                return 0f;
+            }
+        }
+
+        public static float GetMaxVacuum(Thing pad)
+        {
+            Map map = pad == null ? null : pad.Map;
+            if (map == null || pad.Destroyed)
+            {
+                return 0f;
+            }
+            float maxVacuum = 0f;
+            foreach (IntVec3 cell in pad.OccupiedRect().Cells)
+            {
+                maxVacuum = Mathf.Max(maxVacuum, GetVacuum(cell, map));
+            }
+            return maxVacuum;
+        }
+
+        public static bool IsSafeForPawn(Pawn pawn, Map map, IntVec3 cell)
+        {
+            float vacuum = GetVacuum(cell, map);
+            return VacSuitUtility.VacuumResistance(pawn) + Epsilon >= vacuum;
+        }
+
+        public static bool IsPadSafeForPawns(Thing pad, IEnumerable<Pawn> pawns, out string reason)
+        {
+            reason = null;
+            if (pad == null || pad.Destroyed || pad.Map == null)
+            {
+                reason = "departure pad unavailable";
+                return false;
+            }
+            float vacuum = GetMaxVacuum(pad);
+            foreach (Pawn pawn in pawns ?? Enumerable.Empty<Pawn>())
+            {
+                if (pawn == null || pawn.Destroyed)
+                {
+                    continue;
+                }
+                float resistance = VacSuitUtility.VacuumResistance(pawn);
+                if (resistance + Epsilon < vacuum)
+                {
+                    reason = "departure pad vacuum " + vacuum.ToStringPercent() + " exceeds " + pawn.LabelShortCap + "'s vacuum resistance " + resistance.ToStringPercent();
+                    return false;
+                }
+            }
+            return true;
         }
     }
 
@@ -834,7 +1029,7 @@ namespace SpaceServices
                     {
                         GuideDepartingPawnsToPad(record);
                     }
-                    if (Find.TickManager.TicksGame > record.departureRequestedTick + GenDate.TicksPerHour)
+                    if (record.serviceKind != "hospital" && Find.TickManager.TicksGame > record.departureRequestedTick + GenDate.TicksPerHour)
                     {
                         DepartureUtility.CompleteDeparture(map, record, "departure timeout fallback");
                     }
@@ -897,6 +1092,11 @@ namespace SpaceServices
 
         private static void BeginHospitalDeparture(Map map, ServiceGroupRecord record, string reason)
         {
+            if (record.reservedPad != null && !ReservedPadStillExists(record))
+            {
+                ReleaseRecord(record);
+                record.reservedPad = null;
+            }
             if (record.reservedPad == null)
             {
                 record.reservedPad = ServicePadUtility.TryReserveServicePad(map, ServiceUse.Patient, record.id);
@@ -908,6 +1108,19 @@ namespace SpaceServices
                     record.state = "departing";
                     record.departureRequestedTick = Find.TickManager.TicksGame;
                     Log.Message("[Space Services] Hospital patient waiting for free departure pad: " + reason);
+                }
+                return;
+            }
+            if (!ReservedPadCanServe(record, ServiceUse.Patient, out string blockedReason))
+            {
+                if (record.state != "departing")
+                {
+                    record.state = "departing";
+                    record.departureRequestedTick = Find.TickManager.TicksGame;
+                }
+                if (SpaceServicesMod.Settings != null && SpaceServicesMod.Settings.debugLogging)
+                {
+                    Log.Message("[Space Services] Hospital patient departure waiting: " + blockedReason);
                 }
                 return;
             }
@@ -936,6 +1149,10 @@ namespace SpaceServices
             {
                 return record.serviceKind != "hospital";
             }
+            if (!ReservedPadCanServe(record, record.serviceKind == "hospitality" ? ServiceUse.Guest : ServiceUse.Patient, out string blockedReason))
+            {
+                return false;
+            }
             foreach (Pawn pawn in record.pawns)
             {
                 if (pawn == null || pawn.Destroyed)
@@ -953,6 +1170,10 @@ namespace SpaceServices
         private static void GuideDepartingPawnsToPad(ServiceGroupRecord record)
         {
             if (record == null || record.pawns == null || record.reservedPad == null)
+            {
+                return;
+            }
+            if (!ReservedPadCanServe(record, record.serviceKind == "hospitality" ? ServiceUse.Guest : ServiceUse.Patient, out string blockedReason))
             {
                 return;
             }
@@ -976,6 +1197,64 @@ namespace SpaceServices
                 job.locomotionUrgency = LocomotionUrgency.Jog;
                 pawn.jobs.TryTakeOrderedJob(job, JobTag.Misc);
             }
+        }
+
+        public static List<ServiceDepartureBlock> BlockedDepartures()
+        {
+            List<ServiceDepartureBlock> blocks = new List<ServiceDepartureBlock>();
+            foreach (Map map in Find.Maps ?? Enumerable.Empty<Map>())
+            {
+                SpaceServicesMapComponent comp = map == null ? null : map.GetComponent<SpaceServicesMapComponent>();
+                if (comp == null || comp.serviceGroups == null)
+                {
+                    continue;
+                }
+                foreach (ServiceGroupRecord record in comp.serviceGroups)
+                {
+                    if (record == null || record.state != "departing" || record.pawns == null || record.pawns.Count == 0)
+                    {
+                        continue;
+                    }
+                    ServiceUse use = record.serviceKind == "hospitality" ? ServiceUse.Guest : ServiceUse.Patient;
+                    if (!ReservedPadCanServe(record, use, out string reason))
+                    {
+                        blocks.Add(new ServiceDepartureBlock
+                        {
+                            map = map,
+                            record = record,
+                            reason = reason
+                        });
+                    }
+                }
+            }
+            return blocks;
+        }
+
+        private static bool ReservedPadCanServe(ServiceGroupRecord record, ServiceUse use, out string reason)
+        {
+            reason = null;
+            if (record == null)
+            {
+                reason = "no service record";
+                return false;
+            }
+            if (!ReservedPadStillExists(record))
+            {
+                reason = "departure pad unavailable";
+                return false;
+            }
+            CompSpaceServicePad comp = record.reservedPad.TryGetComp<CompSpaceServicePad>();
+            if (comp == null || !comp.MeetsUseRequirements(use))
+            {
+                reason = "departure pad settings block this service";
+                return false;
+            }
+            return ServiceEnvironmentUtility.IsPadSafeForPawns(record.reservedPad, record.pawns, out reason);
+        }
+
+        private static bool ReservedPadStillExists(ServiceGroupRecord record)
+        {
+            return record != null && record.reservedPad != null && !record.reservedPad.Destroyed && record.reservedPad.Map != null;
         }
 
         private static bool IsTryingToLeave(Pawn pawn)
@@ -1618,7 +1897,7 @@ namespace SpaceServices
             }
             foreach (Pawn pawn in PawnsFromArgs(__args))
             {
-                VacSuitUtility.SuitPawnForVacuum(pawn);
+                VacSuitUtility.SuitPawnForEnvironment(pawn, map, cell);
             }
             HospitalLandingRedirectContext.Push(map, cell);
         }
@@ -1629,9 +1908,12 @@ namespace SpaceServices
             {
                 Map map = FindMap(__args);
                 List<Pawn> pawns = PawnsFromArgs(__args).Distinct().ToList();
+                IntVec3 arrivalCell = IntVec3.Invalid;
+                bool hasArrivalCell = map != null && HospitalLandingRedirectContext.TryGetActiveCell(map, out arrivalCell);
                 foreach (Pawn pawn in pawns)
                 {
-                    VacSuitUtility.SuitPawnForVacuum(pawn);
+                    IntVec3 cell = pawn != null && pawn.Spawned ? pawn.Position : hasArrivalCell ? arrivalCell : IntVec3.Invalid;
+                    VacSuitUtility.SuitPawnForEnvironment(pawn, map, cell);
                 }
                 if (map != null && pawns.Count > 0 && SpaceServiceMapDetector.IsServiceEligible(map))
                 {
@@ -1665,7 +1947,7 @@ namespace SpaceServices
                         pawns.Add(pawn);
                     }
                 }
-                VacSuitUtility.SuitPawnsForVacuum(pawns);
+                VacSuitUtility.SuitPawnsForEnvironment(pawns, map, c);
             }
         }
 
@@ -1689,7 +1971,8 @@ namespace SpaceServices
             List<Pawn> pawns = PawnsFromArgs(__args).Distinct().ToList();
             foreach (Pawn pawn in pawns)
             {
-                VacSuitUtility.SuitPawnForVacuum(pawn);
+                IntVec3 cell = pawn != null && pawn.Spawned ? pawn.Position : IntVec3.Invalid;
+                VacSuitUtility.SuitPawnForEnvironment(pawn, map, cell);
             }
             string methodName = __originalMethod == null || __originalMethod.DeclaringType == null ? "" : __originalMethod.DeclaringType.FullName ?? "";
             if (map != null && pawns.Count > 0)
@@ -1980,7 +2263,7 @@ namespace SpaceServices
 
             foreach (Pawn pawn in pawns)
             {
-                VacSuitUtility.SuitPawnForVacuum(pawn);
+                VacSuitUtility.SuitPawnForEnvironment(pawn, map, cell);
                 HospitalLandingRedirectContext.PushForced(map, cell);
                 try
                 {
