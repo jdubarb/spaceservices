@@ -2404,6 +2404,11 @@ namespace SpaceServices
             {
                 return false;
             }
+            // Hospital mass casualties overfill hard; require room for the whole minimum batch.
+            if (incidentDefName == "MassCasualtyEvent" && freeBeds < 3)
+            {
+                return false;
+            }
             if (!Reflect.BoolMember(hospital, "AcceptDanger", false) && HospitalDangersOnMap(map))
             {
                 return false;
@@ -2785,7 +2790,7 @@ namespace SpaceServices
             {
                 VacSuitUtility.SuitPawnForEnvironment(pawn, map, cell);
             }
-            Thing tempLandingSpot = IsMassCasualtySpawnPatient(__originalMethod, __args) ? HospitalLandingRedirectContext.CreateTemporaryPatientLandingSpot(map, cell) : null;
+            Thing tempLandingSpot = HospitalLandingRedirectContext.CreateTemporaryPatientLandingSpot(map, cell);
             HospitalLandingRedirectContext.Push(map, cell, tempLandingSpot);
         }
 
@@ -2995,11 +3000,6 @@ namespace SpaceServices
             return typeName.IndexOf("MassCasualty", StringComparison.OrdinalIgnoreCase) >= 0;
         }
 
-        private static bool IsMassCasualtySpawnPatient(MethodBase method, object[] args)
-        {
-            string typeName = method == null || method.DeclaringType == null ? "" : method.DeclaringType.FullName ?? "";
-            return typeName.IndexOf("MassCasualty", StringComparison.OrdinalIgnoreCase) >= 0 || (args != null && args.Length >= 3);
-        }
     }
 
     public static class HospitalArrivalIncidentContext
