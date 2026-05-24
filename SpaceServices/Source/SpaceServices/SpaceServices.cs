@@ -944,6 +944,8 @@ namespace SpaceServices
     {
         private static readonly string[] AdultSuitDefs = { "Apparel_Vacsuit", "Apparel_VacsuitHelmet" };
         private static readonly string[] ChildSuitDefs = { "Apparel_VacsuitChildren", "Apparel_VacsuitHelmet" };
+        private static readonly HashSet<string> KnownVacSuitDefs = new HashSet<string>(AdultSuitDefs.Concat(ChildSuitDefs));
+        private static readonly Dictionary<int, bool> sealedArrivalSuitRolls = new Dictionary<int, bool>();
         private static StatDef vacuumResistance;
 
         public static void SuitPawnsForVacuum(IEnumerable<Pawn> pawns)
@@ -979,8 +981,43 @@ namespace SpaceServices
             float vacuum = ServiceEnvironmentUtility.GetVacuum(cell, map);
             if (VacuumResistance(pawn) + 0.001f < vacuum)
             {
-                SuitPawnForVacuum(pawn);
+                if (ShouldProvideSuitForArrival(pawn, map, cell))
+                {
+                    SuitPawnForVacuum(pawn);
+                }
+                else
+                {
+                    RemoveKnownVacSuit(pawn);
+                }
             }
+            else if (SpaceServicesMod.Settings != null && SpaceServicesMod.Settings.allowSealedNoSuitArrivals && ServiceEnvironmentUtility.IsSealedNoSuitArrivalCell(cell, map) && !ShouldProvideSuitForArrival(pawn, map, cell))
+            {
+                RemoveKnownVacSuit(pawn);
+            }
+        }
+
+        private static bool ShouldProvideSuitForArrival(Pawn pawn, Map map, IntVec3 cell)
+        {
+            if (SpaceServicesMod.Settings == null || !SpaceServicesMod.Settings.allowSealedNoSuitArrivals)
+            {
+                return true;
+            }
+            if (!ServiceEnvironmentUtility.IsSealedNoSuitArrivalCell(cell, map))
+            {
+                return true;
+            }
+            // Sealed arrival rooms should mostly receive ordinary patients, but keep some suited traffic mixed in.
+            int key = pawn == null ? 0 : pawn.thingIDNumber;
+            if (key == 0)
+            {
+                return Rand.Chance(0.2f);
+            }
+            if (!sealedArrivalSuitRolls.TryGetValue(key, out bool shouldSuit))
+            {
+                shouldSuit = Rand.Chance(0.2f);
+                sealedArrivalSuitRolls[key] = shouldSuit;
+            }
+            return shouldSuit;
         }
 
         public static float VacuumResistance(Pawn pawn)
@@ -1035,6 +1072,22 @@ namespace SpaceServices
                 return;
             }
             pawn.apparel.Wear(newApparel, false, true);
+        }
+
+        private static void RemoveKnownVacSuit(Pawn pawn)
+        {
+            if (pawn == null || pawn.apparel == null)
+            {
+                return;
+            }
+            foreach (Apparel apparel in pawn.apparel.WornApparel.ToList())
+            {
+                if (apparel != null && KnownVacSuitDefs.Contains(apparel.def.defName))
+                {
+                    pawn.apparel.Remove(apparel);
+                    apparel.Destroy(DestroyMode.Vanish);
+                }
+            }
         }
 
         private static StatDef VacuumResistanceDef
@@ -1203,6 +1256,15 @@ namespace SpaceServices
         {
             float vacuum = GetVacuum(cell, map);
             return VacSuitUtility.VacuumResistance(pawn) + Epsilon >= vacuum;
+        }
+
+        public static bool IsSealedNoSuitArrivalCell(IntVec3 cell, Map map)
+        {
+            if (map == null || !cell.IsValid || !cell.InBounds(map))
+            {
+                return false;
+            }
+            return GetVacuum(cell, map) <= Epsilon;
         }
 
         public static bool IsPadSafeForPawns(Thing pad, IEnumerable<Pawn> pawns, out string reason)
@@ -2926,7 +2988,7 @@ namespace SpaceServices
                 bool hasArrivalCell = map != null && HospitalLandingRedirectContext.TryGetActiveCell(map, out arrivalCell);
                 foreach (Pawn pawn in pawns)
                 {
-                    IntVec3 cell = pawn != null && pawn.Spawned ? pawn.Position : hasArrivalCell ? arrivalCell : IntVec3.Invalid;
+                    IntVec3 cell = hasArrivalCell ? arrivalCell : pawn != null && pawn.Spawned ? pawn.Position : IntVec3.Invalid;
                     VacSuitUtility.SuitPawnForEnvironment(pawn, map, cell);
                 }
                 if (map != null && pawns.Count > 0 && SpaceServiceMapDetector.IsServiceEligible(map))
