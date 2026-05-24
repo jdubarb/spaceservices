@@ -86,7 +86,7 @@ namespace SpaceServices
     {
         public List<ServiceGroupRecord> serviceGroups = new List<ServiceGroupRecord>();
         private readonly List<ScheduledServiceShuttleArrival> pendingShuttleArrivals = new List<ScheduledServiceShuttleArrival>();
-        private const int StaleReferenceCleanupVersion = 5;
+        private const int StaleReferenceCleanupVersion = 6;
         private int nextDebugTick;
         private int nextLifecycleTick;
         private bool staleReferenceCleanupDone;
@@ -2291,10 +2291,11 @@ namespace SpaceServices
             int removedServicePawns = CleanupServiceGroups(map);
             int removedLegacyShuttles = CleanupLegacyPassengerShuttleSkyfallers(map);
             int removedSocialMemories = CleanupBrokenSocialMemories(map);
+            int removedDirectRelations = CleanupBrokenDirectRelations(map);
 
-            if (removedHospitalPatients > 0 || removedLordPawns > 0 || removedServicePawns > 0 || removedLegacyShuttles > 0 || removedSocialMemories > 0)
+            if (removedHospitalPatients > 0 || removedLordPawns > 0 || removedServicePawns > 0 || removedLegacyShuttles > 0 || removedSocialMemories > 0 || removedDirectRelations > 0)
             {
-                Log.Message("[Space Services] cleaned stale service references: hospitalPatients=" + removedHospitalPatients + ", lordPawns=" + removedLordPawns + ", servicePawns=" + removedServicePawns + ", legacyPassengerShuttles=" + removedLegacyShuttles + ", socialMemories=" + removedSocialMemories);
+                Log.Message("[Space Services] cleaned stale service references: hospitalPatients=" + removedHospitalPatients + ", lordPawns=" + removedLordPawns + ", servicePawns=" + removedServicePawns + ", legacyPassengerShuttles=" + removedLegacyShuttles + ", socialMemories=" + removedSocialMemories + ", directRelations=" + removedDirectRelations);
             }
         }
 
@@ -2413,13 +2414,13 @@ namespace SpaceServices
 
         private static int CleanupBrokenSocialMemories(Map map)
         {
-            if (map == null || map.mapPawns == null)
+            if (map == null)
             {
                 return 0;
             }
 
             int removed = 0;
-            foreach (Pawn pawn in map.mapPawns.AllPawnsSpawned)
+            foreach (Pawn pawn in PawnsToClean(map))
             {
                 if (pawn == null || pawn.needs == null || pawn.needs.mood == null || pawn.needs.mood.thoughts == null || pawn.needs.mood.thoughts.memories == null)
                 {
@@ -2442,6 +2443,50 @@ namespace SpaceServices
                 });
             }
             return removed;
+        }
+
+        private static int CleanupBrokenDirectRelations(Map map)
+        {
+            int removed = 0;
+            foreach (Pawn pawn in PawnsToClean(map))
+            {
+                if (pawn == null || pawn.relations == null || pawn.relations.DirectRelations == null)
+                {
+                    continue;
+                }
+                removed += pawn.relations.DirectRelations.RemoveAll(relation => relation == null || relation.otherPawn == null || relation.otherPawn.Destroyed);
+            }
+            return removed;
+        }
+
+        private static IEnumerable<Pawn> PawnsToClean(Map map)
+        {
+            HashSet<Pawn> pawns = new HashSet<Pawn>();
+            if (map != null && map.mapPawns != null)
+            {
+                foreach (Pawn pawn in map.mapPawns.AllPawnsSpawned)
+                {
+                    if (pawn != null)
+                    {
+                        pawns.Add(pawn);
+                    }
+                }
+                foreach (Pawn pawn in map.mapPawns.AllPawnsUnspawned)
+                {
+                    if (pawn != null)
+                    {
+                        pawns.Add(pawn);
+                    }
+                }
+            }
+            foreach (Pawn pawn in PawnsFinder.AllMapsWorldAndTemporary_Alive)
+            {
+                if (pawn != null)
+                {
+                    pawns.Add(pawn);
+                }
+            }
+            return pawns;
         }
 
         private static int CleanupServiceGroups(Map map)
