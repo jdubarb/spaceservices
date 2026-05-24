@@ -96,6 +96,12 @@ namespace SpaceServices
         {
         }
 
+        public override void FinalizeInit()
+        {
+            base.FinalizeInit();
+            RunStaleReferenceCleanup();
+        }
+
         public override void ExposeData()
         {
             Scribe_Collections.Look(ref serviceGroups, "serviceGroups", LookMode.Deep);
@@ -114,12 +120,7 @@ namespace SpaceServices
             if (Find.TickManager.TicksGame >= nextLifecycleTick)
             {
                 nextLifecycleTick = Find.TickManager.TicksGame + 250;
-                if (!staleReferenceCleanupDone || staleReferenceCleanupVersion < StaleReferenceCleanupVersion)
-                {
-                    staleReferenceCleanupDone = true;
-                    staleReferenceCleanupVersion = StaleReferenceCleanupVersion;
-                    StaleReferenceCleanupUtility.CleanupAfterLoad(map);
-                }
+                RunStaleReferenceCleanup();
                 ServiceLifecycleUtility.Tick(map, serviceGroups);
             }
             if (Find.TickManager.TicksGame < nextDebugTick)
@@ -132,6 +133,17 @@ namespace SpaceServices
                 SpaceServiceEligibility eligibility = SpaceServiceMapDetector.Evaluate(map);
                 Log.Message("[Space Services] " + eligibility.ToLogString(map));
             }
+        }
+
+        private void RunStaleReferenceCleanup()
+        {
+            if (staleReferenceCleanupDone && staleReferenceCleanupVersion >= StaleReferenceCleanupVersion)
+            {
+                return;
+            }
+            staleReferenceCleanupDone = true;
+            staleReferenceCleanupVersion = StaleReferenceCleanupVersion;
+            StaleReferenceCleanupUtility.CleanupAfterLoad(map);
         }
 
         public void ScheduleShuttleArrival(IntVec3 cell, string shuttleThingDefName, List<Thing> things)
@@ -252,6 +264,7 @@ namespace SpaceServices
         }
     }
 
+    [StaticConstructorOnStartup]
     public class CompSpaceServicePad : ThingComp
     {
         private const float OverlayDrawSize = 1.55f;
