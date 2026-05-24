@@ -5,6 +5,15 @@
     <label>service shuttle payload</label>
     <thingClass>Thing</thingClass>
     <useHitPoints>false</useHitPoints>
+    <drawerType>RealtimeOnly</drawerType>
+    <altitudeLayer>Building</altitudeLayer>
+    <size>(5,3)</size>
+    <graphicData>
+      <texPath>Things/Building/Misc/Shuttle</texPath>
+      <graphicClass>Graphic_Single</graphicClass>
+      <drawSize>(6,3)</drawSize>
+      <color>(162,164,149)</color>
+    </graphicData>
   </ThingDef>
 
   <ThingDef ParentName="ShuttleSkyfallerBase">

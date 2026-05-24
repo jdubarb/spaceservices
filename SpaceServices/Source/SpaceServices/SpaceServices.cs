@@ -1496,7 +1496,8 @@ namespace SpaceServices
                     {
                         if (ReadyForExtraction(record))
                         {
-                            DepartureUtility.CompleteDeparture(map, record, "service pawns boarded pickup shuttle");
+                            record.state = "boardingPickup";
+                            GuideBoardingPawnsToShuttle(record);
                         }
                         else
                         {
@@ -1514,6 +1515,26 @@ namespace SpaceServices
                     else
                     {
                         GuideDepartingPawnsToPad(record);
+                    }
+                    continue;
+                }
+                if (record.state == "boardingPickup")
+                {
+                    if (!ReservedPadCanServe(record, record.serviceKind == "hospitality" ? ServiceUse.Guest : ServiceUse.Patient, out string blockedReason))
+                    {
+                        if (SpaceServicesMod.Settings != null && SpaceServicesMod.Settings.debugLogging)
+                        {
+                            Log.Message("[Space Services] Service pickup boarding waiting: " + blockedReason);
+                        }
+                        continue;
+                    }
+                    if (ReadyForBoardingCompletion(record))
+                    {
+                        DepartureUtility.CompleteDeparture(map, record, "service pawns boarded pickup shuttle");
+                    }
+                    else
+                    {
+                        GuideBoardingPawnsToShuttle(record);
                     }
                     continue;
                 }
@@ -1694,6 +1715,26 @@ namespace SpaceServices
             return true;
         }
 
+        private static bool ReadyForBoardingCompletion(ServiceGroupRecord record)
+        {
+            if (record == null || record.pawns == null || record.pawns.Count == 0 || record.reservedPad == null)
+            {
+                return false;
+            }
+            foreach (Pawn pawn in record.pawns)
+            {
+                if (pawn == null || pawn.Destroyed)
+                {
+                    continue;
+                }
+                if (pawn.Spawned && !PawnAtPickupShuttle(pawn, record.reservedPad))
+                {
+                    return false;
+                }
+            }
+            return true;
+        }
+
         private static void GuideDepartingPawnsToPad(ServiceGroupRecord record)
         {
             if (record == null || record.pawns == null || record.reservedPad == null)
@@ -1730,6 +1771,38 @@ namespace SpaceServices
             }
         }
 
+        private static void GuideBoardingPawnsToShuttle(ServiceGroupRecord record)
+        {
+            if (record == null || record.pawns == null || record.reservedPad == null)
+            {
+                return;
+            }
+            Map map = record.reservedPad.Map;
+            if (map == null)
+            {
+                return;
+            }
+            foreach (Pawn pawn in record.pawns)
+            {
+                if (pawn == null || !pawn.Spawned || pawn.Downed)
+                {
+                    continue;
+                }
+                IntVec3 boardCell = PickupBoardingCell(record.reservedPad, pawn);
+                if (!boardCell.IsValid || pawn.Position.InHorDistOf(boardCell, 1f))
+                {
+                    continue;
+                }
+                if (!pawn.CanReach(boardCell, PathEndMode.OnCell, Danger.Deadly))
+                {
+                    continue;
+                }
+                Job job = JobMaker.MakeJob(JobDefOf.Goto, boardCell);
+                job.locomotionUrgency = LocomotionUrgency.Jog;
+                pawn.jobs.TryTakeOrderedJob(job, JobTag.Misc);
+            }
+        }
+
         private static bool PawnWaitingOutsidePad(Pawn pawn, Thing pad)
         {
             if (pawn == null || !pawn.Spawned || pad == null || pad.Map == null)
@@ -1742,6 +1815,33 @@ namespace SpaceServices
             }
             IntVec3 waitCell = DepartureWaitCell(pad, pawn);
             return waitCell.IsValid && pawn.Position.InHorDistOf(waitCell, 1f);
+        }
+
+        private static bool PawnAtPickupShuttle(Pawn pawn, Thing pad)
+        {
+            if (pawn == null || !pawn.Spawned || pad == null || pad.Map == null)
+            {
+                return false;
+            }
+            IntVec3 boardCell = PickupBoardingCell(pad, pawn);
+            return boardCell.IsValid && pawn.Position.InHorDistOf(boardCell, 1f);
+        }
+
+        private static IntVec3 PickupBoardingCell(Thing pad, Pawn pawn)
+        {
+            Map map = pad == null ? null : pad.Map;
+            if (map == null || pawn == null)
+            {
+                return IntVec3.Invalid;
+            }
+            CellRect padRect = pad.OccupiedRect();
+            return padRect.Cells
+                .Where(cell => cell.InBounds(map) && cell.Standable(map) && (cell.GetFirstPawn(map) == null || cell == pawn.Position))
+                .Where(cell => pawn.CanReach(cell, PathEndMode.OnCell, Danger.Deadly))
+                .OrderBy(cell => cell.DistanceToSquared(pad.Position))
+                .ThenBy(cell => cell.DistanceToSquared(pawn.Position))
+                .DefaultIfEmpty(IntVec3.Invalid)
+                .First();
         }
 
         private static IntVec3 DepartureWaitCell(Thing pad, Pawn pawn)
