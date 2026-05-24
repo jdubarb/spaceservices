@@ -166,6 +166,8 @@ namespace SpaceServices
         public int arrivalTick;
         public int timeoutTick;
         public int departureRequestedTick;
+        public int pickupShuttleTouchdownTick;
+        public string pickupShuttleThingDefName;
         public Thing reservedPad;
         public List<Pawn> pawns = new List<Pawn>();
 
@@ -177,6 +179,8 @@ namespace SpaceServices
             Scribe_Values.Look(ref arrivalTick, "arrivalTick", 0);
             Scribe_Values.Look(ref timeoutTick, "timeoutTick", 0);
             Scribe_Values.Look(ref departureRequestedTick, "departureRequestedTick", 0);
+            Scribe_Values.Look(ref pickupShuttleTouchdownTick, "pickupShuttleTouchdownTick", 0);
+            Scribe_Values.Look(ref pickupShuttleThingDefName, "pickupShuttleThingDefName");
             Scribe_References.Look(ref reservedPad, "reservedPad");
             Scribe_Collections.Look(ref pawns, "pawns", LookMode.Reference);
         }
@@ -719,7 +723,7 @@ namespace SpaceServices
             SkyfallerMaker.SpawnSkyfaller(skyfallerDef, innerThing, cell, map);
         }
 
-        private static void CleanupTouchdownShuttle(Map map, IntVec3 cell, string shuttleThingDefName)
+        public static void CleanupTouchdownShuttle(Map map, IntVec3 cell, string shuttleThingDefName)
         {
             ThingDef shuttleDef = DefDatabase<ThingDef>.GetNamedSilentFail(shuttleThingDefName);
             if (map == null || shuttleDef == null || !cell.IsValid)
@@ -1251,14 +1255,17 @@ namespace SpaceServices
             record.state = "departing";
             record.departureRequestedTick = Find.TickManager.TicksGame;
             Log.Message("[Space Services] Departing " + record.serviceKind + " service group " + record.id + ": " + reason);
-            if (record.reservedPad != null && record.reservedPad.Spawned)
-            {
-                ServiceShuttleUtility.SpawnDeparture(record.reservedPad.Map, record.reservedPad.Position);
-            }
+            Map padMap = record.reservedPad == null ? null : record.reservedPad.Map;
+            IntVec3 padCell = record.reservedPad == null ? IntVec3.Invalid : record.reservedPad.Position;
+            ServiceShuttleUtility.CleanupTouchdownShuttle(padMap, padCell, record.pickupShuttleThingDefName);
 
             bool completed = TryAutoExtract(record.pawns, reason);
             if (completed)
             {
+                if (record.reservedPad != null && record.reservedPad.Spawned)
+                {
+                    ServiceShuttleUtility.SpawnDeparture(record.reservedPad.Map, record.reservedPad.Position);
+                }
                 record.state = "completed";
                 ReleaseReservation(record);
                 Messages.Message("Space Services: service group departed", MessageTypeDefOf.NeutralEvent, false);
@@ -1491,6 +1498,33 @@ namespace SpaceServices
                     records.RemoveAt(i);
                     continue;
                 }
+                if (record.state == "pickupInbound")
+                {
+                    if (Find.TickManager.TicksGame >= record.pickupShuttleTouchdownTick)
+                    {
+                        if (ReadyForExtraction(record))
+                        {
+                            DepartureUtility.CompleteDeparture(map, record, "service pawns boarded pickup shuttle");
+                        }
+                        else
+                        {
+                            if (record.reservedPad != null && record.reservedPad.Spawned)
+                            {
+                                ServiceShuttleUtility.CleanupTouchdownShuttle(record.reservedPad.Map, record.reservedPad.Position, record.pickupShuttleThingDefName);
+                                ServiceShuttleUtility.SpawnDeparture(record.reservedPad.Map, record.reservedPad.Position);
+                            }
+                            record.state = "departing";
+                            record.pickupShuttleTouchdownTick = 0;
+                            record.pickupShuttleThingDefName = null;
+                            GuideDepartingPawnsToPad(record);
+                        }
+                    }
+                    else
+                    {
+                        GuideDepartingPawnsToPad(record);
+                    }
+                    continue;
+                }
                 if (record.state == "departing")
                 {
                     if (record.serviceKind == "hospital" && record.reservedPad == null)
@@ -1499,7 +1533,7 @@ namespace SpaceServices
                     }
                     if (ReadyForExtraction(record))
                     {
-                        DepartureUtility.CompleteDeparture(map, record, "service pawns reached departure pad");
+                        BeginPickupShuttle(record, "service pawns waiting outside departure pad");
                     }
                     else
                     {
@@ -1552,9 +1586,14 @@ namespace SpaceServices
                 BeginHospitalDeparture(map, record, reason);
                 return;
             }
-            if (record.reservedPad == null || ReadyForExtraction(record))
+            if (record.reservedPad == null)
             {
                 DepartureUtility.CompleteDeparture(map, record, reason);
+                return;
+            }
+            if (ReadyForExtraction(record))
+            {
+                BeginPickupShuttle(record, reason);
                 return;
             }
             if (record.state != "departing")
@@ -1602,7 +1641,7 @@ namespace SpaceServices
             }
             if (ReadyForExtraction(record))
             {
-                DepartureUtility.CompleteDeparture(map, record, reason);
+                BeginPickupShuttle(record, reason);
                 return;
             }
             if (record.state != "departing")
@@ -1612,6 +1651,26 @@ namespace SpaceServices
                 Log.Message("[Space Services] Routing hospital patient to departure pad: " + reason);
             }
             GuideDepartingPawnsToPad(record);
+        }
+
+        private static void BeginPickupShuttle(ServiceGroupRecord record, string reason)
+        {
+            if (record == null || record.reservedPad == null || !record.reservedPad.Spawned)
+            {
+                return;
+            }
+            ShuttleVisual visual = ShuttleVisual.Resolve();
+            if (visual == null)
+            {
+                DepartureUtility.CompleteDeparture(record.reservedPad.Map, record, reason);
+                return;
+            }
+
+            record.state = "pickupInbound";
+            record.pickupShuttleTouchdownTick = Find.TickManager.TicksGame + ServiceShuttleUtility.ArrivalTouchdownDelayTicks;
+            record.pickupShuttleThingDefName = visual.shipThingDef.defName;
+            ServiceShuttleUtility.SpawnArrival(record.reservedPad.Map, record.reservedPad.Position);
+            Log.Message("[Space Services] Pickup shuttle inbound for " + record.serviceKind + " service group " + record.id + ": " + reason);
         }
 
         private static bool ReadyForExtraction(ServiceGroupRecord record)
@@ -1635,7 +1694,7 @@ namespace SpaceServices
                 {
                     continue;
                 }
-                if (pawn.Spawned && !pawn.Position.InHorDistOf(cell, 3f))
+                if (pawn.Spawned && !PawnWaitingOutsidePad(pawn, record.reservedPad))
                 {
                     return false;
                 }
@@ -1653,7 +1712,6 @@ namespace SpaceServices
             {
                 return;
             }
-            IntVec3 cell = record.reservedPad.Position;
             Map map = record.reservedPad.Map;
             if (map == null)
             {
@@ -1661,18 +1719,54 @@ namespace SpaceServices
             }
             foreach (Pawn pawn in record.pawns)
             {
-                if (pawn == null || !pawn.Spawned || pawn.Downed || pawn.Position.InHorDistOf(cell, 3f))
+                if (pawn == null || !pawn.Spawned || pawn.Downed)
                 {
                     continue;
                 }
-                if (!pawn.CanReach(cell, PathEndMode.OnCell, Danger.Deadly))
+                IntVec3 waitCell = DepartureWaitCell(record.reservedPad, pawn);
+                if (!waitCell.IsValid || pawn.Position.InHorDistOf(waitCell, 1f))
                 {
                     continue;
                 }
-                Job job = JobMaker.MakeJob(JobDefOf.Goto, cell);
+                if (!pawn.CanReach(waitCell, PathEndMode.OnCell, Danger.Deadly))
+                {
+                    continue;
+                }
+                Job job = JobMaker.MakeJob(JobDefOf.Goto, waitCell);
                 job.locomotionUrgency = LocomotionUrgency.Jog;
                 pawn.jobs.TryTakeOrderedJob(job, JobTag.Misc);
             }
+        }
+
+        private static bool PawnWaitingOutsidePad(Pawn pawn, Thing pad)
+        {
+            if (pawn == null || !pawn.Spawned || pad == null || pad.Map == null)
+            {
+                return false;
+            }
+            if (pad.OccupiedRect().Contains(pawn.Position))
+            {
+                return false;
+            }
+            IntVec3 waitCell = DepartureWaitCell(pad, pawn);
+            return waitCell.IsValid && pawn.Position.InHorDistOf(waitCell, 1f);
+        }
+
+        private static IntVec3 DepartureWaitCell(Thing pad, Pawn pawn)
+        {
+            Map map = pad == null ? null : pad.Map;
+            if (map == null || pawn == null)
+            {
+                return IntVec3.Invalid;
+            }
+            CellRect padRect = pad.OccupiedRect();
+            return padRect.ExpandedBy(1).Cells
+                .Where(cell => cell.InBounds(map) && !padRect.Contains(cell) && cell.Standable(map) && (cell.GetFirstPawn(map) == null || cell == pawn.Position))
+                .Where(cell => pawn.CanReach(cell, PathEndMode.OnCell, Danger.Deadly))
+                .OrderBy(cell => cell.DistanceToSquared(pawn.Position))
+                .ThenBy(cell => cell.DistanceToSquared(pad.Position))
+                .DefaultIfEmpty(IntVec3.Invalid)
+                .First();
         }
 
         public static List<ServiceDepartureBlock> BlockedDepartures()
