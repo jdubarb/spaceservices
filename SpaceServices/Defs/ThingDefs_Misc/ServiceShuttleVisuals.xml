@@ -3,6 +3,7 @@
   <ThingDef ParentName="EtherealThingBase">
     <defName>MLT_ServiceShuttlePayload</defName>
     <label>service shuttle payload</label>
+    <thingClass>Thing</thingClass>
     <useHitPoints>false</useHitPoints>
   </ThingDef>
 </Defs>
