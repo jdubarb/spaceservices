@@ -1285,7 +1285,11 @@ namespace SpaceServices
             IntVec3 padCell = record.reservedPad == null ? IntVec3.Invalid : record.reservedPad.Position;
             ServiceShuttleUtility.CleanupTouchdownShuttle(padMap, padCell, record.pickupShuttleThingDefName);
 
-            bool completed = TryAutoExtract(record.pawns, reason);
+            if (record.serviceKind == "hospital")
+            {
+                NotifyHospitalPatientsLeft(map, record.pawns);
+            }
+            bool completed = TryAutoExtract(map, record.pawns, reason);
             if (completed)
             {
                 if (record.reservedPad != null && record.reservedPad.Spawned)
@@ -1299,7 +1303,7 @@ namespace SpaceServices
             return completed;
         }
 
-        public static bool TryAutoExtract(IEnumerable<Pawn> pawns, string reason)
+        public static bool TryAutoExtract(Map map, IEnumerable<Pawn> pawns, string reason)
         {
             if (SpaceServicesMod.Settings != null && !SpaceServicesMod.Settings.autoExtractFallback)
             {
@@ -1315,11 +1319,13 @@ namespace SpaceServices
                 any = true;
                 if (pawn.Spawned)
                 {
+                    CleanupDepartingPawnReferences(map ?? pawn.MapHeld, pawn);
                     NotifyLordPawnExited(pawn);
                     pawn.DeSpawn(DestroyMode.Vanish);
                 }
                 else if (pawn.MapHeld != null)
                 {
+                    CleanupDepartingPawnReferences(map ?? pawn.MapHeld, pawn);
                     pawn.Destroy(DestroyMode.Vanish);
                 }
             }
@@ -1328,6 +1334,112 @@ namespace SpaceServices
                 Log.Message("[Space Services] Auto-extracted service pawns: " + reason);
             }
             return any;
+        }
+
+        private static void NotifyHospitalPatientsLeft(Map map, IEnumerable<Pawn> pawns)
+        {
+            object hospital = HospitalIncidentGate.FindHospitalComponent(map);
+            IDictionary patients = hospital == null ? null : Reflect.GetMember(hospital, "Patients") as IDictionary;
+            if (patients == null)
+            {
+                return;
+            }
+            foreach (Pawn pawn in pawns ?? Enumerable.Empty<Pawn>())
+            {
+                if (pawn != null && patients.Contains(pawn))
+                {
+                    patients.Remove(pawn);
+                }
+            }
+        }
+
+        private static void CleanupDepartingPawnReferences(Map map, Pawn departingPawn)
+        {
+            if (departingPawn == null)
+            {
+                return;
+            }
+            CleanupSocialMemoriesReferencing(map, departingPawn);
+            CleanupDirectRelationsReferencing(departingPawn);
+            CleanupLordReferences(map, departingPawn);
+        }
+
+        private static void CleanupSocialMemoriesReferencing(Map map, Pawn departingPawn)
+        {
+            foreach (Pawn pawn in PawnsToClean(map))
+            {
+                if (pawn == null || pawn.needs == null || pawn.needs.mood == null || pawn.needs.mood.thoughts == null || pawn.needs.mood.thoughts.memories == null)
+                {
+                    continue;
+                }
+                List<Thought_Memory> memories = pawn.needs.mood.thoughts.memories.Memories;
+                if (memories == null)
+                {
+                    continue;
+                }
+                memories.RemoveAll(memory =>
+                {
+                    Thought_MemorySocial social = memory as Thought_MemorySocial;
+                    return social != null && Reflect.GetMember(social, "otherPawn") == departingPawn;
+                });
+            }
+        }
+
+        private static void CleanupDirectRelationsReferencing(Pawn departingPawn)
+        {
+            foreach (Pawn pawn in PawnsToClean(departingPawn.MapHeld))
+            {
+                if (pawn == null || pawn.relations == null || pawn.relations.DirectRelations == null)
+                {
+                    continue;
+                }
+                pawn.relations.DirectRelations.RemoveAll(relation => relation == null || relation.otherPawn == departingPawn || relation.otherPawn == null || relation.otherPawn.Destroyed);
+            }
+        }
+
+        private static void CleanupLordReferences(Map map, Pawn departingPawn)
+        {
+            if (map == null || map.lordManager == null || map.lordManager.lords == null)
+            {
+                return;
+            }
+            foreach (Lord lord in map.lordManager.lords)
+            {
+                if (lord != null && lord.ownedPawns != null)
+                {
+                    lord.ownedPawns.RemoveAll(pawn => pawn == null || pawn == departingPawn || pawn.Destroyed);
+                }
+            }
+        }
+
+        private static IEnumerable<Pawn> PawnsToClean(Map map)
+        {
+            HashSet<Pawn> pawns = new HashSet<Pawn>();
+            if (map != null && map.mapPawns != null)
+            {
+                foreach (Pawn pawn in map.mapPawns.AllPawnsSpawned)
+                {
+                    if (pawn != null)
+                    {
+                        pawns.Add(pawn);
+                    }
+                }
+                foreach (Pawn pawn in map.mapPawns.AllPawnsUnspawned)
+                {
+                    if (pawn != null)
+                    {
+                        pawns.Add(pawn);
+                    }
+                }
+            }
+            foreach (Pawn pawn in PawnsFinder.AllMapsWorldAndTemporary_Alive)
+            {
+                if (pawn != null)
+                {
+                    pawns.Add(pawn);
+                }
+            }
+            return pawns;
         }
 
         private static void ReleaseReservation(ServiceGroupRecord record)
