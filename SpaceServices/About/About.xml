@@ -19,6 +19,7 @@
   </modDependencies>
   <loadAfter>
     <li>brrainz.harmony</li>
+    <li>Ludeon.RimWorld.Royalty</li>
     <li>Ludeon.RimWorld.Odyssey</li>
     <li>Adamas.Hospital</li>
     <li>Orion.Hospitality</li>

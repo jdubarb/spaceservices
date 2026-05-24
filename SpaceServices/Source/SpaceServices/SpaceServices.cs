@@ -761,29 +761,33 @@ namespace SpaceServices
 
         public static ShuttleVisual Resolve()
         {
-            ThingDef ship = DefDatabase<ThingDef>.GetNamedSilentFail("PassengerShuttle");
+            ThingDef payload = DefDatabase<ThingDef>.GetNamedSilentFail("MLT_ServiceShuttlePayload");
+            if (payload == null)
+            {
+                return null;
+            }
+
             ThingDef incoming = DefDatabase<ThingDef>.GetNamedSilentFail("PassengerShuttleIncoming");
             ThingDef leaving = DefDatabase<ThingDef>.GetNamedSilentFail("PassengerShuttleLeaving");
-            if (ship != null && incoming != null && leaving != null)
+            if (incoming != null && leaving != null)
             {
                 return new ShuttleVisual
                 {
-                    shipThingDef = ship,
+                    shipThingDef = payload,
                     incomingSkyfallerDef = incoming,
                     leavingSkyfallerDef = leaving
                 };
             }
 
-            ship = DefDatabase<ThingDef>.GetNamedSilentFail("Shuttle");
             incoming = DefDatabase<ThingDef>.GetNamedSilentFail("ShuttleIncoming");
             leaving = DefDatabase<ThingDef>.GetNamedSilentFail("ShuttleLeaving");
-            if (ship == null || incoming == null || leaving == null)
+            if (incoming == null || leaving == null)
             {
                 return null;
             }
             return new ShuttleVisual
             {
-                shipThingDef = ship,
+                shipThingDef = payload,
                 incomingSkyfallerDef = incoming,
                 leavingSkyfallerDef = leaving
             };
