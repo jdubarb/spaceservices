@@ -6,15 +6,17 @@
     <description>Marks a controlled arrival and departure point for patients, guests, and other service traffic on stationary space facilities.</description>
     <thingClass>Building</thingClass>
     <graphicData>
-      <texPath>Things/Building/Misc/PartySpot</texPath>
+      <texPath>Things/Building/SpaceServices/ServiceLandingPad</texPath>
       <graphicClass>Graphic_Single</graphicClass>
-      <drawSize>(3,3)</drawSize>
+      <drawSize>(7,7)</drawSize>
     </graphicData>
     <altitudeLayer>FloorEmplacement</altitudeLayer>
     <passability>Standable</passability>
-    <size>(3,3)</size>
+    <size>(7,7)</size>
     <rotatable>false</rotatable>
     <scatterableOnMapGen>false</scatterableOnMapGen>
+    <terrainAffordanceNeeded>Heavy</terrainAffordanceNeeded>
+    <clearBuildingArea>true</clearBuildingArea>
     <useHitPoints>true</useHitPoints>
     <canOverlapZones>true</canOverlapZones>
     <designationCategory>MLT_SpaceServices</designationCategory>
