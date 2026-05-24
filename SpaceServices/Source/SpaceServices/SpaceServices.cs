@@ -599,7 +599,7 @@ namespace SpaceServices
 
         public static bool TryFindServicePadCell(Map map, ServiceUse use, out IntVec3 cell)
         {
-            Thing pad = TryFindServicePad(map, use);
+            Thing pad = TryFindRandomServicePad(map, use);
             if (pad != null)
             {
                 cell = pad.Position;
@@ -612,6 +612,16 @@ namespace SpaceServices
         public static Thing TryFindServicePad(Map map, ServiceUse use)
         {
             return AllServicePads(map, use).FirstOrDefault();
+        }
+
+        public static Thing TryFindRandomServicePad(Map map, ServiceUse use)
+        {
+            List<Thing> pads = AllServicePads(map, use).ToList();
+            if (pads.Count == 0)
+            {
+                return null;
+            }
+            return pads[Rand.Range(0, pads.Count)];
         }
 
         public static Thing TryReserveServicePad(Map map, ServiceUse use, string groupId)
@@ -3079,7 +3089,7 @@ namespace SpaceServices
 
         private static List<IntVec3> BuildArrivalCells(Map map)
         {
-            Thing pad = ServicePadUtility.TryFindServicePad(map, ServiceUse.Patient);
+            Thing pad = ServicePadUtility.TryFindRandomServicePad(map, ServiceUse.Patient);
             if (pad == null)
             {
                 return new List<IntVec3>();
