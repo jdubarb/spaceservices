@@ -146,7 +146,7 @@ namespace SpaceServices
             StaleReferenceCleanupUtility.CleanupAfterLoad(map);
         }
 
-        public void ScheduleShuttleArrival(IntVec3 cell, string shuttleThingDefName, List<Thing> things)
+        public void ScheduleShuttleArrival(IntVec3 cell, string shuttleThingDefName, List<Thing> things, bool showDeparture)
         {
             if (!cell.IsValid || things == null || things.Count == 0)
             {
@@ -157,7 +157,8 @@ namespace SpaceServices
                 cell = cell,
                 touchdownTick = Find.TickManager.TicksGame + ServiceShuttleUtility.ArrivalTouchdownDelayTicks,
                 shuttleThingDefName = shuttleThingDefName,
-                things = things
+                things = things,
+                showDeparture = showDeparture
             });
         }
     }
@@ -168,6 +169,7 @@ namespace SpaceServices
         public int touchdownTick;
         public string shuttleThingDefName;
         public List<Thing> things = new List<Thing>();
+        public bool showDeparture = true;
     }
 
     public sealed class ServiceGroupRecord : IExposable
@@ -649,7 +651,7 @@ namespace SpaceServices
             SpawnSkyfaller(map, cell, ShuttleVisual.Resolve(), false);
         }
 
-        public static bool TryReplaceDropPodWithArrivalShuttle(IntVec3 cell, Map map, ActiveTransporterInfo info, Faction faction)
+        public static bool TryReplaceDropPodWithArrivalShuttle(IntVec3 cell, Map map, ActiveTransporterInfo info, Faction faction, bool showArrival, bool showDeparture)
         {
             if (map == null || info == null || info.innerContainer == null || !cell.IsValid)
             {
@@ -668,7 +670,7 @@ namespace SpaceServices
                 return false;
             }
             ShuttleVisual visual = ShuttleVisual.Resolve();
-            if (visual == null)
+            if (showArrival && visual == null)
             {
                 return false;
             }
@@ -680,8 +682,11 @@ namespace SpaceServices
                 }
                 info.innerContainer.Remove(thing);
             }
-            SpawnSkyfaller(map, cell, visual, true);
-            comp.ScheduleShuttleArrival(cell, visual.shipThingDef.defName, things);
+            if (showArrival)
+            {
+                SpawnSkyfaller(map, cell, visual, true);
+            }
+            comp.ScheduleShuttleArrival(cell, visual == null || visual.shipThingDef == null ? null : visual.shipThingDef.defName, things, showDeparture);
             return true;
         }
 
@@ -698,9 +703,15 @@ namespace SpaceServices
                 {
                     continue;
                 }
-                CleanupTouchdownShuttle(map, arrival.cell, arrival.shuttleThingDefName);
+                if (arrival.showDeparture)
+                {
+                    CleanupTouchdownShuttle(map, arrival.cell, arrival.shuttleThingDefName);
+                }
                 SpawnContents(map, arrival.cell, arrival.things);
-                SpawnDeparture(map, arrival.cell);
+                if (arrival.showDeparture)
+                {
+                    SpawnDeparture(map, arrival.cell);
+                }
                 arrivals.RemoveAt(i);
             }
         }
@@ -1507,23 +1518,17 @@ namespace SpaceServices
                 {
                     if (Find.TickManager.TicksGame >= record.pickupShuttleTouchdownTick)
                     {
-                        if (ReadyForExtraction(record))
+                        if (!ReservedPadCanServe(record, record.serviceKind == "hospitality" ? ServiceUse.Guest : ServiceUse.Patient, out string blockedReason))
                         {
-                            record.state = "boardingPickup";
-                            GuideBoardingPawnsToShuttle(record);
-                        }
-                        else
-                        {
-                            if (record.reservedPad != null && record.reservedPad.Spawned)
+                            if (SpaceServicesMod.Settings != null && SpaceServicesMod.Settings.debugLogging)
                             {
-                                ServiceShuttleUtility.CleanupTouchdownShuttle(record.reservedPad.Map, record.reservedPad.Position, record.pickupShuttleThingDefName);
-                                ServiceShuttleUtility.SpawnDeparture(record.reservedPad.Map, record.reservedPad.Position);
+                                Log.Message("[Space Services] Pickup shuttle waiting for usable pad: " + blockedReason);
                             }
-                            record.state = "departing";
-                            record.pickupShuttleTouchdownTick = 0;
-                            record.pickupShuttleThingDefName = null;
                             GuideDepartingPawnsToPad(record);
+                            continue;
                         }
+                        record.state = "boardingPickup";
+                        GuideBoardingPawnsToShuttle(record);
                     }
                     else
                     {
@@ -1553,9 +1558,10 @@ namespace SpaceServices
                 }
                 if (record.state == "departing")
                 {
-                    if (record.serviceKind == "hospital" && record.reservedPad == null)
+                    if (record.serviceKind == "hospital")
                     {
                         BeginHospitalDeparture(map, record, "waiting for free departure pad");
+                        continue;
                     }
                     if (ReadyForExtraction(record))
                     {
@@ -1638,9 +1644,14 @@ namespace SpaceServices
                 ReleaseRecord(record);
                 record.reservedPad = null;
             }
+            if (record.reservedPad != null && !PadCanSafelyServe(record.reservedPad, ServiceUse.Patient, record.pawns, record.id))
+            {
+                ReleaseRecord(record);
+                record.reservedPad = null;
+            }
             if (record.reservedPad == null)
             {
-                record.reservedPad = ServicePadUtility.TryReserveServicePad(map, ServiceUse.Patient, record.id);
+                record.reservedPad = TryReserveBestDeparturePad(map, ServiceUse.Patient, record);
             }
             if (record.reservedPad == null)
             {
@@ -1652,36 +1663,32 @@ namespace SpaceServices
                 }
                 return;
             }
-            if (!ReservedPadCanServe(record, ServiceUse.Patient, out string blockedReason))
-            {
-                if (record.state != "departing")
-                {
-                    record.state = "departing";
-                    record.departureRequestedTick = Find.TickManager.TicksGame;
-                }
-                if (SpaceServicesMod.Settings != null && SpaceServicesMod.Settings.debugLogging)
-                {
-                    Log.Message("[Space Services] Hospital patient departure waiting: " + blockedReason);
-                }
-                return;
-            }
-            if (ReadyForExtraction(record))
-            {
-                BeginPickupShuttle(record, reason);
-                return;
-            }
             if (record.state != "departing")
             {
                 record.state = "departing";
                 record.departureRequestedTick = Find.TickManager.TicksGame;
                 Log.Message("[Space Services] Routing hospital patient to departure pad: " + reason);
             }
+            if (!ReservedPadCanServe(record, ServiceUse.Patient, out string blockedReason))
+            {
+                if (SpaceServicesMod.Settings != null && SpaceServicesMod.Settings.debugLogging)
+                {
+                    Log.Message("[Space Services] Hospital patient departure waiting: " + blockedReason);
+                }
+                GuideDepartingPawnsToPad(record);
+                return;
+            }
+            BeginPickupShuttle(record, reason);
             GuideDepartingPawnsToPad(record);
         }
 
         private static void BeginPickupShuttle(ServiceGroupRecord record, string reason)
         {
             if (record == null || record.reservedPad == null || !record.reservedPad.Spawned)
+            {
+                return;
+            }
+            if (record.state == "pickupInbound" || record.state == "boardingPickup")
             {
                 return;
             }
@@ -1697,6 +1704,69 @@ namespace SpaceServices
             record.pickupShuttleThingDefName = visual.shipThingDef.defName;
             ServiceShuttleUtility.SpawnArrival(record.reservedPad.Map, record.reservedPad.Position);
             Log.Message("[Space Services] Pickup shuttle inbound for " + record.serviceKind + " service group " + record.id + ": " + reason);
+        }
+
+        private static Thing TryReserveBestDeparturePad(Map map, ServiceUse use, ServiceGroupRecord record)
+        {
+            if (map == null || record == null || string.IsNullOrEmpty(record.id))
+            {
+                return null;
+            }
+            List<Pawn> pawns = record.pawns == null ? new List<Pawn>() : record.pawns.Where(pawn => pawn != null && !pawn.Destroyed).ToList();
+            // Pick the pad the patient can actually survive at before considering distance.
+            IEnumerable<Thing> candidates = ServicePadUtility.AllServicePads(map, use)
+                .Where(pad => PadCanSafelyServe(pad, use, pawns, record.id))
+                .OrderBy(pad => DeparturePadScore(pad, pawns));
+            foreach (Thing pad in candidates)
+            {
+                CompSpaceServicePad comp = pad.TryGetComp<CompSpaceServicePad>();
+                if (comp != null && comp.TryReserve(record.id))
+                {
+                    return pad;
+                }
+            }
+            return null;
+        }
+
+        private static float DeparturePadScore(Thing pad, List<Pawn> pawns)
+        {
+            if (pad == null)
+            {
+                return float.MaxValue;
+            }
+            IEnumerable<Pawn> spawned = pawns == null ? Enumerable.Empty<Pawn>() : pawns.Where(pawn => pawn != null && pawn.Spawned);
+            if (!spawned.Any())
+            {
+                return 0f;
+            }
+            return spawned.Sum(pawn =>
+            {
+                IntVec3 waitCell = DepartureWaitCell(pad, pawn);
+                IntVec3 target = waitCell.IsValid ? waitCell : pad.Position;
+                return pawn.Position.DistanceToSquared(target);
+            });
+        }
+
+        private static bool PadCanSafelyServe(Thing pad, ServiceUse use, IEnumerable<Pawn> pawns, string groupId)
+        {
+            if (pad == null || pad.Destroyed || pad.Map == null)
+            {
+                return false;
+            }
+            CompSpaceServicePad comp = pad.TryGetComp<CompSpaceServicePad>();
+            if (comp == null)
+            {
+                return false;
+            }
+            if (!string.IsNullOrEmpty(comp.reservedForGroup) && comp.reservedForGroup != groupId)
+            {
+                return false;
+            }
+            if (!comp.MeetsUseRequirements(use))
+            {
+                return false;
+            }
+            return ServiceEnvironmentUtility.IsPadSafeForPawns(pad, pawns, out string _);
         }
 
         private static bool ReadyForExtraction(ServiceGroupRecord record)
@@ -1831,11 +1901,16 @@ namespace SpaceServices
                 return false;
             }
             CellRect padRect = pad.OccupiedRect();
+            // Keep patients staged just outside the landing area, but not wandering into nearby rooms.
             if (padRect.ExpandedBy(1).Contains(pawn.Position))
             {
                 return false;
             }
-            return padRect.ExpandedBy(5).Contains(pawn.Position);
+            if (!padRect.ExpandedBy(2).Contains(pawn.Position))
+            {
+                return false;
+            }
+            return SameRoomAsPad(pad, pawn.Position);
         }
 
         private static bool PawnAtPickupShuttle(Pawn pawn, Thing pad)
@@ -1844,7 +1919,22 @@ namespace SpaceServices
             {
                 return false;
             }
-            return pad.OccupiedRect().Contains(pawn.Position);
+            return PickupBoardingRect(pad).Contains(pawn.Position);
+        }
+
+        private static bool SameRoomAsPad(Thing pad, IntVec3 cell)
+        {
+            Map map = pad == null ? null : pad.Map;
+            if (map == null || !cell.InBounds(map))
+            {
+                return false;
+            }
+            Room padRoom = pad.Position.GetRoom(map);
+            if (padRoom == null)
+            {
+                return true;
+            }
+            return cell.GetRoom(map) == padRoom;
         }
 
         private static IntVec3 PickupBoardingCell(Thing pad, Pawn pawn)
@@ -1854,14 +1944,19 @@ namespace SpaceServices
             {
                 return IntVec3.Invalid;
             }
-            CellRect padRect = pad.OccupiedRect();
-            return padRect.Cells
+            CellRect boardingRect = PickupBoardingRect(pad);
+            return boardingRect.Cells
                 .Where(cell => cell.InBounds(map) && cell.Standable(map) && (cell.GetFirstPawn(map) == null || cell == pawn.Position))
                 .Where(cell => pawn.CanReach(cell, PathEndMode.OnCell, Danger.Deadly))
                 .OrderBy(cell => cell.DistanceToSquared(pad.Position))
                 .ThenBy(cell => cell.DistanceToSquared(pawn.Position))
                 .DefaultIfEmpty(IntVec3.Invalid)
                 .First();
+        }
+
+        private static CellRect PickupBoardingRect(Thing pad)
+        {
+            return pad.OccupiedRect().ExpandedBy(1);
         }
 
         private static IntVec3 DepartureWaitCell(Thing pad, Pawn pawn)
@@ -1873,8 +1968,9 @@ namespace SpaceServices
             }
             CellRect padRect = pad.OccupiedRect();
             CellRect noWaitRect = padRect.ExpandedBy(1);
-            return padRect.ExpandedBy(3).Cells
-                .Where(cell => cell.InBounds(map) && !noWaitRect.Contains(cell) && cell.Standable(map) && (cell.GetFirstPawn(map) == null || cell == pawn.Position))
+            // The ring is intentionally tight so the shuttle is visibly picking up from this pad.
+            return padRect.ExpandedBy(2).Cells
+                .Where(cell => cell.InBounds(map) && !noWaitRect.Contains(cell) && SameRoomAsPad(pad, cell) && cell.Standable(map) && (cell.GetFirstPawn(map) == null || cell == pawn.Position))
                 .Where(cell => pawn.CanReach(cell, PathEndMode.OnCell, Danger.Deadly))
                 .OrderBy(cell => cell.DistanceToSquared(pawn.Position))
                 .ThenBy(cell => cell.DistanceToSquared(pad.Position))
@@ -2695,7 +2791,8 @@ namespace SpaceServices
                 }
                 VacSuitUtility.SuitPawnsForEnvironment(pawns, map, c);
             }
-            if (HospitalLandingRedirectContext.TryGetActiveCell(map, out IntVec3 activeCell) && activeCell.IsValid && ServiceShuttleUtility.TryReplaceDropPodWithArrivalShuttle(c, map, info, faction))
+            HospitalArrivalIncidentContext.ArrivalVisualFlags(map, out bool showArrival, out bool showDeparture);
+            if (HospitalLandingRedirectContext.TryGetActiveCell(map, out IntVec3 activeCell) && activeCell.IsValid && ServiceShuttleUtility.TryReplaceDropPodWithArrivalShuttle(c, map, info, faction, showArrival, showDeparture))
             {
                 return false;
             }
@@ -2861,13 +2958,15 @@ namespace SpaceServices
             public Map map;
             public List<IntVec3> cells = new List<IntVec3>();
             public int nextIndex;
+            public bool massCasualty;
+            public bool arrivalVisualUsed;
         }
 
         private static readonly Stack<Request> Requests = new Stack<Request>();
 
         public static void Push(Map map, bool massCasualty)
         {
-            Request request = new Request { map = map };
+            Request request = new Request { map = map, massCasualty = massCasualty };
             if (map != null && massCasualty)
             {
                 request.cells = BuildArrivalCells(map);
@@ -2901,6 +3000,30 @@ namespace SpaceServices
             }
             cell = IntVec3.Invalid;
             return false;
+        }
+
+        public static void ArrivalVisualFlags(Map map, out bool showArrival, out bool showDeparture)
+        {
+            showArrival = true;
+            showDeparture = true;
+            foreach (Request request in Requests)
+            {
+                if (request.map != map || !request.massCasualty)
+                {
+                    continue;
+                }
+                // Mass casualty patients are still separate Hospital drops; only the first one gets the shuttle visual.
+                if (request.arrivalVisualUsed)
+                {
+                    showArrival = false;
+                    showDeparture = false;
+                }
+                else
+                {
+                    request.arrivalVisualUsed = true;
+                }
+                return;
+            }
         }
 
         private static List<IntVec3> BuildArrivalCells(Map map)
