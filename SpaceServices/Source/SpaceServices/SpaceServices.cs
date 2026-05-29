@@ -236,11 +236,15 @@ namespace SpaceServices
             StringBuilder builder = new StringBuilder();
             builder.AppendLine("Service visitors are ready to leave, but Space Services cannot safely extract them yet.");
             builder.AppendLine();
-            foreach (ServiceDepartureBlock block in blocks)
+            foreach (ServiceDepartureBlock block in blocks.Take(8))
             {
                 string serviceKind = block.record == null ? "service" : block.record.serviceKind ?? "service";
                 string mapLabel = block.map == null ? "unknown map" : "map " + block.map.uniqueID;
                 builder.AppendLine("- " + serviceKind + " on " + mapLabel + ": " + (block.reason ?? "departure blocked"));
+            }
+            if (blocks.Count > 8)
+            {
+                builder.AppendLine("- " + (blocks.Count - 8) + " more blocked departures.");
             }
             builder.AppendLine();
             builder.Append("Fix the service pad or restore a safe atmosphere at the pad.");
@@ -1909,7 +1913,7 @@ namespace SpaceServices
             // Pick the pad the patient can actually survive at before considering distance.
             IEnumerable<Thing> candidates = ServicePadUtility.AllServicePads(map, use)
                 .Where(pad => PadCanSafelyServe(pad, use, pawns, record.id))
-                .OrderBy(pad => DeparturePadScore(pad, pawns));
+                .OrderBy(pad => DeparturePadScore(map, record, pad, pawns));
             foreach (Thing pad in candidates)
             {
                 CompSpaceServicePad comp = pad.TryGetComp<CompSpaceServicePad>();
@@ -1921,23 +1925,48 @@ namespace SpaceServices
             return null;
         }
 
-        private static float DeparturePadScore(Thing pad, List<Pawn> pawns)
+        private static float DeparturePadScore(Map map, ServiceGroupRecord record, Thing pad, List<Pawn> pawns)
         {
             if (pad == null)
             {
                 return float.MaxValue;
             }
-            IEnumerable<Pawn> spawned = pawns == null ? Enumerable.Empty<Pawn>() : pawns.Where(pawn => pawn != null && pawn.Spawned);
-            if (!spawned.Any())
-            {
-                return 0f;
-            }
-            return spawned.Sum(pawn =>
+            List<Pawn> spawned = pawns == null ? new List<Pawn>() : pawns.Where(pawn => pawn != null && pawn.Spawned).ToList();
+            float score = spawned.Sum(pawn =>
             {
                 IntVec3 waitCell = DepartureWaitCell(pad, pawn);
                 IntVec3 target = waitCell.IsValid ? waitCell : pad.Position;
                 return pawn.Position.DistanceToSquared(target);
             });
+            if (ShouldPreserveSealedPadsForLowResistancePatients(map, record, pawns))
+            {
+                score += ServiceEnvironmentUtility.GetMaxVacuum(pad) > 0.05f ? -100000f : 100000f;
+            }
+            return score;
+        }
+
+        private static bool ShouldPreserveSealedPadsForLowResistancePatients(Map map, ServiceGroupRecord record, List<Pawn> pawns)
+        {
+            if (map == null || record == null || record.serviceKind != "hospital" || pawns == null || pawns.Count == 0)
+            {
+                return false;
+            }
+            if (pawns.Any(pawn => pawn != null && !pawn.Destroyed && VacSuitUtility.VacuumResistance(pawn) < 0.95f))
+            {
+                return false;
+            }
+            SpaceServicesMapComponent comp = map.GetComponent<SpaceServicesMapComponent>();
+            if (comp == null || comp.serviceGroups == null)
+            {
+                return false;
+            }
+            return comp.serviceGroups.Any(other =>
+                other != null &&
+                other != record &&
+                other.serviceKind == "hospital" &&
+                other.state != "completed" &&
+                other.pawns != null &&
+                other.pawns.Any(pawn => pawn != null && !pawn.Destroyed && VacSuitUtility.VacuumResistance(pawn) < 0.95f));
         }
 
         private static bool PadCanSafelyServe(Thing pad, ServiceUse use, IEnumerable<Pawn> pawns, string groupId)
@@ -2191,6 +2220,10 @@ namespace SpaceServices
                     ServiceUse use = record.serviceKind == "hospitality" ? ServiceUse.Guest : ServiceUse.Patient;
                     if (!ReservedPadCanServe(record, use, out string reason))
                     {
+                        if (!ReservedPadStillExists(record))
+                        {
+                            reason = NoReservedPadBlockReason(map, use, record);
+                        }
                         blocks.Add(new ServiceDepartureBlock
                         {
                             map = map,
@@ -2201,6 +2234,38 @@ namespace SpaceServices
                 }
             }
             return blocks;
+        }
+
+        private static string NoReservedPadBlockReason(Map map, ServiceUse use, ServiceGroupRecord record)
+        {
+            List<Pawn> pawns = record == null || record.pawns == null ? new List<Pawn>() : record.pawns.Where(pawn => pawn != null && !pawn.Destroyed).ToList();
+            List<Thing> pads = ServicePadUtility.AllServicePads(map, use).ToList();
+            if (pads.Count == 0)
+            {
+                return "no " + use.ToString().ToLowerInvariant() + " service pad exists";
+            }
+            foreach (Thing pad in pads)
+            {
+                CompSpaceServicePad comp = pad == null ? null : pad.TryGetComp<CompSpaceServicePad>();
+                if (comp == null)
+                {
+                    continue;
+                }
+                if (!string.IsNullOrEmpty(comp.reservedForGroup) && (record == null || comp.reservedForGroup != record.id))
+                {
+                    continue;
+                }
+                if (!comp.MeetsUseRequirements(use, out string padReason))
+                {
+                    return "service pad blocked: " + (padReason ?? "settings block this service");
+                }
+                if (!ServiceEnvironmentUtility.IsPadSafeForPawns(pad, pawns, out string safetyReason))
+                {
+                    return safetyReason ?? "service pad is unsafe";
+                }
+                return "service pad is not reserved yet";
+            }
+            return "all matching service pads are reserved";
         }
 
         private static bool ReservedPadCanServe(ServiceGroupRecord record, ServiceUse use, out string reason)
