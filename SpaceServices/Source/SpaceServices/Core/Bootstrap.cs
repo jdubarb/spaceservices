@@ -29,5 +29,4 @@ namespace SpaceServices
             Log.Message("[Space Services] Loaded.");
         }
     }
-
 }

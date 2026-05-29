@@ -240,5 +240,4 @@ namespace SpaceServices
             return string.IsNullOrEmpty(roof.label) ? roof.defName : roof.label;
         }
     }
-
 }

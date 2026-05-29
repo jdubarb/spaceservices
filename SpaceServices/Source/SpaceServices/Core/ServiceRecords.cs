@@ -13,15 +13,6 @@ using Verse.AI.Group;
 
 namespace SpaceServices
 {
-    public sealed class ScheduledServiceShuttleArrival
-    {
-        public IntVec3 cell;
-        public int touchdownTick;
-        public string shuttleThingDefName;
-        public List<Thing> things = new List<Thing>();
-        public bool showDeparture = true;
-    }
-
     public sealed class ServiceGroupRecord : IExposable
     {
         public string id;
@@ -72,5 +63,4 @@ namespace SpaceServices
             }
         }
     }
-
 }

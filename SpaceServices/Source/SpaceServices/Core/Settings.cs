@@ -64,5 +64,4 @@ namespace SpaceServices
             Scribe_Values.Look(ref allowSealedNoSuitArrivals, "allowSealedNoSuitArrivals", false);
         }
     }
-
 }

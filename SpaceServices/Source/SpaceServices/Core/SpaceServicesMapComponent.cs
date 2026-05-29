@@ -94,4 +94,12 @@ namespace SpaceServices
         }
     }
 
+    public sealed class ScheduledServiceShuttleArrival
+    {
+        public IntVec3 cell;
+        public int touchdownTick;
+        public string shuttleThingDefName;
+        public List<Thing> things = new List<Thing>();
+        public bool showDeparture = true;
+    }
 }

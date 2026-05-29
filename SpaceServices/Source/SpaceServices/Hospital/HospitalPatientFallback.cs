@@ -138,5 +138,4 @@ namespace SpaceServices
             Messages.Message("Space Services: patient arrived", pawn, MessageTypeDefOf.NeutralEvent, false);
         }
     }
-
 }

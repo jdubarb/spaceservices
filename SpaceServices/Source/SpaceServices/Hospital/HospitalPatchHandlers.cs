@@ -13,59 +13,11 @@ using Verse.AI.Group;
 
 namespace SpaceServices
 {
-    public static class OptionalPatchHandlers
+    public static class HospitalPatchHandlers
     {
-        public static void SpaceportsIsMapInSpacePostfix(Map map, ref bool __result)
-        {
-            if (SpaceServicesMod.Settings != null && SpaceServicesMod.Settings.enableSpaceportsBridge && SpaceServiceMapDetector.IsServiceEligible(map))
-            {
-                __result = true;
-            }
-        }
-
-        public static bool SpaceportsSuitUpPawnsPrefix(List<Pawn> pawns)
-        {
-            VacSuitUtility.SuitPawnsForVacuum(pawns);
-            return true;
-        }
-
-        public static void SpaceportsHospitalityShuttleCheckPostfix(Map map, Faction faction, ref bool __result)
-        {
-            if (__result || SpaceServicesMod.Settings == null || !SpaceServicesMod.Settings.enableSpaceportsBridge || !SpaceServiceMapDetector.IsServiceEligible(map))
-            {
-                return;
-            }
-            if (faction != null && faction.def != null && faction.def.techLevel == TechLevel.Neolithic)
-            {
-                return;
-            }
-            __result = true;
-        }
-
-        public static void SpaceportsCheckIfClearForLandingPostfix(Map map, int typeVal, ref bool __result)
-        {
-            if (__result || SpaceServicesMod.Settings == null || !SpaceServicesMod.Settings.enableSpaceportsBridge || !SpaceServiceMapDetector.IsServiceEligible(map))
-            {
-                return;
-            }
-            if (typeVal != 1 && typeVal != 3)
-            {
-                return;
-            }
-            if (!SpaceServicesMod.Settings.enableHospitality || ServicePadUtility.TryFindServicePad(map, ServiceUse.Guest) == null)
-            {
-                return;
-            }
-            if (HasBlockingLandingCondition(map))
-            {
-                return;
-            }
-            __result = true;
-        }
-
         public static void HospitalLandingSpotPostfix(object[] __args, ref IntVec3 __result)
         {
-            Map map = FindMap(__args);
+            Map map = OptionalPatchUtility.FindMap(__args);
             if (map != null && SpaceServiceMapDetector.IsServiceEligible(map) && ServicePadUtility.TryFindServicePadCell(map, ServiceUse.Patient, out IntVec3 cell))
             {
                 __result = cell;
@@ -115,7 +67,7 @@ namespace SpaceServices
 
         public static void HospitalSpawnPatientPrefix(MethodBase __originalMethod, object[] __args)
         {
-            Map map = FindMap(__args);
+            Map map = OptionalPatchUtility.FindMap(__args);
             if (map == null || !SpaceServiceMapDetector.IsServiceEligible(map))
             {
                 HospitalLandingRedirectContext.Push(null, IntVec3.Invalid, null);
@@ -129,7 +81,7 @@ namespace SpaceServices
             {
                 cell = IntVec3.Invalid;
             }
-            foreach (Pawn pawn in PawnsFromArgs(__args))
+            foreach (Pawn pawn in OptionalPatchUtility.PawnsFromArgs(__args))
             {
                 VacSuitUtility.SuitPawnForEnvironment(pawn, map, cell);
             }
@@ -141,8 +93,8 @@ namespace SpaceServices
         {
             try
             {
-                Map map = FindMap(__args);
-                List<Pawn> pawns = PawnsFromArgs(__args).Distinct().ToList();
+                Map map = OptionalPatchUtility.FindMap(__args);
+                List<Pawn> pawns = OptionalPatchUtility.PawnsFromArgs(__args).Distinct().ToList();
                 IntVec3 arrivalCell = IntVec3.Invalid;
                 bool hasArrivalCell = map != null && HospitalLandingRedirectContext.TryGetActiveCell(map, out arrivalCell);
                 foreach (Pawn pawn in pawns)
@@ -202,33 +154,6 @@ namespace SpaceServices
             ServiceLifecycleUtility.ReleasePawn(pawn, "Hospital removed patient from map");
         }
 
-        public static void SuitPawnsInArgsPostfix(MethodBase __originalMethod, object[] __args)
-        {
-            Map map = FindMap(__args);
-            if (map != null && !SpaceServiceMapDetector.IsServiceEligible(map))
-            {
-                return;
-            }
-            List<Pawn> pawns = PawnsFromArgs(__args).Distinct().ToList();
-            foreach (Pawn pawn in pawns)
-            {
-                IntVec3 cell = pawn != null && pawn.Spawned ? pawn.Position : IntVec3.Invalid;
-                VacSuitUtility.SuitPawnForEnvironment(pawn, map, cell);
-            }
-            string methodName = __originalMethod == null || __originalMethod.DeclaringType == null ? "" : __originalMethod.DeclaringType.FullName ?? "";
-            if (map != null && pawns.Count > 0)
-            {
-                if (methodName.IndexOf("Hospital.", StringComparison.OrdinalIgnoreCase) >= 0)
-                {
-                    ServiceLifecycleUtility.RegisterPawns(map, "hospital", pawns);
-                }
-                else if (methodName.IndexOf("Hospitality.", StringComparison.OrdinalIgnoreCase) >= 0)
-                {
-                    ServiceLifecycleUtility.RegisterPawns(map, "hospitality", pawns);
-                }
-            }
-        }
-
         public static void HospitalPatientArrivesTryExecutePostfix(object __instance, IncidentParms parms, ref bool __result)
         {
             try
@@ -267,72 +192,6 @@ namespace SpaceServices
             HospitalArrivalIncidentContext.Pop();
         }
 
-        private static bool HasBlockingLandingCondition(Map map)
-        {
-            if (map == null)
-            {
-                return true;
-            }
-            GameConditionDef kessler = DefDatabase<GameConditionDef>.GetNamedSilentFail("Spaceports_KesslerSyndrome");
-            if (kessler != null && map.gameConditionManager.ConditionIsActive(kessler))
-            {
-                return true;
-            }
-            if (GenHostility.AnyHostileActiveThreatToPlayer(map, true))
-            {
-                return true;
-            }
-            return false;
-        }
-
-        private static IEnumerable<Pawn> PawnsFromArgs(object[] args)
-        {
-            foreach (object arg in args ?? new object[0])
-            {
-                Pawn pawn = arg as Pawn;
-                if (pawn != null)
-                {
-                    yield return pawn;
-                    continue;
-                }
-                IEnumerable<Pawn> pawns = arg as IEnumerable<Pawn>;
-                if (pawns != null)
-                {
-                    foreach (Pawn p in pawns)
-                    {
-                        yield return p;
-                    }
-                }
-            }
-        }
-
-        private static Map FindMap(object[] args)
-        {
-            foreach (object arg in args ?? new object[0])
-            {
-                Map map = arg as Map;
-                if (map != null)
-                {
-                    return map;
-                }
-                IncidentParms parms = arg as IncidentParms;
-                if (parms != null)
-                {
-                    Map targetMap = parms.target as Map;
-                    if (targetMap != null)
-                    {
-                        return targetMap;
-                    }
-                }
-                Pawn pawn = arg as Pawn;
-                if (pawn != null && pawn.MapHeld != null)
-                {
-                    return pawn.MapHeld;
-                }
-            }
-            return Find.CurrentMap;
-        }
-
         private static bool IsMassCasualtyIncident(object worker, string incidentDefName)
         {
             if (incidentDefName == "MassCasualtyEvent")
@@ -342,7 +201,5 @@ namespace SpaceServices
             string typeName = worker == null ? "" : worker.GetType().FullName ?? "";
             return typeName.IndexOf("MassCasualty", StringComparison.OrdinalIgnoreCase) >= 0;
         }
-
     }
-
 }

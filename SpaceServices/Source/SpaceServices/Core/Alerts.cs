@@ -51,5 +51,4 @@ namespace SpaceServices
             return culprits.Count == 0 ? AlertReport.Inactive : AlertReport.CulpritsAre(culprits);
         }
     }
-
 }

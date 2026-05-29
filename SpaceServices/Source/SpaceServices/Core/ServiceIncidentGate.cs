@@ -85,5 +85,4 @@ namespace SpaceServices
             return ServicePadUtility.TryFindServicePad(map, use) != null;
         }
     }
-
 }
