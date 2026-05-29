@@ -1,0 +1,140 @@
+using HarmonyLib;
+using RimWorld;
+using System;
+using System.Collections;
+using System.Collections.Generic;
+using System.Linq;
+using System.Reflection;
+using System.Text;
+using UnityEngine;
+using Verse;
+using Verse.AI;
+using Verse.AI.Group;
+
+namespace SpaceServices
+{
+    public sealed class SpaceServiceEligibility
+    {
+        public bool allowed;
+        public readonly List<string> allowReasons = new List<string>();
+        public readonly List<string> blockReasons = new List<string>();
+
+        public string ToLogString(Map map)
+        {
+            string mapId = map == null ? "null map" : "map " + map.uniqueID;
+            return mapId + " allowed=" + allowed + " allow=[" + string.Join(", ", allowReasons.ToArray()) + "] block=[" + string.Join(", ", blockReasons.ToArray()) + "]";
+        }
+    }
+
+    public static class SpaceServiceMapDetector
+    {
+        public static SpaceServiceEligibility Evaluate(Map map)
+        {
+            SpaceServiceEligibility result = new SpaceServiceEligibility();
+            if (map == null)
+            {
+                result.blockReasons.Add("no map");
+                return result;
+            }
+
+            object parent = Reflect.GetMember(map, "Parent");
+            string parentDef = Reflect.DefName(parent);
+            string parentType = parent == null ? "" : parent.GetType().FullName ?? "";
+
+            if (parentDef == "Gravship" || parentType.EndsWith(".Gravship", StringComparison.Ordinal) || parentType == "RimWorld.Gravship")
+            {
+                result.blockReasons.Add("actual gravship parent");
+            }
+            if (parentDef == "QE_SpaceCustomSite" || parentDef == "QE_CustomMap_SpaceSubMap" || parentType.StartsWith("QuestEditor_Library.", StringComparison.Ordinal))
+            {
+                result.blockReasons.Add("temporary quest space map");
+            }
+
+            string layerDef = DefNameFromNested(map, "Tile", "LayerDef");
+            if (Reflect.BoolFromNested(map, "Tile", "LayerDef", "isSpace"))
+            {
+                result.allowReasons.Add("tile layer is space:" + layerDef);
+            }
+
+            string biomeDef = Reflect.DefName(map.Biome);
+            if (Reflect.BoolMember(map.Biome, "inVacuum"))
+            {
+                result.allowReasons.Add("biome is vacuum:" + biomeDef);
+            }
+
+            object orbitalDebris = Reflect.GetMember(map, "OrbitalDebris") ?? Reflect.GetMember(map, "orbitalDebris");
+            if (Reflect.DefName(orbitalDebris) == "Asteroid" || Convert.ToString(orbitalDebris) == "Asteroid")
+            {
+                result.allowReasons.Add("orbital debris asteroid");
+            }
+
+            object generatorDef = Reflect.GetMember(map, "generatorDef") ?? Reflect.GetMember(map, "GeneratorDef");
+            string generator = Reflect.DefName(generatorDef);
+            if (ContainsAny(generator, "Asteroid", "Orbit", "Moon", "Station", "Space"))
+            {
+                result.allowReasons.Add("space-like generator:" + generator);
+            }
+
+            if (parentDef == "SpaceSettlement")
+            {
+                result.allowReasons.Add("space settlement parent");
+            }
+            if (TypeOrBaseNameContains(parent, "SpaceMapParent") || ContainsAny(parentType, "SpaceSettlement", "AsteroidMapParent", "Station", "OrbitalBase"))
+            {
+                result.allowReasons.Add("stationary space parent:" + parentType);
+            }
+
+            if (Reflect.BoolFromNested(map, "Tile", "LayerDef", "isSpace") == false && ContainsAny(layerDef, "SkyIsland", "Troposphere", "Stratosphere", "Mesosphere"))
+            {
+                result.blockReasons.Add("non-vacuum atmospheric or sky layer");
+            }
+
+            result.allowed = result.blockReasons.Count == 0 && result.allowReasons.Count > 0;
+            return result;
+        }
+
+        public static bool IsServiceEligible(Map map)
+        {
+            return Evaluate(map).allowed;
+        }
+
+        private static string DefNameFromNested(object root, params string[] path)
+        {
+            object current = root;
+            for (int i = 0; i < path.Length; i++)
+            {
+                current = Reflect.GetMember(current, path[i]);
+            }
+            return Reflect.DefName(current);
+        }
+
+        private static bool ContainsAny(string value, params string[] needles)
+        {
+            if (string.IsNullOrEmpty(value))
+            {
+                return false;
+            }
+            for (int i = 0; i < needles.Length; i++)
+            {
+                if (value.IndexOf(needles[i], StringComparison.OrdinalIgnoreCase) >= 0)
+                {
+                    return true;
+                }
+            }
+            return false;
+        }
+
+        private static bool TypeOrBaseNameContains(object obj, string name)
+        {
+            for (Type type = obj == null ? null : obj.GetType(); type != null; type = type.BaseType)
+            {
+                if (type.Name.IndexOf(name, StringComparison.OrdinalIgnoreCase) >= 0 || (type.FullName ?? "").IndexOf(name, StringComparison.OrdinalIgnoreCase) >= 0)
+                {
+                    return true;
+                }
+            }
+            return false;
+        }
+    }
+
+}
