@@ -1717,7 +1717,7 @@ namespace SpaceServices
                     {
                         if (!ReservedPadCanServe(record, record.serviceKind == "hospitality" ? ServiceUse.Guest : ServiceUse.Patient, out string blockedReason))
                         {
-                            if (SpaceServicesMod.Settings != null && SpaceServicesMod.Settings.debugLogging)
+                            if (ShouldLogBlockedDeparture())
                             {
                                 Log.Message("[Space Services] Pickup shuttle waiting for usable pad: " + blockedReason);
                             }
@@ -1737,7 +1737,7 @@ namespace SpaceServices
                 {
                     if (!ReservedPadCanServe(record, record.serviceKind == "hospitality" ? ServiceUse.Guest : ServiceUse.Patient, out string blockedReason))
                     {
-                        if (SpaceServicesMod.Settings != null && SpaceServicesMod.Settings.debugLogging)
+                        if (ShouldLogBlockedDeparture())
                         {
                             Log.Message("[Space Services] Service pickup boarding waiting: " + blockedReason);
                         }
@@ -1784,6 +1784,14 @@ namespace SpaceServices
                     BeginDeparture(map, record, "service visit timeout");
                 }
             }
+        }
+
+        private static bool ShouldLogBlockedDeparture()
+        {
+            return SpaceServicesMod.Settings != null &&
+                SpaceServicesMod.Settings.debugLogging &&
+                Find.TickManager != null &&
+                Find.TickManager.TicksGame % 2500 == 0;
         }
 
         private static List<Pawn> ActiveTrackedPawns(Map map, ServiceGroupRecord record)
@@ -1988,7 +1996,8 @@ namespace SpaceServices
             {
                 return false;
             }
-            return ServiceEnvironmentUtility.IsPadSafeForPawns(pad, pawns, out string _);
+            return ServiceEnvironmentUtility.IsPadSafeForPawns(pad, pawns, out string _) &&
+                PadReachableForPawns(pad, pawns, false, out string _);
         }
 
         private static bool ReadyForExtraction(ServiceGroupRecord record)
@@ -2144,6 +2153,25 @@ namespace SpaceServices
             return PickupBoardingRect(pad).Contains(pawn.Position);
         }
 
+        private static bool PadReachableForPawns(Thing pad, IEnumerable<Pawn> pawns, bool boarding, out string reason)
+        {
+            reason = null;
+            foreach (Pawn pawn in pawns ?? Enumerable.Empty<Pawn>())
+            {
+                if (pawn == null || pawn.Destroyed || !pawn.Spawned || pawn.Downed)
+                {
+                    continue;
+                }
+                IntVec3 cell = boarding ? PickupBoardingCell(pad, pawn) : DepartureWaitCell(pad, pawn);
+                if (!cell.IsValid)
+                {
+                    reason = pawn.LabelShortCap + " cannot reach a " + (boarding ? "boarding" : "staging") + " cell near the departure pad";
+                    return false;
+                }
+            }
+            return true;
+        }
+
         private static bool SameRoomAsPad(Thing pad, IntVec3 cell)
         {
             Map map = pad == null ? null : pad.Map;
@@ -2213,7 +2241,7 @@ namespace SpaceServices
                 }
                 foreach (ServiceGroupRecord record in comp.serviceGroups)
                 {
-                    if (record == null || record.state != "departing" || record.pawns == null || record.pawns.Count == 0)
+                    if (record == null || record.pawns == null || record.pawns.Count == 0 || !ShouldReportDepartureBlock(record))
                     {
                         continue;
                     }
@@ -2223,6 +2251,10 @@ namespace SpaceServices
                         if (!ReservedPadStillExists(record))
                         {
                             reason = NoReservedPadBlockReason(map, use, record);
+                        }
+                        if (string.IsNullOrEmpty(reason))
+                        {
+                            continue;
                         }
                         blocks.Add(new ServiceDepartureBlock
                         {
@@ -2234,6 +2266,19 @@ namespace SpaceServices
                 }
             }
             return blocks;
+        }
+
+        private static bool ShouldReportDepartureBlock(ServiceGroupRecord record)
+        {
+            if (record == null || record.state == "completed")
+            {
+                return false;
+            }
+            if (record.state == "departing" || record.state == "pickupInbound" || record.state == "boardingPickup")
+            {
+                return true;
+            }
+            return record.serviceKind == "hospital" && record.state == "arrived";
         }
 
         private static string NoReservedPadBlockReason(Map map, ServiceUse use, ServiceGroupRecord record)
@@ -2263,7 +2308,11 @@ namespace SpaceServices
                 {
                     return safetyReason ?? "service pad is unsafe";
                 }
-                return "service pad is not reserved yet";
+                if (!PadReachableForPawns(pad, pawns, false, out string reachReason))
+                {
+                    return reachReason ?? "service pad cannot be reached";
+                }
+                return null;
             }
             return "all matching service pads are reserved";
         }
@@ -2292,7 +2341,12 @@ namespace SpaceServices
                 reason = "departure pad blocked: " + (reason ?? "settings block this service");
                 return false;
             }
-            return ServiceEnvironmentUtility.IsPadSafeForPawns(record.reservedPad, record.pawns, out reason);
+            if (!ServiceEnvironmentUtility.IsPadSafeForPawns(record.reservedPad, record.pawns, out reason))
+            {
+                return false;
+            }
+            bool boarding = record.state == "boardingPickup";
+            return PadReachableForPawns(record.reservedPad, record.pawns, boarding, out reason);
         }
 
         private static bool ReservedPadStillExists(ServiceGroupRecord record)
