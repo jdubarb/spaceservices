@@ -26,15 +26,29 @@ namespace SpaceServices
                 AccessTools.TypeByName("Hospitality.Utilities.SpawnGroupUtility"),
                 AccessTools.TypeByName("Hospitality.IncidentWorker_VisitorGroup"),
                 AccessTools.TypeByName("Hospitality.IncidentWorker_VisitorGroupMax"),
+                AccessTools.TypeByName("Hospitality.IncidentWorker_VisitorGroupSelectFaction"),
                 AccessTools.TypeByName("Hospitality.Spacer.IncidentWorker_VisitorGroupSpacer")
             };
             foreach (Type type in types.Where(t => t != null))
             {
-                foreach (MethodInfo method in type.GetMethods(AccessTools.all).Where(m => m.DeclaringType == type && (m.Name == "TryDropSpawn" || m.Name == "SpawnGroup" || m.Name == "SpawnPawns" || m.Name == "SpawnVisitor" || m.Name == "GeneratePawns")))
+                foreach (MethodInfo method in type.GetMethods(AccessTools.all).Where(m => m.DeclaringType == type && (m.Name == "TryDropSpawn" || m.Name == "SpawnPawns" || m.Name == "GeneratePawns")))
                 {
                     OptionalModPatches.PatchIfExists(harmony, method, typeof(OptionalPatchUtility), postfix: nameof(OptionalPatchUtility.SuitPawnsInArgsPostfix));
                 }
             }
+            Type visitorGroup = AccessTools.TypeByName("Hospitality.IncidentWorker_VisitorGroup");
+            Type selectFaction = AccessTools.TypeByName("Hospitality.IncidentWorker_VisitorGroupSelectFaction");
+            Type spawnUtility = AccessTools.TypeByName("Hospitality.Utilities.SpawnGroupUtility");
+            Type guestUtility = AccessTools.TypeByName("Hospitality.Utilities.GuestUtility");
+            Type visitPoint = AccessTools.TypeByName("Hospitality.LordToil_VisitPoint");
+
+            OptionalModPatches.PatchIfExists(harmony, AccessTools.Method(visitorGroup, "TryExecuteWorker"), typeof(HospitalityPatchHandlers), prefix: nameof(HospitalityPatchHandlers.VisitorGroupTryExecutePrefix), postfix: nameof(HospitalityPatchHandlers.VisitorGroupTryExecutePostfix));
+            OptionalModPatches.PatchIfExists(harmony, AccessTools.Method(selectFaction, "TryExecuteWorker"), typeof(HospitalityPatchHandlers), prefix: nameof(HospitalityPatchHandlers.VisitorGroupTryExecutePrefix), postfix: nameof(HospitalityPatchHandlers.VisitorGroupTryExecutePostfix));
+            OptionalModPatches.PatchIfExists(harmony, AccessTools.Method(visitorGroup, "GetSpot"), typeof(HospitalityPatchHandlers), postfix: nameof(HospitalityPatchHandlers.GetSpotPostfix));
+            OptionalModPatches.PatchIfExists(harmony, AccessTools.Method(visitorGroup, "SpawnGroup"), typeof(HospitalityPatchHandlers), prefix: nameof(HospitalityPatchHandlers.SpawnGroupPrefix), postfix: nameof(HospitalityPatchHandlers.SpawnGroupPostfix));
+            OptionalModPatches.PatchIfExists(harmony, AccessTools.Method(spawnUtility, "SpawnVisitor"), typeof(HospitalityPatchHandlers), prefix: nameof(HospitalityPatchHandlers.SpawnVisitorPrefix), postfix: nameof(HospitalityPatchHandlers.SpawnVisitorPostfix));
+            OptionalModPatches.PatchIfExists(harmony, AccessTools.Method(guestUtility, "Leave"), typeof(HospitalityPatchHandlers), postfix: nameof(HospitalityPatchHandlers.GuestLeavePostfix));
+            OptionalModPatches.PatchIfExists(harmony, AccessTools.Method(visitPoint, "Leave"), typeof(HospitalityPatchHandlers), postfix: nameof(HospitalityPatchHandlers.VisitPointLeavePostfix));
         }
     }
 }

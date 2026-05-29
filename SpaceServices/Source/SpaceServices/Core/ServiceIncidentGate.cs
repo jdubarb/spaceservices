@@ -70,8 +70,8 @@ namespace SpaceServices
             }
             if (HospitalityIncidents.Contains(incidentDefName))
             {
-                // Hospitality needs its own arrival/departure pipeline before natural space-map events are safe.
-                return false;
+                return (SpaceServicesMod.Settings == null || SpaceServicesMod.Settings.enableHospitality) &&
+                    HospitalityIncidentGate.CanAcceptHospitalityIncident(incidentDefName, map);
             }
             return false;
         }
