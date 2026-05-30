@@ -106,7 +106,7 @@ namespace SpaceServices
             {
                 Pawn pawn = key as Pawn;
                 object patientData = key == null ? null : patients[key];
-                if (pawn == null || pawn.Destroyed || IsSyntheticFallbackPatientData(patientData))
+                if (ServicePawnUtility.IsTerminalPawn(pawn) || IsSyntheticFallbackPatientData(patientData))
                 {
                     removeKeys.Add(key);
                 }
@@ -248,7 +248,7 @@ namespace SpaceServices
                     record.reservedPad = null;
                 }
                 int before = record.pawns.Count;
-                record.pawns = record.pawns.Where(pawn => pawn != null && !pawn.Destroyed).Distinct().ToList();
+                record.pawns = record.pawns.Where(pawn => !ServicePawnUtility.IsTerminalPawn(pawn)).Distinct().ToList();
                 removed += before - record.pawns.Count;
                 if (record.serviceKind == "hospital" && hospitalPatients != null)
                 {

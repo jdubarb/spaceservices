@@ -47,7 +47,7 @@ namespace SpaceServices
                 return;
             }
 
-            List<Pawn> list = pawns.Where(p => p != null && !p.Destroyed).Distinct().ToList();
+            List<Pawn> list = pawns.Where(p => !ServicePawnUtility.IsTerminalPawn(p)).Distinct().ToList();
             if (list.Count == 0)
             {
                 return;
@@ -155,6 +155,12 @@ namespace SpaceServices
                 ServiceDebugUtility.LogAudit("RequestDepartureForPawn no service record pawn=" + ServiceDebugUtility.PawnAuditSummary(pawn) + " reason=" + (reason ?? "none"));
                 return false;
             }
+            if (ServicePawnUtility.IsPlayerOwnedPawn(pawn))
+            {
+                ReleasePawn(pawn, "pawn became player-owned before service departure");
+                ServiceDebugUtility.LogAudit("RequestDepartureForPawn ignored player-owned pawn=" + ServiceDebugUtility.PawnAuditSummary(pawn) + " reason=" + (reason ?? "none"));
+                return false;
+            }
             ServiceDebugUtility.LogAudit("RequestDepartureForPawn found " + RecordAudit(record) + " pawn=" + ServiceDebugUtility.PawnAuditSummary(pawn) + " reason=" + (reason ?? "none"));
             if (record.state == "completed" || record.state == "extracting")
             {
@@ -173,9 +179,20 @@ namespace SpaceServices
             {
                 return false;
             }
-            ReleaseRecord(record);
-            record.state = "completed";
-            Log.Message("[Space Services] Released service group " + record.id + ": " + reason);
+            if (record.pawns != null)
+            {
+                record.pawns.RemoveAll(tracked => tracked == null || tracked == pawn || ServicePawnUtility.IsTerminalPawn(tracked));
+            }
+            if (record.pawns == null || record.pawns.Count == 0)
+            {
+                ReleaseRecord(record);
+                record.state = "completed";
+                Log.Message("[Space Services] Released service group " + record.id + ": " + reason);
+            }
+            else
+            {
+                ServiceDebugUtility.LogAudit("Released pawn from active service group " + RecordAudit(record) + " pawn=" + ServiceDebugUtility.PawnAuditSummary(pawn) + " reason=" + (reason ?? "none"));
+            }
             return true;
         }
 
@@ -464,12 +481,12 @@ namespace SpaceServices
 
         private static List<Pawn> ActiveTrackedPawns(Map map, ServiceGroupRecord record)
         {
-            List<Pawn> pawns = record == null || record.pawns == null ? new List<Pawn>() : record.pawns.Where(p => p != null && !p.Destroyed).Distinct().ToList();
+            List<Pawn> pawns = record == null || record.pawns == null ? new List<Pawn>() : record.pawns.Where(p => !ServicePawnUtility.IsTerminalPawn(p)).Distinct().ToList();
             if (record == null || record.serviceKind != "hospital" || pawns.Count == 0)
             {
                 if (record != null && record.serviceKind == "hospitality")
                 {
-                    return pawns.Where(pawn => pawn.Spawned && !HospitalityBedUtility.IsRescuedGuest(pawn)).ToList();
+                    return pawns.Where(IsActiveHospitalityServicePawn).ToList();
                 }
                 return pawns;
             }
@@ -482,6 +499,20 @@ namespace SpaceServices
             }
 
             return pawns.Where(pawn => pawn.Spawned || hospitalPatients.Contains(pawn)).ToList();
+        }
+
+        private static bool IsActiveHospitalityServicePawn(Pawn pawn)
+        {
+            if (ServicePawnUtility.IsTerminalPawn(pawn) || !pawn.Spawned)
+            {
+                return false;
+            }
+            if (ServicePawnUtility.IsPlayerOwnedPawn(pawn))
+            {
+                // Hospitality join offers and recruit-guest mods turn visitors into colonists; never route them to extraction.
+                return false;
+            }
+            return !HospitalityBedUtility.IsRescuedGuest(pawn);
         }
 
         private static void BeginDeparture(Map map, ServiceGroupRecord record, string reason)

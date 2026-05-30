@@ -30,7 +30,15 @@ namespace SpaceServices
             IntVec3 padCell = record.reservedPad == null ? IntVec3.Invalid : record.reservedPad.Position;
             ServiceShuttleUtility.CleanupTouchdownShuttle(padMap, padCell, record.pickupShuttleThingDefName);
 
-            bool completed = TryAutoExtract(map, record.pawns, reason);
+            List<Pawn> departingPawns = record.pawns.Where(pawn => !ServicePawnUtility.IsTerminalPawn(pawn) && !ServicePawnUtility.IsPlayerOwnedPawn(pawn)).ToList();
+            if (departingPawns.Count == 0)
+            {
+                record.state = "completed";
+                ReleaseReservation(record);
+                ServiceDebugUtility.LogAudit("CompleteDeparture finished without extractable pawns id=" + record.id + " pawns=" + PawnListAudit(record.pawns));
+                return true;
+            }
+            bool completed = TryAutoExtract(map, departingPawns, reason);
             ServiceDebugUtility.LogAudit("CompleteDeparture extraction result id=" + record.id + " completed=" + completed + " pawns=" + PawnListAudit(record.pawns));
             if (completed)
             {
@@ -41,7 +49,7 @@ namespace SpaceServices
                 record.state = "completed";
                 if (record.serviceKind == "hospital")
                 {
-                    NotifyHospitalPatientsLeft(map, record.pawns);
+                    NotifyHospitalPatientsLeft(map, departingPawns);
                 }
                 ReleaseReservation(record);
                 ServiceDebugUtility.LogAudit("CompleteDeparture finished id=" + record.id + " state=" + record.state);
@@ -59,9 +67,14 @@ namespace SpaceServices
             bool any = false;
             foreach (Pawn pawn in pawns ?? Enumerable.Empty<Pawn>())
             {
-                if (pawn == null || pawn.Destroyed)
+                if (ServicePawnUtility.IsTerminalPawn(pawn))
                 {
                     ServiceDebugUtility.LogAudit("TryAutoExtract skip destroyed/null pawn=" + ServiceDebugUtility.PawnAuditSummary(pawn));
+                    continue;
+                }
+                if (ServicePawnUtility.IsPlayerOwnedPawn(pawn))
+                {
+                    Log.Warning("[Space Services] Refusing to auto-extract player-owned service pawn: " + ServiceDebugUtility.PawnAuditSummary(pawn) + ", reason=" + (reason ?? "none"));
                     continue;
                 }
                 any = true;
@@ -134,12 +147,8 @@ namespace SpaceServices
             {
                 return;
             }
-            foreach (Pawn pawn in pawns ?? Enumerable.Empty<Pawn>())
+            foreach (Pawn pawn in (pawns ?? Enumerable.Empty<Pawn>()).Where(pawn => !ServicePawnUtility.IsTerminalPawn(pawn)).ToList())
             {
-                if (pawn == null)
-                {
-                    continue;
-                }
                 if (patientLeftTheMap != null)
                 {
                     try

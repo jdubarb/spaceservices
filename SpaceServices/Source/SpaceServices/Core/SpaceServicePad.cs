@@ -370,7 +370,7 @@ namespace SpaceServices
                 ClearWatchedReservation("service record moved to another pad");
                 return true;
             }
-            if (record.pawns == null || !record.pawns.Any(pawn => pawn != null && !pawn.Destroyed && (pawn.Spawned || pawn.MapHeld != null)))
+            if (record.pawns == null || !record.pawns.Any(pawn => !ServicePawnUtility.IsTerminalPawn(pawn) && (pawn.Spawned || pawn.MapHeld != null)))
             {
                 record.state = "completed";
                 ClearWatchedReservation("service record has no active pawns");
