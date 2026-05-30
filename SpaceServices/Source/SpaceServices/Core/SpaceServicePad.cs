@@ -669,8 +669,7 @@ namespace SpaceServices
                 {
                     CompSpaceServicePad comp = building.TryGetComp<CompSpaceServicePad>();
                     return comp == null ? 99 : comp.PriorityRank(use);
-                })
-                .ThenBy(building => building.Position.DistanceToSquared(IntVec3.Zero)))
+                }))
             {
                 CompSpaceServicePad comp = building.TryGetComp<CompSpaceServicePad>();
                 if (comp != null && comp.IsUsableFor(use))
@@ -715,6 +714,34 @@ namespace SpaceServices
                 return (comp == null ? 99 : comp.PriorityRank(use)) == bestRank;
             }).ToList();
             return bestPads[Rand.Range(0, bestPads.Count)];
+        }
+
+        public static bool TryFindNearestServicePadCell(Map map, ServiceUse use, IntVec3 origin, out IntVec3 cell)
+        {
+            Thing pad = TryFindNearestServicePad(map, use, origin);
+            if (pad != null)
+            {
+                cell = pad.Position;
+                return true;
+            }
+            cell = IntVec3.Invalid;
+            return false;
+        }
+
+        public static Thing TryFindNearestServicePad(Map map, ServiceUse use, IntVec3 origin)
+        {
+            if (!origin.IsValid)
+            {
+                return TryFindRandomServicePad(map, use);
+            }
+            return AllServicePads(map, use)
+                .OrderBy(pad =>
+                {
+                    CompSpaceServicePad comp = pad.TryGetComp<CompSpaceServicePad>();
+                    return comp == null ? 99 : comp.PriorityRank(use);
+                })
+                .ThenBy(pad => pad.Position.DistanceToSquared(origin))
+                .FirstOrDefault();
         }
 
         public static Thing TryReserveServicePad(Map map, ServiceUse use, string groupId)

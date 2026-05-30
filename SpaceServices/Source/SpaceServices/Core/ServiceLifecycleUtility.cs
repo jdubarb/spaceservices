@@ -19,6 +19,7 @@ namespace SpaceServices
         private const int HospitalityDepartureHardTimeoutTicks = 7500;
         private const int HospitalityBedlessDepartureGraceTicks = 2500 * 16;
         private const int PickupBoardingHardTimeoutTicks = 2500;
+        private const float VacuumPadDistanceTolerance = 2.5f;
 
         public static int NextTickInterval(List<ServiceGroupRecord> records)
         {
@@ -640,11 +641,11 @@ namespace SpaceServices
                 return null;
             }
             List<Pawn> pawns = record.pawns == null ? new List<Pawn>() : record.pawns.Where(pawn => pawn != null && !pawn.Destroyed).ToList();
-            // Pick the pad the patient can actually survive at before considering distance.
-            IEnumerable<Thing> candidates = ServicePadUtility.AllServicePads(map, use)
+            // Pick only pads the service pawns can survive at, then prefer matching priority and reasonable vacuum routing.
+            List<Thing> candidates = ServicePadUtility.AllServicePads(map, use)
                 .Where(pad => PadCanSafelyServe(pad, use, pawns, record.id, ShouldBypassGuestArea(record)))
-                .OrderBy(pad => DeparturePadScore(map, record, pad, pawns, use));
-            foreach (Thing pad in candidates)
+                .ToList();
+            foreach (Thing pad in OrderedDeparturePads(map, record, candidates, pawns, use))
             {
                 CompSpaceServicePad comp = pad.TryGetComp<CompSpaceServicePad>();
                 if (comp != null && comp.TryReserve(record.id))
@@ -656,6 +657,59 @@ namespace SpaceServices
             }
             ServiceDebugUtility.LogAudit("TryReserveBestDeparturePad no candidates record=" + record.id + " use=" + use + " pawns=" + PawnSummary(pawns));
             return null;
+        }
+
+        private static IEnumerable<Thing> OrderedDeparturePads(Map map, ServiceGroupRecord record, List<Thing> candidates, List<Pawn> pawns, ServiceUse use)
+        {
+            if (candidates == null || candidates.Count == 0)
+            {
+                yield break;
+            }
+
+            foreach (int rank in candidates
+                .Select(pad =>
+                {
+                    CompSpaceServicePad comp = pad.TryGetComp<CompSpaceServicePad>();
+                    return comp == null ? 99 : comp.PriorityRank(use);
+                })
+                .Distinct()
+                .OrderBy(value => value))
+            {
+                List<Thing> ranked = candidates.Where(pad =>
+                {
+                    CompSpaceServicePad comp = pad.TryGetComp<CompSpaceServicePad>();
+                    return (comp == null ? 99 : comp.PriorityRank(use)) == rank;
+                }).ToList();
+
+                foreach (Thing pad in OrderedByVacuumPreference(map, record, ranked, pawns, use))
+                {
+                    yield return pad;
+                }
+            }
+        }
+
+        private static IEnumerable<Thing> OrderedByVacuumPreference(Map map, ServiceGroupRecord record, List<Thing> candidates, List<Pawn> pawns, ServiceUse use)
+        {
+            if (!ShouldPreferVacuumDeparturePad(pawns))
+            {
+                return candidates.OrderBy(pad => DeparturePadScore(map, record, pad, pawns, use));
+            }
+
+            List<Thing> vacuumPads = candidates.Where(IsVacuumPad).ToList();
+            List<Thing> sealedPads = candidates.Where(pad => !IsVacuumPad(pad)).ToList();
+            if (vacuumPads.Count == 0 || sealedPads.Count == 0)
+            {
+                return candidates.OrderBy(pad => DeparturePadScore(map, record, pad, pawns, use));
+            }
+
+            float bestVacuumDistance = vacuumPads.Min(pad => DepartureTravelDistance(record, pad, pawns));
+            float bestSealedDistance = sealedPads.Min(pad => DepartureTravelDistance(record, pad, pawns));
+            bool vacuumTooFar = bestVacuumDistance > bestSealedDistance * VacuumPadDistanceTolerance * VacuumPadDistanceTolerance;
+            IEnumerable<Thing> preferred = vacuumTooFar ? sealedPads : vacuumPads;
+            IEnumerable<Thing> fallback = vacuumTooFar ? vacuumPads : sealedPads;
+            return preferred
+                .OrderBy(pad => DeparturePadScore(map, record, pad, pawns, use))
+                .Concat(fallback.OrderBy(pad => DeparturePadScore(map, record, pad, pawns, use)));
         }
 
         private static float DeparturePadScore(Map map, ServiceGroupRecord record, Thing pad, List<Pawn> pawns, ServiceUse use)
@@ -676,35 +730,30 @@ namespace SpaceServices
             {
                 score += comp.PriorityRank(use) * 1000000f;
             }
-            if (ShouldPreserveSealedPadsForLowResistancePatients(map, record, pawns))
-            {
-                score += ServiceEnvironmentUtility.GetMaxVacuum(pad) > 0.05f ? -100000f : 100000f;
-            }
             return score;
         }
 
-        private static bool ShouldPreserveSealedPadsForLowResistancePatients(Map map, ServiceGroupRecord record, List<Pawn> pawns)
+        private static float DepartureTravelDistance(ServiceGroupRecord record, Thing pad, List<Pawn> pawns)
         {
-            if (map == null || record == null || record.serviceKind != "hospital" || pawns == null || pawns.Count == 0)
+            List<Pawn> spawned = pawns == null ? new List<Pawn>() : pawns.Where(pawn => pawn != null && pawn.Spawned).ToList();
+            return spawned.Sum(pawn =>
             {
-                return false;
-            }
-            if (pawns.Any(pawn => pawn != null && !pawn.Destroyed && VacSuitUtility.VacuumResistance(pawn) < 0.95f))
-            {
-                return false;
-            }
-            SpaceServicesMapComponent comp = map.GetComponent<SpaceServicesMapComponent>();
-            if (comp == null || comp.serviceGroups == null)
-            {
-                return false;
-            }
-            return comp.serviceGroups.Any(other =>
-                other != null &&
-                other != record &&
-                other.serviceKind == "hospital" &&
-                other.state != "completed" &&
-                other.pawns != null &&
-                other.pawns.Any(pawn => pawn != null && !pawn.Destroyed && VacSuitUtility.VacuumResistance(pawn) < 0.95f));
+                IntVec3 waitCell = DepartureWaitCell(pad, pawn, ShouldBypassGuestArea(record));
+                IntVec3 target = waitCell.IsValid ? waitCell : pad.Position;
+                return pawn.Position.DistanceToSquared(target);
+            });
+        }
+
+        private static bool ShouldPreferVacuumDeparturePad(List<Pawn> pawns)
+        {
+            return pawns != null &&
+                pawns.Count > 0 &&
+                pawns.All(pawn => pawn != null && !pawn.Destroyed && VacSuitUtility.VacuumResistance(pawn) >= 0.95f);
+        }
+
+        private static bool IsVacuumPad(Thing pad)
+        {
+            return pad != null && ServiceEnvironmentUtility.GetMaxVacuum(pad) > 0.05f;
         }
 
         private static bool PadCanSafelyServe(Thing pad, ServiceUse use, IEnumerable<Pawn> pawns, string groupId, bool bypassGuestArea)

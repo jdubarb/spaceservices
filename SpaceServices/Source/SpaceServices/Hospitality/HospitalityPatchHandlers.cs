@@ -46,7 +46,7 @@ namespace SpaceServices
             }
 
             ShuttleVisual visual = ShuttleVisual.Resolve();
-            Thing pad = ServicePadUtility.TryFindRandomServicePad(map, ServiceUse.Guest);
+            Thing pad = ServicePadUtility.TryFindNearestServicePad(map, ServiceUse.Guest, parms == null ? IntVec3.Invalid : parms.spawnCenter);
             if (visual != null && pad != null)
             {
                 parms.spawnCenter = pad.Position;
@@ -61,7 +61,7 @@ namespace SpaceServices
                 }
             }
 
-            if (ServicePadUtility.TryFindServicePadCell(map, ServiceUse.Guest, out IntVec3 cell))
+            if (ServicePadUtility.TryFindNearestServicePadCell(map, ServiceUse.Guest, parms == null ? IntVec3.Invalid : parms.spawnCenter, out IntVec3 cell))
             {
                 parms.spawnCenter = cell;
             }
@@ -99,7 +99,7 @@ namespace SpaceServices
 
         public static void SpawnGroupPrefix(IncidentParms parms, Map map)
         {
-            if (map != null && SpaceServiceMapDetector.IsServiceEligible(map) && ServicePadUtility.TryFindServicePadCell(map, ServiceUse.Guest, out IntVec3 cell))
+            if (map != null && SpaceServiceMapDetector.IsServiceEligible(map) && ServicePadUtility.TryFindNearestServicePadCell(map, ServiceUse.Guest, parms == null ? IntVec3.Invalid : parms.spawnCenter, out IntVec3 cell))
             {
                 parms.spawnCenter = cell;
             }

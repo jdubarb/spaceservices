@@ -18,12 +18,7 @@ namespace SpaceServices
     {
         private static readonly string[] DuplicateBuildDefs =
         {
-            "PodLauncher",
-            "TransportPod",
-            "ShipLandingBeacon",
-            "PatientLandingSpot",
-            "Spaceports_ShuttleLandingPad",
-            "Spaceports_Beacon"
+            "MLT_ServiceLandingPad"
         };
 
         public static void Postfix(DesignationCategoryDef __instance)
