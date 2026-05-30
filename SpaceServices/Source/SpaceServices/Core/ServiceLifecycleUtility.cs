@@ -326,6 +326,12 @@ namespace SpaceServices
                     }
                     if (ReadyForExtraction(record))
                     {
+                        if (record.serviceKind == "hospitality" && ServiceDangerUtility.HospitalityTrafficBlocked(map, out string dangerReason))
+                        {
+                            ServiceDebugUtility.LogThrottled("hospitality-pickup-danger-" + record.id, "Hospitality pickup delayed for service group " + record.id + ": " + dangerReason, GenDate.TicksPerHour);
+                            GuideDepartingPawnsToPad(record);
+                            continue;
+                        }
                         BeginPickupShuttle(record, "service pawns waiting outside departure pad");
                     }
                     else if (record.serviceKind == "hospitality" && HospitalityDepartureTimedOut(record))

@@ -139,6 +139,11 @@ namespace SpaceServices
                 ServiceDebugUtility.LogAudit("ScheduleHospitalityIncident rejected beds need=" + expectedBedDemand + " " + HospitalityBedUtility.Report(map).ToSummary());
                 return false;
             }
+            if (ServiceDangerUtility.HospitalityTrafficBlocked(map, out string dangerReason))
+            {
+                ServiceDebugUtility.LogAudit("ScheduleHospitalityIncident rejected danger=" + dangerReason);
+                return false;
+            }
             string reservationId = "hospitality-arrival-" + Find.UniqueIDsManager.GetNextThingID();
             CompSpaceServicePad comp = pad.TryGetComp<CompSpaceServicePad>();
             if (comp == null || !comp.TryReserve(reservationId))
@@ -184,6 +189,15 @@ namespace SpaceServices
                 {
                     ServiceDebugUtility.LogAudit("TickPendingHospitalityIncidents canceled unusable pad reservation=" + incident.reservationId + " pad=" + ServiceDebugUtility.ThingAuditSummary(incident.pad));
                     Messages.Message("Space Services: visitor arrival canceled, landing pad is no longer usable", incident.pad, MessageTypeDefOf.RejectInput, false);
+                    ServiceShuttleUtility.CleanupTouchdownShuttle(map, incident.pad.Position, incident.shuttleThingDefName);
+                    ServiceShuttleUtility.SpawnDeparture(map, incident.pad.Position);
+                    ReleaseArrivalReservation(incident);
+                    continue;
+                }
+                if (ServiceDangerUtility.HospitalityTrafficBlocked(map, out string dangerReason))
+                {
+                    ServiceDebugUtility.LogAudit("TickPendingHospitalityIncidents waved off danger reservation=" + incident.reservationId + " reason=" + dangerReason + " pad=" + ServiceDebugUtility.ThingAuditSummary(incident.pad));
+                    Messages.Message("Space Services: visitor arrival waved off, " + dangerReason, incident.pad, MessageTypeDefOf.NegativeEvent, false);
                     ServiceShuttleUtility.CleanupTouchdownShuttle(map, incident.pad.Position, incident.shuttleThingDefName);
                     ServiceShuttleUtility.SpawnDeparture(map, incident.pad.Position);
                     ReleaseArrivalReservation(incident);

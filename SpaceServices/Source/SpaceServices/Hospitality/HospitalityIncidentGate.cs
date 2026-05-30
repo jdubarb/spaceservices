@@ -34,6 +34,10 @@ namespace SpaceServices
             {
                 return false;
             }
+            if (ServiceDangerUtility.HospitalityTrafficBlocked(map, out _))
+            {
+                return false;
+            }
             return !RequiresGuestBedCapacity() || HospitalityBedUtility.Report(map).freeBeds >= EstimatedBedDemand(incidentDefName, worker);
         }
 
@@ -60,6 +64,10 @@ namespace SpaceServices
             if (ServicePadUtility.TryFindServicePad(map, ServiceUse.Guest) == null)
             {
                 return "no usable guest service pad";
+            }
+            if (ServiceDangerUtility.HospitalityTrafficBlocked(map, out string dangerReason))
+            {
+                return "hospitality traffic blocked by " + dangerReason;
             }
             if (RequiresGuestBedCapacity())
             {
