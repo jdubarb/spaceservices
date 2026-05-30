@@ -45,6 +45,7 @@ namespace SpaceServices
             Map map = parms == null ? null : parms.target as Map;
             if (map != null && SpaceServiceMapDetector.IsServiceEligible(map))
             {
+                HospitalityArrivalContext.FinalizeArrival(map);
                 HospitalityArrivalContext.Pop();
             }
         }
@@ -78,6 +79,7 @@ namespace SpaceServices
         {
             if (map != null && SpaceServiceMapDetector.IsServiceEligible(map))
             {
+                HospitalityArrivalContext.FinalizeArrival(map);
                 HospitalityArrivalContext.Pop();
             }
         }
@@ -91,19 +93,6 @@ namespace SpaceServices
             if (HospitalityArrivalContext.TryGetArrivalCell(map, out IntVec3 cell))
             {
                 location = cell;
-            }
-            if (HospitalityArrivalContext.TryUseArrivalVisual(map, out IntVec3 visualCell))
-            {
-                ShuttleVisual visual = ShuttleVisual.Resolve();
-                if (visual != null)
-                {
-                    ServiceShuttleUtility.SpawnArrival(map, visualCell);
-                    SpaceServicesMapComponent comp = map.GetComponent<SpaceServicesMapComponent>();
-                    if (comp != null)
-                    {
-                        comp.ScheduleShuttleArrival(visualCell, visual.shipThingDef == null ? null : visual.shipThingDef.defName, new List<Thing>(), true);
-                    }
-                }
             }
             VacSuitUtility.SuitPawnForEnvironment(pawn, map, location);
         }

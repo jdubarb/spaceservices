@@ -184,6 +184,10 @@ namespace SpaceServices
                     records.RemoveAt(i);
                     continue;
                 }
+                if (record.serviceKind == "hospitality" && record.state == "arrived")
+                {
+                    GuardHospitalityGuestsFromVacuum(map, record);
+                }
                 if (record.state == "pickupInbound")
                 {
                     if (Find.TickManager.TicksGame >= record.pickupShuttleTouchdownTick)
@@ -265,6 +269,80 @@ namespace SpaceServices
                 SpaceServicesMod.Settings.debugLogging &&
                 Find.TickManager != null &&
                 Find.TickManager.TicksGame % 2500 == 0;
+        }
+
+        private static void GuardHospitalityGuestsFromVacuum(Map map, ServiceGroupRecord record)
+        {
+            if (map == null || record == null || record.pawns == null)
+            {
+                return;
+            }
+            foreach (Pawn pawn in record.pawns)
+            {
+                if (pawn == null || !pawn.Spawned || pawn.Downed)
+                {
+                    continue;
+                }
+                bool unsafeNow = !ServiceEnvironmentUtility.IsSafeForPawn(pawn, map, pawn.Position);
+                bool unsafeDestination = PawnCurrentJobTargetsUnsafeVacuum(pawn, map);
+                if (!unsafeNow && !unsafeDestination)
+                {
+                    continue;
+                }
+                IntVec3 safeCell = FindHospitalitySafeCell(map, record.reservedPad, pawn);
+                if (!safeCell.IsValid || safeCell == pawn.Position)
+                {
+                    continue;
+                }
+                Job job = JobMaker.MakeJob(JobDefOf.Goto, safeCell);
+                job.locomotionUrgency = LocomotionUrgency.Jog;
+                pawn.jobs.TryTakeOrderedJob(job, JobTag.Misc);
+            }
+        }
+
+        private static bool PawnCurrentJobTargetsUnsafeVacuum(Pawn pawn, Map map)
+        {
+            Job job = pawn == null ? null : pawn.CurJob;
+            if (job == null || map == null)
+            {
+                return false;
+            }
+            return TargetCellUnsafeForPawn(job.targetA, pawn, map) ||
+                TargetCellUnsafeForPawn(job.targetB, pawn, map) ||
+                TargetCellUnsafeForPawn(job.targetC, pawn, map);
+        }
+
+        private static bool TargetCellUnsafeForPawn(LocalTargetInfo target, Pawn pawn, Map map)
+        {
+            if (!target.IsValid || !target.Cell.IsValid || !target.Cell.InBounds(map))
+            {
+                return false;
+            }
+            return !ServiceEnvironmentUtility.IsSafeForPawn(pawn, map, target.Cell);
+        }
+
+        private static IntVec3 FindHospitalitySafeCell(Map map, Thing pad, Pawn pawn)
+        {
+            IEnumerable<IntVec3> candidates = Enumerable.Empty<IntVec3>();
+            Room room = pad != null && pad.Spawned ? pad.Position.GetRoom(map) : null;
+            if (room != null)
+            {
+                candidates = room.Cells;
+            }
+            if (pad != null && pad.Spawned)
+            {
+                candidates = candidates.Concat(GenRadial.RadialCellsAround(pad.Position, 12f, true));
+            }
+            candidates = candidates.Concat(GenRadial.RadialCellsAround(pawn.Position, 12f, true));
+
+            return candidates
+                .Where(cell => cell.InBounds(map) && cell.Standable(map))
+                .Where(cell => cell.GetFirstPawn(map) == null || cell == pawn.Position)
+                .Where(cell => ServiceEnvironmentUtility.IsSafeForPawn(pawn, map, cell))
+                .Where(cell => pawn.CanReach(cell, PathEndMode.OnCell, Danger.Deadly))
+                .OrderBy(cell => pad != null && pad.Spawned ? cell.DistanceToSquared(pad.Position) : cell.DistanceToSquared(pawn.Position))
+                .DefaultIfEmpty(IntVec3.Invalid)
+                .First();
         }
 
         private static List<Pawn> ActiveTrackedPawns(Map map, ServiceGroupRecord record)

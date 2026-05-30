@@ -19,7 +19,7 @@ namespace SpaceServices
         {
             public Map map;
             public Thing pad;
-            public bool arrivalVisualUsed;
+            public bool finalized;
         }
 
         private static readonly Stack<Request> Requests = new Stack<Request>();
@@ -55,19 +55,46 @@ namespace SpaceServices
             return false;
         }
 
-        public static bool TryUseArrivalVisual(Map map, out IntVec3 cell)
+        public static void FinalizeArrival(Map map)
+        {
+            Request request = CurrentRequest(map);
+            if (request == null || request.finalized)
+            {
+                return;
+            }
+            request.finalized = true;
+            if (request.pad == null || request.pad.Destroyed)
+            {
+                return;
+            }
+            ShuttleVisual visual = ShuttleVisual.Resolve();
+            if (visual == null)
+            {
+                return;
+            }
+
+            ServiceShuttleUtility.SpawnArrival(map, request.pad.Position);
+            SpaceServicesMapComponent comp = map.GetComponent<SpaceServicesMapComponent>();
+            if (comp != null)
+            {
+                comp.ScheduleShuttleArrival(
+                    request.pad.Position,
+                    visual.shipThingDef == null ? null : visual.shipThingDef.defName,
+                    new List<Thing>(),
+                    true);
+            }
+        }
+
+        private static Request CurrentRequest(Map map)
         {
             foreach (Request request in Requests)
             {
-                if (request != null && request.map == map && request.pad != null && !request.pad.Destroyed && !request.arrivalVisualUsed)
+                if (request != null && request.map == map && request.pad != null && !request.pad.Destroyed)
                 {
-                    request.arrivalVisualUsed = true;
-                    cell = request.pad.Position;
-                    return true;
+                    return request;
                 }
             }
-            cell = IntVec3.Invalid;
-            return false;
+            return null;
         }
     }
 }
