@@ -137,9 +137,13 @@ namespace SpaceServices
                 }
                 VacSuitUtility.SuitPawnsForEnvironment(pawns, map, c);
             }
+            if (HospitalArrivalIncidentContext.IsMassCasualty(map))
+            {
+                ServiceDebugUtility.LogAudit("Hospital mass casualty using normal drop pod landing at " + c);
+                return true;
+            }
             HospitalArrivalIncidentContext.ArrivalVisualFlags(map, out bool showArrival, out bool showDeparture);
-            bool delayContents = !HospitalArrivalIncidentContext.IsMassCasualty(map);
-            if (HospitalLandingRedirectContext.TryGetActiveCell(map, out IntVec3 activeCell) && activeCell.IsValid && ServiceShuttleUtility.TryReplaceDropPodWithArrivalShuttle(c, map, info, faction, showArrival, showDeparture, delayContents))
+            if (HospitalLandingRedirectContext.TryGetActiveCell(map, out IntVec3 activeCell) && activeCell.IsValid && ServiceShuttleUtility.TryReplaceDropPodWithArrivalShuttle(c, map, info, faction, showArrival, showDeparture))
             {
                 return false;
             }
