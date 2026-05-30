@@ -28,15 +28,14 @@ namespace SpaceServices
         private static readonly Vector2 OverlaySize = new Vector2(OverlayDrawSize, OverlayDrawSize);
         private static readonly Graphic HospitalOverlay = GraphicDatabase.Get<Graphic_Single>("Things/Building/SpaceServices/ServiceLandingPad_Hospital", ShaderDatabase.Cutout, OverlaySize, Color.white);
         private static readonly Graphic HospitalityOverlay = GraphicDatabase.Get<Graphic_Single>("Things/Building/SpaceServices/ServiceLandingPad_Hospitality", ShaderDatabase.Cutout, OverlaySize, Color.white);
-        private static readonly Graphic TradeOverlay = GraphicDatabase.Get<Graphic_Single>("Things/Building/SpaceServices/ServiceLandingPad_Trade", ShaderDatabase.Cutout, OverlaySize, Color.white);
         private static readonly Texture2D HospitalIcon = ContentFinder<Texture2D>.Get("Things/Building/SpaceServices/ServiceLandingPad_Hospital");
         private static readonly Texture2D HospitalityIcon = ContentFinder<Texture2D>.Get("Things/Building/SpaceServices/ServiceLandingPad_Hospitality");
-        private static readonly Texture2D TradeIcon = ContentFinder<Texture2D>.Get("Things/Building/SpaceServices/ServiceLandingPad_Trade");
 
-        public ServicePadMode activeMode = ServicePadMode.Hospital;
+        public ServicePadMode activeMode = ServicePadMode.HospitalPriority;
         private bool legacyAllowGuests = true;
         private bool legacyAllowPatients = true;
         private bool legacyAllowEmergency = true;
+        private int modeVersion = 2;
         public bool requireVacSafeRoof = false;
         public bool preferShuttle = true;
         public bool requirePower = false;
@@ -47,10 +46,12 @@ namespace SpaceServices
         {
             if (Scribe.mode == LoadSaveMode.Saving)
             {
+                modeVersion = 2;
                 SyncLegacyModeFlags();
             }
 
-            Scribe_Values.Look(ref activeMode, "activeMode", ServicePadMode.Hospital);
+            Scribe_Values.Look(ref modeVersion, "modeVersion", 0);
+            Scribe_Values.Look(ref activeMode, "activeMode", ServicePadMode.HospitalPriority);
             Scribe_Values.Look(ref legacyAllowGuests, "allowGuests", true);
             Scribe_Values.Look(ref legacyAllowPatients, "allowPatients", true);
             Scribe_Values.Look(ref legacyAllowEmergency, "allowEmergency", true);
@@ -62,7 +63,11 @@ namespace SpaceServices
 
             if (Scribe.mode == LoadSaveMode.PostLoadInit)
             {
-                MigrateLegacyModeFlags();
+                if (modeVersion < 2)
+                {
+                    MigrateLegacyModeFlags();
+                    modeVersion = 2;
+                }
             }
         }
 
@@ -246,7 +251,7 @@ namespace SpaceServices
                 reason = "reserved";
                 return false;
             }
-            if (MeetsUseRequirements(ActiveUse(), out string modeReason))
+            if (CanServeAnyActiveUse(out string modeReason))
             {
                 reason = null;
                 return true;
@@ -255,19 +260,37 @@ namespace SpaceServices
             return false;
         }
 
+        private bool CanServeAnyActiveUse(out string reason)
+        {
+            reason = null;
+            if (AllowsUse(ServiceUse.Patient) && MeetsUseRequirements(ServiceUse.Patient, out reason))
+            {
+                return true;
+            }
+            if (AllowsUse(ServiceUse.Guest) && MeetsUseRequirements(ServiceUse.Guest, out reason))
+            {
+                return true;
+            }
+            return false;
+        }
+
         private string ModeLabel()
         {
-            if (activeMode == ServicePadMode.Hospital)
+            if (activeMode == ServicePadMode.HospitalOnly)
             {
-                return "hospital";
+                return "hospital only";
             }
-            if (activeMode == ServicePadMode.Hospitality)
+            if (activeMode == ServicePadMode.HospitalityOnly)
             {
-                return "hospitality";
+                return "hospitality only";
             }
-            if (activeMode == ServicePadMode.Trade)
+            if (activeMode == ServicePadMode.HospitalPriority)
             {
-                return "trade";
+                return "hospital priority";
+            }
+            if (activeMode == ServicePadMode.HospitalityPriority)
+            {
+                return "hospitality priority";
             }
             return activeMode.ToString();
         }
@@ -360,7 +383,7 @@ namespace SpaceServices
 
         private bool IsWatchdogEligible()
         {
-            return MeetsUseRequirements(ActiveUse());
+            return CanServeAnyActiveUse(out _);
         }
 
         private void ClearWatchedReservation(string reason)
@@ -390,9 +413,10 @@ namespace SpaceServices
             {
                 yield return gizmo;
             }
-            yield return ModeCommand(ServicePadMode.Hospital, "MLT_SpaceServices_Gizmo_ModeHospital", "MLT_SpaceServices_Gizmo_ModeHospitalDesc", HospitalIcon);
-            yield return ModeCommand(ServicePadMode.Hospitality, "MLT_SpaceServices_Gizmo_ModeHospitality", "MLT_SpaceServices_Gizmo_ModeHospitalityDesc", HospitalityIcon);
-            yield return ModeCommand(ServicePadMode.Trade, "MLT_SpaceServices_Gizmo_ModeTrade", "MLT_SpaceServices_Gizmo_ModeTradeDesc", TradeIcon);
+            yield return ModeCommand(ServicePadMode.HospitalOnly, "MLT_SpaceServices_Gizmo_ModeHospitalOnly", "MLT_SpaceServices_Gizmo_ModeHospitalOnlyDesc", HospitalIcon);
+            yield return ModeCommand(ServicePadMode.HospitalityOnly, "MLT_SpaceServices_Gizmo_ModeHospitalityOnly", "MLT_SpaceServices_Gizmo_ModeHospitalityOnlyDesc", HospitalityIcon);
+            yield return ModeCommand(ServicePadMode.HospitalPriority, "MLT_SpaceServices_Gizmo_ModeHospitalPriority", "MLT_SpaceServices_Gizmo_ModeHospitalPriorityDesc", HospitalIcon);
+            yield return ModeCommand(ServicePadMode.HospitalityPriority, "MLT_SpaceServices_Gizmo_ModeHospitalityPriority", "MLT_SpaceServices_Gizmo_ModeHospitalityPriorityDesc", HospitalityIcon);
             yield return Toggle("MLT_SpaceServices_Gizmo_RequireVacRoof", () => requireVacSafeRoof, v => requireVacSafeRoof = v);
             yield return Toggle("MLT_SpaceServices_Gizmo_RequirePower", () => requirePower, v => requirePower = v);
             if (ShouldShowDevGizmos())
@@ -438,61 +462,99 @@ namespace SpaceServices
 
         private Graphic CurrentOverlay()
         {
-            if (activeMode == ServicePadMode.Hospital)
+            if (Prioritizes(ServiceUse.Patient))
             {
                 return HospitalOverlay;
             }
-            if (activeMode == ServicePadMode.Hospitality)
+            if (Prioritizes(ServiceUse.Guest))
             {
                 return HospitalityOverlay;
-            }
-            if (activeMode == ServicePadMode.Trade)
-            {
-                return TradeOverlay;
             }
             return null;
         }
 
-        private bool AllowsUse(ServiceUse use)
+        public bool AllowsUse(ServiceUse use)
         {
-            return ActiveUse() == use;
+            if (use == ServiceUse.Patient)
+            {
+                return activeMode == ServicePadMode.HospitalOnly ||
+                    activeMode == ServicePadMode.HospitalPriority ||
+                    activeMode == ServicePadMode.HospitalityPriority;
+            }
+            if (use == ServiceUse.Guest)
+            {
+                return activeMode == ServicePadMode.HospitalityOnly ||
+                    activeMode == ServicePadMode.HospitalPriority ||
+                    activeMode == ServicePadMode.HospitalityPriority;
+            }
+            return false;
         }
 
-        private ServiceUse ActiveUse()
+        public bool Prioritizes(ServiceUse use)
         {
-            if (activeMode == ServicePadMode.Hospitality)
+            if (!AllowsUse(use))
             {
-                return ServiceUse.Guest;
+                return false;
             }
-            if (activeMode == ServicePadMode.Trade)
+            if (activeMode == ServicePadMode.HospitalOnly || activeMode == ServicePadMode.HospitalityOnly)
             {
-                return ServiceUse.Emergency;
+                return true;
             }
-            return ServiceUse.Patient;
+            return (use == ServiceUse.Patient && activeMode == ServicePadMode.HospitalPriority) ||
+                (use == ServiceUse.Guest && activeMode == ServicePadMode.HospitalityPriority);
+        }
+
+        public int PriorityRank(ServiceUse use)
+        {
+            if (!AllowsUse(use))
+            {
+                return 99;
+            }
+            if (activeMode == ServicePadMode.HospitalOnly || activeMode == ServicePadMode.HospitalityOnly)
+            {
+                return 0;
+            }
+            return Prioritizes(use) ? 1 : 2;
         }
 
         private void MigrateLegacyModeFlags()
         {
-            if (legacyAllowGuests && !legacyAllowPatients)
+            if (activeMode == ServicePadMode.Hospital)
             {
-                activeMode = ServicePadMode.Hospitality;
+                activeMode = ServicePadMode.HospitalOnly;
+            }
+            else if (activeMode == ServicePadMode.Hospitality)
+            {
+                activeMode = ServicePadMode.HospitalityOnly;
+            }
+            else if (activeMode == ServicePadMode.Trade)
+            {
+                activeMode = ServicePadMode.HospitalityOnly;
+            }
+            else if (legacyAllowGuests && !legacyAllowPatients)
+            {
+                activeMode = ServicePadMode.HospitalityOnly;
             }
             else if (legacyAllowEmergency && !legacyAllowGuests && !legacyAllowPatients)
             {
-                activeMode = ServicePadMode.Trade;
+                activeMode = ServicePadMode.HospitalityOnly;
+            }
+            else if (legacyAllowGuests && legacyAllowPatients)
+            {
+                activeMode = ServicePadMode.HospitalPriority;
             }
             else
             {
-                activeMode = ServicePadMode.Hospital;
+                activeMode = ServicePadMode.HospitalOnly;
             }
             SyncLegacyModeFlags();
         }
 
         private void SyncLegacyModeFlags()
         {
-            legacyAllowPatients = activeMode == ServicePadMode.Hospital;
-            legacyAllowGuests = activeMode == ServicePadMode.Hospitality;
-            legacyAllowEmergency = activeMode == ServicePadMode.Trade;
+            legacyAllowPatients = AllowsUse(ServiceUse.Patient);
+            legacyAllowGuests = AllowsUse(ServiceUse.Guest);
+            legacyAllowEmergency = false;
         }
 
         private static Command_Toggle Toggle(string labelKey, Func<bool> getter, Action<bool> setter)
@@ -563,12 +625,15 @@ namespace SpaceServices
     public enum ServiceUse
     {
         Guest,
-        Patient,
-        Emergency
+        Patient
     }
 
     public enum ServicePadMode
     {
+        HospitalOnly,
+        HospitalityOnly,
+        HospitalPriority,
+        HospitalityPriority,
         Hospital,
         Hospitality,
         Trade
@@ -599,7 +664,13 @@ namespace SpaceServices
             {
                 yield break;
             }
-            foreach (Thing building in AllServicePadBuildings(map))
+            foreach (Thing building in AllServicePadBuildings(map)
+                .OrderBy(building =>
+                {
+                    CompSpaceServicePad comp = building.TryGetComp<CompSpaceServicePad>();
+                    return comp == null ? 99 : comp.PriorityRank(use);
+                })
+                .ThenBy(building => building.Position.DistanceToSquared(IntVec3.Zero)))
             {
                 CompSpaceServicePad comp = building.TryGetComp<CompSpaceServicePad>();
                 if (comp != null && comp.IsUsableFor(use))
@@ -633,7 +704,17 @@ namespace SpaceServices
             {
                 return null;
             }
-            return pads[Rand.Range(0, pads.Count)];
+            int bestRank = pads.Min(pad =>
+            {
+                CompSpaceServicePad comp = pad.TryGetComp<CompSpaceServicePad>();
+                return comp == null ? 99 : comp.PriorityRank(use);
+            });
+            List<Thing> bestPads = pads.Where(pad =>
+            {
+                CompSpaceServicePad comp = pad.TryGetComp<CompSpaceServicePad>();
+                return (comp == null ? 99 : comp.PriorityRank(use)) == bestRank;
+            }).ToList();
+            return bestPads[Rand.Range(0, bestPads.Count)];
         }
 
         public static Thing TryReserveServicePad(Map map, ServiceUse use, string groupId)
@@ -656,6 +737,47 @@ namespace SpaceServices
         public static int CountServicePads(Map map, ServiceUse use)
         {
             return AllServicePads(map, use).Count();
+        }
+
+        public static bool PriorityThrottleAllows(Map map, ServiceUse use, out string reason)
+        {
+            List<Thing> pads = AllServicePads(map, use).ToList();
+            if (pads.Count == 0)
+            {
+                reason = "no usable " + use + " service pad";
+                return false;
+            }
+            if (pads.Any(pad =>
+            {
+                CompSpaceServicePad comp = pad.TryGetComp<CompSpaceServicePad>();
+                return comp != null && comp.Prioritizes(use);
+            }))
+            {
+                reason = null;
+                return true;
+            }
+            if (Rand.Chance(0.25f))
+            {
+                reason = null;
+                return true;
+            }
+            reason = "only low-priority shared service pads available";
+            return false;
+        }
+
+        public static string PriorityReadinessReport(Map map, ServiceUse use)
+        {
+            List<Thing> pads = AllServicePads(map, use).ToList();
+            if (pads.Count == 0)
+            {
+                return "no usable " + use + " service pad";
+            }
+            bool hasPriority = pads.Any(pad =>
+            {
+                CompSpaceServicePad comp = pad.TryGetComp<CompSpaceServicePad>();
+                return comp != null && comp.Prioritizes(use);
+            });
+            return hasPriority ? "priority pad available" : "only low-priority shared service pads available";
         }
     }
 }

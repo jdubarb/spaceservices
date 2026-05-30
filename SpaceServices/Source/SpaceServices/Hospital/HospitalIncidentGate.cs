@@ -15,7 +15,7 @@ namespace SpaceServices
 {
     public static class HospitalIncidentGate
     {
-        public static bool CanAcceptHospitalIncident(string incidentDefName, Map map)
+        public static bool CanAcceptHospitalIncident(string incidentDefName, Map map, bool applyPriorityThrottle = true)
         {
             object hospital = FindHospitalComponent(map);
             if (hospital == null)
@@ -48,6 +48,10 @@ namespace SpaceServices
             {
                 return false;
             }
+            if (SpaceServiceMapDetector.IsServiceEligible(map) && applyPriorityThrottle && !ServicePadUtility.PriorityThrottleAllows(map, ServiceUse.Patient, out _))
+            {
+                return false;
+            }
             return true;
         }
 
@@ -63,6 +67,7 @@ namespace SpaceServices
                 ", bedCount=" + CallInt(hospital, "BedCount", -1) +
                 ", full=" + CallBool(hospital, "IsFull", false) +
                 ", freePatientPads=" + ServicePadUtility.CountServicePads(map, ServiceUse.Patient) +
+                ", patientPadPriority=" + ServicePadUtility.PriorityReadinessReport(map, ServiceUse.Patient) +
                 ", massCasualties=" + Reflect.BoolMember(hospital, "MassCasualties", true) +
                 ", acceptDanger=" + Reflect.BoolMember(hospital, "AcceptDanger", false) +
                 ", danger=" + HospitalDangersOnMap(map);

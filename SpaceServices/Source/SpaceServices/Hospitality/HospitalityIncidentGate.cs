@@ -20,7 +20,7 @@ namespace SpaceServices
             return CanAcceptHospitalityIncident(incidentDefName, map, null);
         }
 
-        public static bool CanAcceptHospitalityIncident(string incidentDefName, Map map, object worker)
+        public static bool CanAcceptHospitalityIncident(string incidentDefName, Map map, object worker, bool applyPriorityThrottle = true)
         {
             if (SpaceServicesMod.Settings != null && !SpaceServicesMod.Settings.enableHospitality)
             {
@@ -35,6 +35,10 @@ namespace SpaceServices
                 return false;
             }
             if (ServiceDangerUtility.HospitalityTrafficBlocked(map, out _))
+            {
+                return false;
+            }
+            if (applyPriorityThrottle && !ServicePadUtility.PriorityThrottleAllows(map, ServiceUse.Guest, out _))
             {
                 return false;
             }
@@ -68,6 +72,11 @@ namespace SpaceServices
             if (ServiceDangerUtility.HospitalityTrafficBlocked(map, out string dangerReason))
             {
                 return "hospitality traffic blocked by " + dangerReason;
+            }
+            string priorityReport = ServicePadUtility.PriorityReadinessReport(map, ServiceUse.Guest);
+            if (priorityReport != "priority pad available")
+            {
+                return priorityReport;
             }
             if (RequiresGuestBedCapacity())
             {

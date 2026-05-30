@@ -52,7 +52,7 @@ namespace SpaceServices
             {
                 return;
             }
-            if (!SpaceServicesMod.Settings.enableHospitality || ServicePadUtility.TryFindServicePad(map, ServiceUse.Guest) == null)
+            if (!HasSpaceportsLandingInfrastructure(map))
             {
                 return;
             }
@@ -61,6 +61,23 @@ namespace SpaceServices
                 return;
             }
             __result = true;
+        }
+
+        private static bool HasSpaceportsLandingInfrastructure(Map map)
+        {
+            if (map == null)
+            {
+                return false;
+            }
+            foreach (Building building in map.listerBuildings.allBuildingsColonist)
+            {
+                string defName = building == null || building.def == null ? null : building.def.defName;
+                if (defName == "Spaceports_ShuttleLandingPad" || defName == "Spaceports_Beacon")
+                {
+                    return true;
+                }
+            }
+            return false;
         }
 
         private static bool HasBlockingLandingCondition(Map map)

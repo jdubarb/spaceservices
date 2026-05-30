@@ -14,12 +14,14 @@
   <MLT_SpaceServices_Settings_RequirePad>Require service pad for arrivals</MLT_SpaceServices_Settings_RequirePad>
   <MLT_SpaceServices_Settings_SealedNoSuit>Allow sealed non-vacsuit arrivals</MLT_SpaceServices_Settings_SealedNoSuit>
 
-  <MLT_SpaceServices_Gizmo_ModeHospital>Hospital</MLT_SpaceServices_Gizmo_ModeHospital>
-  <MLT_SpaceServices_Gizmo_ModeHospitalDesc>Use this pad for Hospital patient arrivals and departures.</MLT_SpaceServices_Gizmo_ModeHospitalDesc>
-  <MLT_SpaceServices_Gizmo_ModeHospitality>Hospitality</MLT_SpaceServices_Gizmo_ModeHospitality>
-  <MLT_SpaceServices_Gizmo_ModeHospitalityDesc>Use this pad for Hospitality guest arrivals and departures.</MLT_SpaceServices_Gizmo_ModeHospitalityDesc>
-  <MLT_SpaceServices_Gizmo_ModeTrade>Trade</MLT_SpaceServices_Gizmo_ModeTrade>
-  <MLT_SpaceServices_Gizmo_ModeTradeDesc>Reserve this pad for future trade and spaceport service traffic.</MLT_SpaceServices_Gizmo_ModeTradeDesc>
+  <MLT_SpaceServices_Gizmo_ModeHospitalOnly>Hospital only</MLT_SpaceServices_Gizmo_ModeHospitalOnly>
+  <MLT_SpaceServices_Gizmo_ModeHospitalOnlyDesc>Use this pad only for Hospital patient arrivals and departures.</MLT_SpaceServices_Gizmo_ModeHospitalOnlyDesc>
+  <MLT_SpaceServices_Gizmo_ModeHospitalityOnly>Hospitality only</MLT_SpaceServices_Gizmo_ModeHospitalityOnly>
+  <MLT_SpaceServices_Gizmo_ModeHospitalityOnlyDesc>Use this pad only for Hospitality guest arrivals and departures.</MLT_SpaceServices_Gizmo_ModeHospitalityOnlyDesc>
+  <MLT_SpaceServices_Gizmo_ModeHospitalPriority>Hospital priority</MLT_SpaceServices_Gizmo_ModeHospitalPriority>
+  <MLT_SpaceServices_Gizmo_ModeHospitalPriorityDesc>Use this pad for Hospital and Hospitality traffic, preferring Hospital patients.</MLT_SpaceServices_Gizmo_ModeHospitalPriorityDesc>
+  <MLT_SpaceServices_Gizmo_ModeHospitalityPriority>Hospitality priority</MLT_SpaceServices_Gizmo_ModeHospitalityPriority>
+  <MLT_SpaceServices_Gizmo_ModeHospitalityPriorityDesc>Use this pad for Hospital and Hospitality traffic, preferring Hospitality guests.</MLT_SpaceServices_Gizmo_ModeHospitalityPriorityDesc>
   <MLT_SpaceServices_Gizmo_RequireVacRoof>Require vac-safe roof</MLT_SpaceServices_Gizmo_RequireVacRoof>
   <MLT_SpaceServices_Gizmo_RequirePower>Require power</MLT_SpaceServices_Gizmo_RequirePower>
   <MLT_SpaceServices_Gizmo_ReportMap>Report service map status</MLT_SpaceServices_Gizmo_ReportMap>

@@ -643,13 +643,13 @@ namespace SpaceServices
             // Pick the pad the patient can actually survive at before considering distance.
             IEnumerable<Thing> candidates = ServicePadUtility.AllServicePads(map, use)
                 .Where(pad => PadCanSafelyServe(pad, use, pawns, record.id, ShouldBypassGuestArea(record)))
-                .OrderBy(pad => DeparturePadScore(map, record, pad, pawns));
+                .OrderBy(pad => DeparturePadScore(map, record, pad, pawns, use));
             foreach (Thing pad in candidates)
             {
                 CompSpaceServicePad comp = pad.TryGetComp<CompSpaceServicePad>();
                 if (comp != null && comp.TryReserve(record.id))
                 {
-                    ServiceDebugUtility.LogAudit("TryReserveBestDeparturePad reserved record=" + record.id + " use=" + use + " pad=" + ServiceDebugUtility.ThingAuditSummary(pad) + " score=" + DeparturePadScore(map, record, pad, pawns));
+                    ServiceDebugUtility.LogAudit("TryReserveBestDeparturePad reserved record=" + record.id + " use=" + use + " pad=" + ServiceDebugUtility.ThingAuditSummary(pad) + " score=" + DeparturePadScore(map, record, pad, pawns, use));
                     return pad;
                 }
                 ServiceDebugUtility.LogAudit("TryReserveBestDeparturePad candidate could not reserve record=" + record.id + " use=" + use + " pad=" + ServiceDebugUtility.ThingAuditSummary(pad));
@@ -658,7 +658,7 @@ namespace SpaceServices
             return null;
         }
 
-        private static float DeparturePadScore(Map map, ServiceGroupRecord record, Thing pad, List<Pawn> pawns)
+        private static float DeparturePadScore(Map map, ServiceGroupRecord record, Thing pad, List<Pawn> pawns, ServiceUse use)
         {
             if (pad == null)
             {
@@ -671,6 +671,11 @@ namespace SpaceServices
                 IntVec3 target = waitCell.IsValid ? waitCell : pad.Position;
                 return pawn.Position.DistanceToSquared(target);
             });
+            CompSpaceServicePad comp = pad.TryGetComp<CompSpaceServicePad>();
+            if (comp != null)
+            {
+                score += comp.PriorityRank(use) * 1000000f;
+            }
             if (ShouldPreserveSealedPadsForLowResistancePatients(map, record, pawns))
             {
                 score += ServiceEnvironmentUtility.GetMaxVacuum(pad) > 0.05f ? -100000f : 100000f;

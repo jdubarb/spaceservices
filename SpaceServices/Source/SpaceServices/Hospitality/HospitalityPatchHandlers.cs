@@ -28,7 +28,7 @@ namespace SpaceServices
 
             IncidentDef incident = Reflect.GetMember(__instance, "def") as IncidentDef;
             string incidentDefName = incident == null ? "VisitorGroup" : incident.defName;
-            if (!HospitalityIncidentGate.CanAcceptHospitalityIncident(incidentDefName, map, __instance))
+            if (!HospitalityIncidentGate.CanAcceptHospitalityIncident(incidentDefName, map, __instance, false))
             {
                 string report = HospitalityIncidentGate.ReadinessReport(incidentDefName, map, __instance);
                 ServiceDebugUtility.LogAudit("Hospitality VisitorGroup blocked incident=" + incidentDefName + " report=" + report);
@@ -87,7 +87,7 @@ namespace SpaceServices
             {
                 return true;
             }
-            if (!HospitalityIncidentGate.CanAcceptHospitalityIncident("VisitorGroup", map))
+            if (!HospitalityIncidentGate.CanAcceptHospitalityIncident("VisitorGroup", map, null, false))
             {
                 return true;
             }

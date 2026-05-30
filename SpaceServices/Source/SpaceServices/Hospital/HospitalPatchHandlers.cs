@@ -42,7 +42,7 @@ namespace SpaceServices
             }
             IncidentDef incident = Reflect.GetMember(__instance, "def") as IncidentDef;
             string incidentDefName = incident == null ? (IsMassCasualtyIncident(__instance, null) ? "MassCasualtyEvent" : "PatientArrives") : incident.defName;
-            if (HospitalIncidentGate.CanAcceptHospitalIncident(incidentDefName, map))
+            if (HospitalIncidentGate.CanAcceptHospitalIncident(incidentDefName, map, false))
             {
                 HospitalArrivalIncidentContext.Push(map, IsMassCasualtyIncident(__instance, incidentDefName));
                 return true;
@@ -168,7 +168,7 @@ namespace SpaceServices
                 {
                     return;
                 }
-                if (!HospitalIncidentGate.CanAcceptHospitalIncident("PatientArrives", map))
+                if (!HospitalIncidentGate.CanAcceptHospitalIncident("PatientArrives", map, false))
                 {
                     string report = HospitalIncidentGate.ReadinessReport("PatientArrives", map);
                     ServiceDebugUtility.LogThrottled("hospital-fallback-block-" + report, "Hospital PatientArrives returned false; fallback blocked: " + report, GenDate.TicksPerHour);
