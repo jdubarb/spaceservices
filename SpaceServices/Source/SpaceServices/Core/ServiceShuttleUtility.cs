@@ -19,11 +19,13 @@ namespace SpaceServices
 
         public static void SpawnArrival(Map map, IntVec3 cell)
         {
+            ServiceDebugUtility.LogAudit("SpawnArrivalShuttle cell=" + cell + " map=" + (map == null ? "null" : map.Index.ToString()));
             SpawnSkyfaller(map, cell, ShuttleVisual.Resolve(), true);
         }
 
         public static void SpawnDeparture(Map map, IntVec3 cell)
         {
+            ServiceDebugUtility.LogAudit("SpawnDepartureShuttle cell=" + cell + " map=" + (map == null ? "null" : map.Index.ToString()));
             SpawnSkyfaller(map, cell, ShuttleVisual.Resolve(), false);
         }
 
@@ -135,13 +137,16 @@ namespace SpaceServices
             {
                 return;
             }
+            int destroyed = 0;
             foreach (Thing thing in cell.GetThingList(map).ToList())
             {
                 if (thing != null && thing.def == shuttleDef)
                 {
                     thing.Destroy(DestroyMode.Vanish);
+                    destroyed++;
                 }
             }
+            ServiceDebugUtility.LogAudit("CleanupTouchdownShuttle cell=" + cell + " map=" + map.Index + " def=" + shuttleThingDefName + " destroyed=" + destroyed);
         }
 
         private static IntVec3 FindSpawnCell(IntVec3 center, Map map, int index)

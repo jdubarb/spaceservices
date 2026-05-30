@@ -156,6 +156,11 @@ namespace SpaceServices
                 return false;
             }
             ServiceDebugUtility.LogAudit("RequestDepartureForPawn found " + RecordAudit(record) + " pawn=" + ServiceDebugUtility.PawnAuditSummary(pawn) + " reason=" + (reason ?? "none"));
+            if (record.state == "completed" || record.state == "extracting")
+            {
+                ServiceDebugUtility.LogAudit("RequestDepartureForPawn skipped duplicate request for terminal record " + RecordAudit(record));
+                return true;
+            }
             BeginDeparture(map, record, reason);
             return true;
         }
@@ -481,8 +486,9 @@ namespace SpaceServices
 
         private static void BeginDeparture(Map map, ServiceGroupRecord record, string reason)
         {
-            if (record == null || record.state == "completed")
+            if (record == null || record.state == "completed" || record.state == "extracting")
             {
+                ServiceDebugUtility.LogAudit("BeginDeparture skipped terminal record " + RecordAudit(record) + " reason=" + (reason ?? "none"));
                 return;
             }
             ServiceDebugUtility.LogAudit("BeginDeparture enter " + RecordAudit(record) + " reason=" + (reason ?? "none") + " pawns=" + PawnSummary(record.pawns));

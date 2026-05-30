@@ -22,7 +22,7 @@ namespace SpaceServices
                 return false;
             }
 
-            record.state = "departing";
+            record.state = "extracting";
             record.departureRequestedTick = Find.TickManager.TicksGame;
             Log.Message("[Space Services] Departing " + record.serviceKind + " service group " + record.id + ": " + reason);
             ServiceDebugUtility.LogAudit("CompleteDeparture begin id=" + record.id + " kind=" + record.serviceKind + " state=" + record.state + " reason=" + (reason ?? "none") + " pawns=" + PawnListAudit(record.pawns) + " pad=" + ServiceDebugUtility.ThingAuditSummary(record.reservedPad));
