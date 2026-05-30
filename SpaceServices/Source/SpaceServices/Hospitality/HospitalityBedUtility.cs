@@ -96,6 +96,7 @@ namespace SpaceServices
                 }
                 if (HospitalityPatchHandlers.TryRunNativeGuestLeave(pawn))
                 {
+                    ClearGuestRuntimeReferences(pawn, comp, "native leave");
                     ServiceDebugUtility.LogAudit("Ran Hospitality GuestUtility.Leave for service departure: " + GuestDebugSummary(pawn));
                     continue;
                 }
@@ -116,6 +117,7 @@ namespace SpaceServices
                 {
                     Reflect.SetMember(comp, "arrived", false);
                 }
+                ClearGuestRuntimeReferences(pawn, comp, "fallback leave");
                 ServiceDebugUtility.LogAudit("After Hospitality fallback departure prep: " + GuestDebugSummary(pawn));
             }
         }
@@ -177,6 +179,20 @@ namespace SpaceServices
                 return "null";
             }
             return job.def.defName + "/lord=" + LordLabel(job.lord);
+        }
+
+        private static void ClearGuestRuntimeReferences(Pawn pawn, object comp, string reason)
+        {
+            if (comp == null)
+            {
+                return;
+            }
+            object oldLord = Reflect.GetMember(comp, "lord");
+            if (oldLord != null)
+            {
+                Reflect.SetMember(comp, "lord", null);
+            }
+            ServiceDebugUtility.LogAudit("Cleared Hospitality runtime refs reason=" + reason + " oldCompLord=" + LordLabel(oldLord as Lord) + " pawn=" + GuestDebugSummary(pawn));
         }
 
         private static IEnumerable<Thing> GuestBeds(Map map)
