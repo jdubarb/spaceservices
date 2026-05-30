@@ -85,6 +85,11 @@ namespace SpaceServices
             {
                 return max;
             }
+            if (!string.IsNullOrEmpty(incidentDefName) && incidentDefName.IndexOf("VisitorGroup", StringComparison.OrdinalIgnoreCase) >= 0)
+            {
+                // Hospitality does not always expose group size up front; reserve for a normal full group.
+                return 5;
+            }
             return 1;
         }
 

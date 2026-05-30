@@ -718,6 +718,10 @@ namespace SpaceServices
             {
                 return false;
             }
+            if (record.serviceKind == "hospitality" && HospitalityReadyForPickupCall(record))
+            {
+                return true;
+            }
             foreach (Pawn pawn in record.pawns)
             {
                 if (pawn == null || pawn.Destroyed)
@@ -730,6 +734,34 @@ namespace SpaceServices
                     return false;
                 }
             }
+            return true;
+        }
+
+        private static bool HospitalityReadyForPickupCall(ServiceGroupRecord record)
+        {
+            if (record == null || record.reservedPad == null || record.pawns == null)
+            {
+                return false;
+            }
+            List<Pawn> spawned = record.pawns.Where(pawn => pawn != null && pawn.Spawned && !pawn.Destroyed && !pawn.Downed).ToList();
+            if (spawned.Count == 0)
+            {
+                return true;
+            }
+            int staged = spawned.Count(pawn => PawnReadyForPickupCall(pawn, record));
+            if (staged == spawned.Count)
+            {
+                return true;
+            }
+            if (staged == 0)
+            {
+                return false;
+            }
+            if (!spawned.All(pawn => PawnNearDeparturePad(pawn, record.reservedPad)))
+            {
+                return false;
+            }
+            ServiceDebugUtility.LogAudit("HospitalityReadyForPickupCall allowing clustered group staged=" + staged + "/" + spawned.Count + " record=" + RecordAudit(record));
             return true;
         }
 
@@ -903,6 +935,15 @@ namespace SpaceServices
                 return false;
             }
             return SameRoomAsPad(pad, pawn.Position);
+        }
+
+        private static bool PawnNearDeparturePad(Pawn pawn, Thing pad)
+        {
+            if (pawn == null || !pawn.Spawned || pad == null || pad.Map == null)
+            {
+                return false;
+            }
+            return pad.OccupiedRect().ExpandedBy(5).Contains(pawn.Position) && SameRoomAsPad(pad, pawn.Position);
         }
 
         private static bool PawnAtPickupShuttle(Pawn pawn, Thing pad)
