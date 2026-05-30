@@ -125,6 +125,10 @@ namespace SpaceServices
             {
                 return;
             }
+            if (!HospitalityArrivalContext.TryGetArrivalPad(map, out Thing arrivalPad))
+            {
+                return;
+            }
             List<Pawn> pawns = new List<Pawn>();
             if (spawned != null)
             {
@@ -138,7 +142,6 @@ namespace SpaceServices
             {
                 pawns.Add(__result);
             }
-            HospitalityArrivalContext.TryGetArrivalPad(map, out Thing arrivalPad);
             ServiceLifecycleUtility.RegisterPawns(map, "hospitality", pawns.Distinct(), arrivalPad);
         }
 
@@ -148,7 +151,10 @@ namespace SpaceServices
             {
                 return;
             }
-            HospitalityArrivalContext.TryGetArrivalPad(map, out Thing arrivalPad);
+            if (!HospitalityArrivalContext.TryGetArrivalPad(map, out Thing arrivalPad))
+            {
+                return;
+            }
             ServiceLifecycleUtility.RegisterPawns(map, "hospitality", pawns, arrivalPad);
         }
 
