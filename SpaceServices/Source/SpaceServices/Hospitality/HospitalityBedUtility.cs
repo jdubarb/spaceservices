@@ -63,6 +63,12 @@ namespace SpaceServices
             return false;
         }
 
+        public static bool IsRescuedGuest(Pawn pawn)
+        {
+            object comp = CompGuest(pawn);
+            return comp != null && Reflect.BoolMember(comp, "rescued");
+        }
+
         public static void PrepareGuestsForServiceDeparture(ServiceGroupRecord record)
         {
             if (record == null || record.serviceKind != "hospitality" || record.pawns == null)

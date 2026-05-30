@@ -336,7 +336,7 @@ namespace SpaceServices
                     {
                         string oldReservation = reservedForGroup;
                         ForceRelease();
-                        ServiceLifecycleUtility.ReleaseGroup(parent.MapHeld, oldReservation, "dev cleared pad reservation");
+                        ServiceLifecycleUtility.ClearGroupReservation(parent.MapHeld, oldReservation, "dev cleared pad reservation");
                         Messages.Message("Space Services: pad reservation cleared", parent, MessageTypeDefOf.NeutralEvent, false);
                     }
                 };
