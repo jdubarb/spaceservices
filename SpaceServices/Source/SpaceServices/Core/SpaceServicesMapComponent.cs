@@ -118,14 +118,26 @@ namespace SpaceServices
             {
                 return;
             }
-            pendingShuttleArrivals.Add(new ScheduledServiceShuttleArrival
+            ScheduledServiceShuttleArrival arrival = new ScheduledServiceShuttleArrival
             {
                 cell = cell,
                 touchdownTick = Find.TickManager.TicksGame + ServiceShuttleUtility.ArrivalTouchdownDelayTicks,
                 shuttleThingDefName = shuttleThingDefName,
-                things = things ?? new List<Thing>(),
                 showDeparture = showDeparture
-            });
+            };
+            foreach (Thing thing in things ?? Enumerable.Empty<Thing>())
+            {
+                if (thing != null && !thing.Destroyed)
+                {
+                    // Keep delayed arrivals in a real holder so RimWorld does not treat owned patients as free world pawns.
+                    arrival.things.TryAddOrTransfer(thing, canMergeWithExistingStacks: false);
+                }
+            }
+            if (arrival.things.Count == 0 && !showDeparture)
+            {
+                return;
+            }
+            pendingShuttleArrivals.Add(arrival);
         }
 
         public bool ScheduleHospitalityIncident(object worker, IncidentParms parms, Thing pad, string shuttleThingDefName)
@@ -389,13 +401,29 @@ namespace SpaceServices
         }
     }
 
-    public sealed class ScheduledServiceShuttleArrival
+    public sealed class ScheduledServiceShuttleArrival : IThingHolder
     {
         public IntVec3 cell;
         public int touchdownTick;
         public string shuttleThingDefName;
-        public List<Thing> things = new List<Thing>();
+        public ThingOwner<Thing> things;
         public bool showDeparture = true;
+        public IThingHolder ParentHolder => null;
+
+        public ScheduledServiceShuttleArrival()
+        {
+            things = new ThingOwner<Thing>(this, oneStackOnly: false);
+        }
+
+        public void GetChildHolders(List<IThingHolder> outChildren)
+        {
+            ThingOwnerUtility.AppendThingHoldersFromThings(outChildren, GetDirectlyHeldThings());
+        }
+
+        public ThingOwner GetDirectlyHeldThings()
+        {
+            return things;
+        }
     }
 
     public sealed class ScheduledHospitalityIncident

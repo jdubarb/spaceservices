@@ -92,16 +92,17 @@ namespace SpaceServices
             }
         }
 
-        private static void SpawnContents(Map map, IntVec3 cell, List<Thing> things)
+        private static void SpawnContents(Map map, IntVec3 cell, ThingOwner<Thing> things)
         {
             int index = 0;
-            foreach (Thing thing in things ?? Enumerable.Empty<Thing>())
+            foreach (Thing thing in (things == null ? Enumerable.Empty<Thing>() : things.ToList()))
             {
                 if (thing == null || thing.Destroyed)
                 {
                     continue;
                 }
                 IntVec3 spawnCell = FindSpawnCell(cell, map, index++);
+                things.Remove(thing);
                 GenSpawn.Spawn(thing, spawnCell, map);
             }
         }
