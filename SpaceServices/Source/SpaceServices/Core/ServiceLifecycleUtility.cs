@@ -719,6 +719,20 @@ namespace SpaceServices
                         continue;
                     }
                     ServiceUse use = record.serviceKind == "hospitality" ? ServiceUse.Guest : ServiceUse.Patient;
+                    if (record.serviceKind == "hospital" && record.state == "arrived")
+                    {
+                        string futureDepartureReason = NoReservedPadBlockReason(map, use, record);
+                        if (!string.IsNullOrEmpty(futureDepartureReason))
+                        {
+                            blocks.Add(new ServiceDepartureBlock
+                            {
+                                map = map,
+                                record = record,
+                                reason = futureDepartureReason
+                            });
+                        }
+                        continue;
+                    }
                     if (!ReservedPadCanServe(record, use, out string reason))
                     {
                         if (!ReservedPadStillExists(record))
