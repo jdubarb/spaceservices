@@ -29,7 +29,7 @@ namespace SpaceServices
             SpawnSkyfaller(map, cell, ShuttleVisual.Resolve(), false);
         }
 
-        public static bool TryReplaceDropPodWithArrivalShuttle(IntVec3 cell, Map map, ActiveTransporterInfo info, Faction faction, bool showArrival, bool showDeparture)
+        public static bool TryReplaceDropPodWithArrivalShuttle(IntVec3 cell, Map map, ActiveTransporterInfo info, Faction faction, bool showArrival, bool showDeparture, bool delayContents = true)
         {
             if (map == null || info == null || info.innerContainer == null || !cell.IsValid)
             {
@@ -63,6 +63,16 @@ namespace SpaceServices
             if (showArrival)
             {
                 SpawnSkyfaller(map, cell, visual, true);
+            }
+            if (!delayContents)
+            {
+                ServiceDebugUtility.LogAudit("TryReplaceDropPodWithArrivalShuttle spawning contents immediately cell=" + cell + " count=" + things.Count + " showDeparture=" + showDeparture);
+                SpawnContents(map, cell, things);
+                if (showDeparture)
+                {
+                    comp.ScheduleShuttleArrival(cell, visual == null || visual.shipThingDef == null ? null : visual.shipThingDef.defName, new List<Thing>(), true);
+                }
+                return true;
             }
             comp.ScheduleShuttleArrival(cell, visual == null || visual.shipThingDef == null ? null : visual.shipThingDef.defName, things, showDeparture);
             return true;
@@ -105,6 +115,20 @@ namespace SpaceServices
                 }
                 IntVec3 spawnCell = FindSpawnCell(cell, map, index++);
                 things.Remove(thing);
+                GenSpawn.Spawn(thing, spawnCell, map);
+            }
+        }
+
+        private static void SpawnContents(Map map, IntVec3 cell, List<Thing> things)
+        {
+            int index = 0;
+            foreach (Thing thing in things ?? Enumerable.Empty<Thing>())
+            {
+                if (thing == null || thing.Destroyed)
+                {
+                    continue;
+                }
+                IntVec3 spawnCell = FindSpawnCell(cell, map, index++);
                 GenSpawn.Spawn(thing, spawnCell, map);
             }
         }

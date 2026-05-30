@@ -88,6 +88,18 @@ namespace SpaceServices
             }
         }
 
+        public static bool IsMassCasualty(Map map)
+        {
+            foreach (Request request in Requests)
+            {
+                if (request.map == map && request.massCasualty)
+                {
+                    return true;
+                }
+            }
+            return false;
+        }
+
         private static List<IntVec3> BuildArrivalCells(Map map)
         {
             Thing pad = ServicePadUtility.TryFindRandomServicePad(map, ServiceUse.Patient);
