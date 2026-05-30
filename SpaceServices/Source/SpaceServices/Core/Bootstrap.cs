@@ -16,7 +16,7 @@ namespace SpaceServices
     [StaticConstructorOnStartup]
     public static class SpaceServicesBootstrap
     {
-        public const string PackageId = "mlt.spaceservices.onesix";
+        public const string PackageId = "jdubarb.spaceservices";
         public const string CategoryDefName = "MLT_SpaceServices";
 
         private static readonly Harmony Harmony = new Harmony(PackageId);
