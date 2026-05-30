@@ -125,8 +125,12 @@ namespace SpaceServices
 
         public static void CleanupTouchdownShuttle(Map map, IntVec3 cell, string shuttleThingDefName)
         {
+            if (map == null || !cell.IsValid || string.IsNullOrEmpty(shuttleThingDefName))
+            {
+                return;
+            }
             ThingDef shuttleDef = DefDatabase<ThingDef>.GetNamedSilentFail(shuttleThingDefName);
-            if (map == null || shuttleDef == null || !cell.IsValid)
+            if (shuttleDef == null)
             {
                 return;
             }

@@ -247,7 +247,7 @@ namespace SpaceServices
                     }
                     continue;
                 }
-                if (record.serviceKind != "hospital" && record.pawns.Any(IsTryingToLeave))
+                if (record.serviceKind != "hospital" && record.serviceKind != "hospitality" && record.pawns.Any(IsTryingToLeave))
                 {
                     BeginDeparture(map, record, "service lord entered departure state");
                     continue;
