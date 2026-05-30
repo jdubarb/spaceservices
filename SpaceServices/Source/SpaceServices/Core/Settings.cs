@@ -31,23 +31,23 @@ namespace SpaceServices
         {
             Listing_Standard listing = new Listing_Standard();
             listing.Begin(inRect);
-            listing.CheckboxLabeled("MLT_SpaceServices_Settings_DebugLogging".Translate(), ref Settings.debugLogging);
-            listing.CheckboxLabeled("MLT_SpaceServices_Settings_VerboseDevLogging".Translate(), ref Settings.verboseDevLogging);
-            listing.CheckboxLabeled("MLT_SpaceServices_Settings_AutoExtract".Translate(), ref Settings.autoExtractFallback);
-            listing.CheckboxLabeled("MLT_SpaceServices_Settings_Hospital".Translate(), ref Settings.enableHospital);
-            listing.CheckboxLabeled("MLT_SpaceServices_Settings_Hospitality".Translate(), ref Settings.enableHospitality);
-            listing.CheckboxLabeled("MLT_SpaceServices_Settings_HospitalityRequireBeds".Translate(), ref Settings.hospitalityRequireGuestBeds);
-            listing.CheckboxLabeled("MLT_SpaceServices_Settings_HospitalityAutoDepartBedless".Translate(), ref Settings.hospitalityAutoDepartBedlessGuests);
-            listing.CheckboxLabeled("MLT_SpaceServices_Settings_HospitalityVacuumGuard".Translate(), ref Settings.hospitalityVacuumGuard);
-            listing.CheckboxLabeled("MLT_SpaceServices_Settings_HospitalityFallbackScheduler".Translate(), ref Settings.hospitalityFallbackScheduler);
+            listing.CheckboxLabeled("JDB_SpaceServices_Settings_DebugLogging".Translate(), ref Settings.debugLogging);
+            listing.CheckboxLabeled("JDB_SpaceServices_Settings_VerboseDevLogging".Translate(), ref Settings.verboseDevLogging);
+            listing.CheckboxLabeled("JDB_SpaceServices_Settings_AutoExtract".Translate(), ref Settings.autoExtractFallback);
+            listing.CheckboxLabeled("JDB_SpaceServices_Settings_Hospital".Translate(), ref Settings.enableHospital);
+            listing.CheckboxLabeled("JDB_SpaceServices_Settings_Hospitality".Translate(), ref Settings.enableHospitality);
+            listing.CheckboxLabeled("JDB_SpaceServices_Settings_HospitalityRequireBeds".Translate(), ref Settings.hospitalityRequireGuestBeds);
+            listing.CheckboxLabeled("JDB_SpaceServices_Settings_HospitalityAutoDepartBedless".Translate(), ref Settings.hospitalityAutoDepartBedlessGuests);
+            listing.CheckboxLabeled("JDB_SpaceServices_Settings_HospitalityVacuumGuard".Translate(), ref Settings.hospitalityVacuumGuard);
+            listing.CheckboxLabeled("JDB_SpaceServices_Settings_HospitalityFallbackScheduler".Translate(), ref Settings.hospitalityFallbackScheduler);
             Settings.hospitalityFallbackIntervalDays = listing.SliderLabeled(
-                "MLT_SpaceServices_Settings_HospitalityFallbackInterval".Translate(Settings.hospitalityFallbackIntervalDays.ToString("0.0")),
+                "JDB_SpaceServices_Settings_HospitalityFallbackInterval".Translate(Settings.hospitalityFallbackIntervalDays.ToString("0.0")),
                 Settings.hospitalityFallbackIntervalDays,
                 0.5f,
                 5f);
-            listing.CheckboxLabeled("MLT_SpaceServices_Settings_Spaceports".Translate(), ref Settings.enableSpaceportsBridge);
-            listing.CheckboxLabeled("MLT_SpaceServices_Settings_RequirePad".Translate(), ref Settings.requireServicePadForArrivals);
-            listing.CheckboxLabeled("MLT_SpaceServices_Settings_SealedNoSuit".Translate(), ref Settings.allowSealedNoSuitArrivals);
+            listing.CheckboxLabeled("JDB_SpaceServices_Settings_Spaceports".Translate(), ref Settings.enableSpaceportsBridge);
+            listing.CheckboxLabeled("JDB_SpaceServices_Settings_RequirePad".Translate(), ref Settings.requireServicePadForArrivals);
+            listing.CheckboxLabeled("JDB_SpaceServices_Settings_SealedNoSuit".Translate(), ref Settings.allowSealedNoSuitArrivals);
             listing.End();
             Settings.Write();
         }

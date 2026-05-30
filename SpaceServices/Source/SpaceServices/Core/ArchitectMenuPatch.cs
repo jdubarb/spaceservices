@@ -18,7 +18,7 @@ namespace SpaceServices
     {
         private static readonly string[] DuplicateBuildDefs =
         {
-            "MLT_ServiceLandingPad"
+            "JDB_ServiceLandingPad"
         };
 
         public static void Postfix(DesignationCategoryDef __instance)

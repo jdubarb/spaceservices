@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <Defs>
   <ThingDef ParentName="BuildingBase">
-    <defName>MLT_ServiceLandingPad</defName>
+    <defName>JDB_ServiceLandingPad</defName>
     <label>service landing pad</label>
     <description>Marks a controlled arrival and departure point for patients, guests, and other service traffic on stationary space facilities.</description>
     <thingClass>Building</thingClass>
@@ -19,7 +19,7 @@
     <clearBuildingArea>true</clearBuildingArea>
     <useHitPoints>false</useHitPoints>
     <canOverlapZones>true</canOverlapZones>
-    <designationCategory>MLT_SpaceServices</designationCategory>
+    <designationCategory>JDB_SpaceServices</designationCategory>
     <uiOrder>100</uiOrder>
     <statBases>
       <WorkToBuild>800</WorkToBuild>

@@ -418,20 +418,20 @@ namespace SpaceServices
             {
                 yield return gizmo;
             }
-            yield return ModeCommand(ServicePadMode.HospitalOnly, "MLT_SpaceServices_Gizmo_ModeHospitalOnly", "MLT_SpaceServices_Gizmo_ModeHospitalOnlyDesc", HospitalIcon);
-            yield return ModeCommand(ServicePadMode.HospitalityOnly, "MLT_SpaceServices_Gizmo_ModeHospitalityOnly", "MLT_SpaceServices_Gizmo_ModeHospitalityOnlyDesc", HospitalityIcon);
-            yield return ModeCommand(ServicePadMode.Shared, "MLT_SpaceServices_Gizmo_ModeShared", "MLT_SpaceServices_Gizmo_ModeSharedDesc", SharedIcon);
-            yield return ModeCommand(ServicePadMode.HospitalPriority, "MLT_SpaceServices_Gizmo_ModeHospitalPriority", "MLT_SpaceServices_Gizmo_ModeHospitalPriorityDesc", HospitalIcon);
-            yield return ModeCommand(ServicePadMode.HospitalityPriority, "MLT_SpaceServices_Gizmo_ModeHospitalityPriority", "MLT_SpaceServices_Gizmo_ModeHospitalityPriorityDesc", HospitalityIcon);
-            yield return Toggle("MLT_SpaceServices_Gizmo_RequireVacRoof", () => requireVacSafeRoof, v => requireVacSafeRoof = v);
-            yield return Toggle("MLT_SpaceServices_Gizmo_RequirePower", () => requirePower, v => requirePower = v);
+            yield return ModeCommand(ServicePadMode.HospitalOnly, "JDB_SpaceServices_Gizmo_ModeHospitalOnly", "JDB_SpaceServices_Gizmo_ModeHospitalOnlyDesc", HospitalIcon);
+            yield return ModeCommand(ServicePadMode.HospitalityOnly, "JDB_SpaceServices_Gizmo_ModeHospitalityOnly", "JDB_SpaceServices_Gizmo_ModeHospitalityOnlyDesc", HospitalityIcon);
+            yield return ModeCommand(ServicePadMode.Shared, "JDB_SpaceServices_Gizmo_ModeShared", "JDB_SpaceServices_Gizmo_ModeSharedDesc", SharedIcon);
+            yield return ModeCommand(ServicePadMode.HospitalPriority, "JDB_SpaceServices_Gizmo_ModeHospitalPriority", "JDB_SpaceServices_Gizmo_ModeHospitalPriorityDesc", HospitalIcon);
+            yield return ModeCommand(ServicePadMode.HospitalityPriority, "JDB_SpaceServices_Gizmo_ModeHospitalityPriority", "JDB_SpaceServices_Gizmo_ModeHospitalityPriorityDesc", HospitalityIcon);
+            yield return Toggle("JDB_SpaceServices_Gizmo_RequireVacRoof", () => requireVacSafeRoof, v => requireVacSafeRoof = v);
+            yield return Toggle("JDB_SpaceServices_Gizmo_RequirePower", () => requirePower, v => requirePower = v);
             if (ShouldShowDevGizmos())
             {
                 yield return DebugDangerToggle();
                 yield return new Command_Action
                 {
-                    defaultLabel = "MLT_SpaceServices_Gizmo_ReportMap".Translate(),
-                    defaultDesc = "MLT_SpaceServices_Gizmo_ReportMapDesc".Translate(),
+                    defaultLabel = "JDB_SpaceServices_Gizmo_ReportMap".Translate(),
+                    defaultDesc = "JDB_SpaceServices_Gizmo_ReportMapDesc".Translate(),
                     action = delegate
                     {
                         SpaceServiceEligibility eligibility = SpaceServiceMapDetector.Evaluate(parent.MapHeld);

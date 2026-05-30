@@ -17,7 +17,7 @@ namespace SpaceServices
     public static class SpaceServicesBootstrap
     {
         public const string PackageId = "jdubarb.spaceservices";
-        public const string CategoryDefName = "MLT_SpaceServices";
+        public const string CategoryDefName = "JDB_SpaceServices";
 
         private static readonly Harmony Harmony = new Harmony(PackageId);
 

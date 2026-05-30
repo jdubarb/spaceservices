@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <Defs>
   <DesignationCategoryDef>
-    <defName>MLT_SpaceServices</defName>
+    <defName>JDB_SpaceServices</defName>
     <label>Space Services</label>
     <description>Landing, departure, and service infrastructure for stationary space facilities.</description>
     <order>249</order>

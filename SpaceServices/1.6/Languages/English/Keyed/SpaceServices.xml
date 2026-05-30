@@ -1,31 +1,31 @@
 <?xml version="1.0" encoding="utf-8"?>
 <LanguageData>
-  <MLT_SpaceServices_Settings_DebugLogging>Debug logging</MLT_SpaceServices_Settings_DebugLogging>
-  <MLT_SpaceServices_Settings_VerboseDevLogging>Verbose dev logging</MLT_SpaceServices_Settings_VerboseDevLogging>
-  <MLT_SpaceServices_Settings_AutoExtract>Auto-extract fallback</MLT_SpaceServices_Settings_AutoExtract>
-  <MLT_SpaceServices_Settings_Hospital>Hospital support</MLT_SpaceServices_Settings_Hospital>
-  <MLT_SpaceServices_Settings_Hospitality>Hospitality support</MLT_SpaceServices_Settings_Hospitality>
-  <MLT_SpaceServices_Settings_HospitalityRequireBeds>Require free guest beds for Hospitality arrivals</MLT_SpaceServices_Settings_HospitalityRequireBeds>
-  <MLT_SpaceServices_Settings_HospitalityAutoDepartBedless>Auto-depart Hospitality guests without beds</MLT_SpaceServices_Settings_HospitalityAutoDepartBedless>
-  <MLT_SpaceServices_Settings_HospitalityVacuumGuard>Hospitality vacuum guard (periodic tick interrupt)</MLT_SpaceServices_Settings_HospitalityVacuumGuard>
-  <MLT_SpaceServices_Settings_HospitalityFallbackScheduler>Space Hospitality fallback visits (use if Hospitality is not spawning guests)</MLT_SpaceServices_Settings_HospitalityFallbackScheduler>
-  <MLT_SpaceServices_Settings_HospitalityFallbackInterval>Fallback visit interval: {0} days</MLT_SpaceServices_Settings_HospitalityFallbackInterval>
-  <MLT_SpaceServices_Settings_Spaceports>Spaceports bridge</MLT_SpaceServices_Settings_Spaceports>
-  <MLT_SpaceServices_Settings_RequirePad>Require service pad for arrivals</MLT_SpaceServices_Settings_RequirePad>
-  <MLT_SpaceServices_Settings_SealedNoSuit>Allow sealed non-vacsuit arrivals</MLT_SpaceServices_Settings_SealedNoSuit>
+  <JDB_SpaceServices_Settings_DebugLogging>Debug logging</JDB_SpaceServices_Settings_DebugLogging>
+  <JDB_SpaceServices_Settings_VerboseDevLogging>Verbose dev logging</JDB_SpaceServices_Settings_VerboseDevLogging>
+  <JDB_SpaceServices_Settings_AutoExtract>Auto-extract fallback</JDB_SpaceServices_Settings_AutoExtract>
+  <JDB_SpaceServices_Settings_Hospital>Hospital support</JDB_SpaceServices_Settings_Hospital>
+  <JDB_SpaceServices_Settings_Hospitality>Hospitality support</JDB_SpaceServices_Settings_Hospitality>
+  <JDB_SpaceServices_Settings_HospitalityRequireBeds>Require free guest beds for Hospitality arrivals</JDB_SpaceServices_Settings_HospitalityRequireBeds>
+  <JDB_SpaceServices_Settings_HospitalityAutoDepartBedless>Auto-depart Hospitality guests without beds</JDB_SpaceServices_Settings_HospitalityAutoDepartBedless>
+  <JDB_SpaceServices_Settings_HospitalityVacuumGuard>Hospitality vacuum guard (periodic tick interrupt)</JDB_SpaceServices_Settings_HospitalityVacuumGuard>
+  <JDB_SpaceServices_Settings_HospitalityFallbackScheduler>Space Hospitality fallback visits (use if Hospitality is not spawning guests)</JDB_SpaceServices_Settings_HospitalityFallbackScheduler>
+  <JDB_SpaceServices_Settings_HospitalityFallbackInterval>Fallback visit interval: {0} days</JDB_SpaceServices_Settings_HospitalityFallbackInterval>
+  <JDB_SpaceServices_Settings_Spaceports>Spaceports bridge</JDB_SpaceServices_Settings_Spaceports>
+  <JDB_SpaceServices_Settings_RequirePad>Require service pad for arrivals</JDB_SpaceServices_Settings_RequirePad>
+  <JDB_SpaceServices_Settings_SealedNoSuit>Allow sealed non-vacsuit arrivals</JDB_SpaceServices_Settings_SealedNoSuit>
 
-  <MLT_SpaceServices_Gizmo_ModeHospitalOnly>Hospital only</MLT_SpaceServices_Gizmo_ModeHospitalOnly>
-  <MLT_SpaceServices_Gizmo_ModeHospitalOnlyDesc>Use this pad only for Hospital patient arrivals and departures.</MLT_SpaceServices_Gizmo_ModeHospitalOnlyDesc>
-  <MLT_SpaceServices_Gizmo_ModeHospitalityOnly>Hospitality only</MLT_SpaceServices_Gizmo_ModeHospitalityOnly>
-  <MLT_SpaceServices_Gizmo_ModeHospitalityOnlyDesc>Use this pad only for Hospitality guest arrivals and departures.</MLT_SpaceServices_Gizmo_ModeHospitalityOnlyDesc>
-  <MLT_SpaceServices_Gizmo_ModeShared>Shared</MLT_SpaceServices_Gizmo_ModeShared>
-  <MLT_SpaceServices_Gizmo_ModeSharedDesc>Use this pad for Hospital and Hospitality traffic without preferring either service.</MLT_SpaceServices_Gizmo_ModeSharedDesc>
-  <MLT_SpaceServices_Gizmo_ModeHospitalPriority>Hospital priority</MLT_SpaceServices_Gizmo_ModeHospitalPriority>
-  <MLT_SpaceServices_Gizmo_ModeHospitalPriorityDesc>Use this pad for Hospital and Hospitality traffic, preferring Hospital patients.</MLT_SpaceServices_Gizmo_ModeHospitalPriorityDesc>
-  <MLT_SpaceServices_Gizmo_ModeHospitalityPriority>Hospitality priority</MLT_SpaceServices_Gizmo_ModeHospitalityPriority>
-  <MLT_SpaceServices_Gizmo_ModeHospitalityPriorityDesc>Use this pad for Hospital and Hospitality traffic, preferring Hospitality guests.</MLT_SpaceServices_Gizmo_ModeHospitalityPriorityDesc>
-  <MLT_SpaceServices_Gizmo_RequireVacRoof>Require vac-safe roof</MLT_SpaceServices_Gizmo_RequireVacRoof>
-  <MLT_SpaceServices_Gizmo_RequirePower>Require power</MLT_SpaceServices_Gizmo_RequirePower>
-  <MLT_SpaceServices_Gizmo_ReportMap>Report service map status</MLT_SpaceServices_Gizmo_ReportMap>
-  <MLT_SpaceServices_Gizmo_ReportMapDesc>Write the current map's Space Services eligibility reasons to the log.</MLT_SpaceServices_Gizmo_ReportMapDesc>
+  <JDB_SpaceServices_Gizmo_ModeHospitalOnly>Hospital only</JDB_SpaceServices_Gizmo_ModeHospitalOnly>
+  <JDB_SpaceServices_Gizmo_ModeHospitalOnlyDesc>Use this pad only for Hospital patient arrivals and departures.</JDB_SpaceServices_Gizmo_ModeHospitalOnlyDesc>
+  <JDB_SpaceServices_Gizmo_ModeHospitalityOnly>Hospitality only</JDB_SpaceServices_Gizmo_ModeHospitalityOnly>
+  <JDB_SpaceServices_Gizmo_ModeHospitalityOnlyDesc>Use this pad only for Hospitality guest arrivals and departures.</JDB_SpaceServices_Gizmo_ModeHospitalityOnlyDesc>
+  <JDB_SpaceServices_Gizmo_ModeShared>Shared</JDB_SpaceServices_Gizmo_ModeShared>
+  <JDB_SpaceServices_Gizmo_ModeSharedDesc>Use this pad for Hospital and Hospitality traffic without preferring either service.</JDB_SpaceServices_Gizmo_ModeSharedDesc>
+  <JDB_SpaceServices_Gizmo_ModeHospitalPriority>Hospital priority</JDB_SpaceServices_Gizmo_ModeHospitalPriority>
+  <JDB_SpaceServices_Gizmo_ModeHospitalPriorityDesc>Use this pad for Hospital and Hospitality traffic, preferring Hospital patients.</JDB_SpaceServices_Gizmo_ModeHospitalPriorityDesc>
+  <JDB_SpaceServices_Gizmo_ModeHospitalityPriority>Hospitality priority</JDB_SpaceServices_Gizmo_ModeHospitalityPriority>
+  <JDB_SpaceServices_Gizmo_ModeHospitalityPriorityDesc>Use this pad for Hospital and Hospitality traffic, preferring Hospitality guests.</JDB_SpaceServices_Gizmo_ModeHospitalityPriorityDesc>
+  <JDB_SpaceServices_Gizmo_RequireVacRoof>Require vac-safe roof</JDB_SpaceServices_Gizmo_RequireVacRoof>
+  <JDB_SpaceServices_Gizmo_RequirePower>Require power</JDB_SpaceServices_Gizmo_RequirePower>
+  <JDB_SpaceServices_Gizmo_ReportMap>Report service map status</JDB_SpaceServices_Gizmo_ReportMap>
+  <JDB_SpaceServices_Gizmo_ReportMapDesc>Write the current map's Space Services eligibility reasons to the log.</JDB_SpaceServices_Gizmo_ReportMapDesc>
 </LanguageData>

@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <Defs>
   <ThingDef ParentName="EtherealThingBase">
-    <defName>MLT_ServiceShuttlePayload</defName>
+    <defName>JDB_ServiceShuttlePayload</defName>
     <label>service shuttle payload</label>
     <thingClass>Thing</thingClass>
     <useHitPoints>false</useHitPoints>
@@ -17,7 +17,7 @@
   </ThingDef>
 
   <ThingDef ParentName="ShuttleSkyfallerBase">
-    <defName>MLT_ServiceShuttleIncoming</defName>
+    <defName>JDB_ServiceShuttleIncoming</defName>
     <label>service shuttle (incoming)</label>
     <thingClass>Skyfaller</thingClass>
     <skyfaller>
@@ -54,7 +54,7 @@
   </ThingDef>
 
   <ThingDef ParentName="ShuttleSkyfallerBase">
-    <defName>MLT_ServiceShuttleLeaving</defName>
+    <defName>JDB_ServiceShuttleLeaving</defName>
     <label>service shuttle (leaving)</label>
     <thingClass>Skyfaller</thingClass>
     <skyfaller>

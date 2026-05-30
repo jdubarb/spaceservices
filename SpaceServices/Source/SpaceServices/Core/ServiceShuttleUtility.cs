@@ -171,14 +171,14 @@ namespace SpaceServices
 
         public static ShuttleVisual Resolve()
         {
-            ThingDef payload = DefDatabase<ThingDef>.GetNamedSilentFail("MLT_ServiceShuttlePayload");
+            ThingDef payload = DefDatabase<ThingDef>.GetNamedSilentFail("JDB_ServiceShuttlePayload");
             if (payload == null)
             {
                 return null;
             }
 
-            ThingDef incoming = DefDatabase<ThingDef>.GetNamedSilentFail("MLT_ServiceShuttleIncoming");
-            ThingDef leaving = DefDatabase<ThingDef>.GetNamedSilentFail("MLT_ServiceShuttleLeaving");
+            ThingDef incoming = DefDatabase<ThingDef>.GetNamedSilentFail("JDB_ServiceShuttleIncoming");
+            ThingDef leaving = DefDatabase<ThingDef>.GetNamedSilentFail("JDB_ServiceShuttleLeaving");
             if (incoming == null || leaving == null)
             {
                 return null;
