@@ -216,7 +216,7 @@ namespace SpaceServices
                     }
                 }
             }
-            foreach (Pawn pawn in PawnsFinder.AllMapsWorldAndTemporary_Alive)
+            foreach (Pawn pawn in PawnsFinder.AllMapsWorldAndTemporary_AliveOrDead)
             {
                 if (pawn != null)
                 {
