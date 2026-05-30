@@ -58,6 +58,7 @@ namespace SpaceServices
                 active.pawns.Any(pawn => list.Contains(pawn)));
             if (existing != null)
             {
+                ServiceDebugUtility.LogAudit("RegisterPawns merged kind=" + kind + " existing=" + existing.id + " incoming=" + PawnSummary(list) + " arrivalPad=" + ServiceDebugUtility.ThingAuditSummary(arrivalPad));
                 foreach (Pawn pawn in list)
                 {
                     if (!existing.pawns.Contains(pawn))
@@ -96,6 +97,7 @@ namespace SpaceServices
 
             comp.serviceGroups.Add(record);
             ServiceDebugUtility.Log("Registered " + kind + " service group " + record.id + " pawns=" + list.Count + " padReserved=" + (record.reservedPad != null) + " arrivalPad=" + (arrivalPad != null));
+            ServiceDebugUtility.LogAudit("RegisterPawns new " + RecordAudit(record) + " pawns=" + PawnSummary(list) + " arrivalPad=" + ServiceDebugUtility.ThingAuditSummary(arrivalPad));
         }
 
         public static bool ReleaseGroup(Map map, string groupId, string reason)
@@ -148,8 +150,10 @@ namespace SpaceServices
             ServiceGroupRecord record;
             if (!TryFindRecordForPawn(pawn, out map, out record))
             {
+                ServiceDebugUtility.LogAudit("RequestDepartureForPawn no service record pawn=" + ServiceDebugUtility.PawnAuditSummary(pawn) + " reason=" + (reason ?? "none"));
                 return false;
             }
+            ServiceDebugUtility.LogAudit("RequestDepartureForPawn found " + RecordAudit(record) + " pawn=" + ServiceDebugUtility.PawnAuditSummary(pawn) + " reason=" + (reason ?? "none"));
             BeginDeparture(map, record, reason);
             return true;
         }
@@ -454,6 +458,7 @@ namespace SpaceServices
             {
                 return;
             }
+            ServiceDebugUtility.LogAudit("BeginDeparture enter " + RecordAudit(record) + " reason=" + (reason ?? "none") + " pawns=" + PawnSummary(record.pawns));
             if (record.serviceKind == "hospital")
             {
                 BeginHospitalDeparture(map, record, reason);
@@ -464,6 +469,7 @@ namespace SpaceServices
                 record.reservedPad = TryReserveBestDeparturePad(map, ServiceUse.Guest, record);
                 if (record.reservedPad == null)
                 {
+                    ServiceDebugUtility.LogAudit("BeginDeparture no hospitality departure pad " + RecordAudit(record));
                     if (record.state != "departing")
                     {
                         record.state = "departing";
@@ -476,6 +482,7 @@ namespace SpaceServices
             EnsureHospitalityDeparturePrepared(record);
             if (ReadyForExtraction(record))
             {
+                ServiceDebugUtility.LogAudit("BeginDeparture ready for immediate pickup " + RecordAudit(record));
                 BeginPickupShuttle(record, reason);
                 return;
             }
@@ -494,25 +501,30 @@ namespace SpaceServices
             {
                 return;
             }
+            ServiceDebugUtility.LogAudit("EnsureHospitalityDeparturePrepared begin " + RecordAudit(record));
             HospitalityBedUtility.PrepareGuestsForServiceDeparture(record);
             record.hospitalityDeparturePrepared = true;
+            ServiceDebugUtility.LogAudit("EnsureHospitalityDeparturePrepared end " + RecordAudit(record) + " pawns=" + PawnSummary(record.pawns));
         }
 
         private static void BeginHospitalDeparture(Map map, ServiceGroupRecord record, string reason)
         {
             if (record.reservedPad != null && !ReservedPadStillExists(record))
             {
+                ServiceDebugUtility.LogAudit("BeginHospitalDeparture releasing missing pad " + RecordAudit(record));
                 ReleaseRecord(record);
                 record.reservedPad = null;
             }
             if (record.reservedPad != null && !PadCanSafelyServe(record.reservedPad, ServiceUse.Patient, record.pawns, record.id, false))
             {
+                ServiceDebugUtility.LogAudit("BeginHospitalDeparture releasing unsafe pad " + RecordAudit(record) + " pad=" + ServiceDebugUtility.ThingAuditSummary(record.reservedPad));
                 ReleaseRecord(record);
                 record.reservedPad = null;
             }
             if (record.reservedPad == null)
             {
                 record.reservedPad = TryReserveBestDeparturePad(map, ServiceUse.Patient, record);
+                ServiceDebugUtility.LogAudit("BeginHospitalDeparture reserved pad result " + RecordAudit(record) + " pad=" + ServiceDebugUtility.ThingAuditSummary(record.reservedPad));
             }
             if (record.reservedPad == null)
             {
@@ -551,10 +563,13 @@ namespace SpaceServices
             }
             if (record.reservedPad != null && PadCanSafelyServe(record.reservedPad, use, record.pawns, record.id, ShouldBypassGuestArea(record)))
             {
+                ServiceDebugUtility.LogAudit("EnsureReservedDeparturePad keeping existing " + RecordAudit(record) + " pad=" + ServiceDebugUtility.ThingAuditSummary(record.reservedPad));
                 return true;
             }
+            ServiceDebugUtility.LogAudit("EnsureReservedDeparturePad finding replacement " + RecordAudit(record) + " oldPad=" + ServiceDebugUtility.ThingAuditSummary(record.reservedPad));
             ReleaseRecord(record);
             record.reservedPad = TryReserveBestDeparturePad(map, use, record);
+            ServiceDebugUtility.LogAudit("EnsureReservedDeparturePad result " + RecordAudit(record) + " pad=" + ServiceDebugUtility.ThingAuditSummary(record.reservedPad));
             if (record.reservedPad == null)
             {
                 if (SpaceServicesMod.Settings != null && SpaceServicesMod.Settings.debugLogging && ShouldLogBlockedDeparture())
@@ -579,6 +594,7 @@ namespace SpaceServices
             ShuttleVisual visual = ShuttleVisual.Resolve();
             if (visual == null)
             {
+                ServiceDebugUtility.LogAudit("BeginPickupShuttle no shuttle visual, completing directly " + RecordAudit(record));
                 DepartureUtility.CompleteDeparture(record.reservedPad.Map, record, reason);
                 return;
             }
@@ -588,6 +604,7 @@ namespace SpaceServices
             record.pickupShuttleThingDefName = visual.shipThingDef.defName;
             ServiceShuttleUtility.SpawnArrival(record.reservedPad.Map, record.reservedPad.Position);
             Log.Message("[Space Services] Pickup shuttle inbound for " + record.serviceKind + " service group " + record.id + ": " + reason);
+            ServiceDebugUtility.LogAudit("BeginPickupShuttle " + RecordAudit(record) + " touchdownTick=" + record.pickupShuttleTouchdownTick + " ship=" + record.pickupShuttleThingDefName + " reason=" + (reason ?? "none"));
         }
 
         private static Thing TryReserveBestDeparturePad(Map map, ServiceUse use, ServiceGroupRecord record)
@@ -606,9 +623,12 @@ namespace SpaceServices
                 CompSpaceServicePad comp = pad.TryGetComp<CompSpaceServicePad>();
                 if (comp != null && comp.TryReserve(record.id))
                 {
+                    ServiceDebugUtility.LogAudit("TryReserveBestDeparturePad reserved record=" + record.id + " use=" + use + " pad=" + ServiceDebugUtility.ThingAuditSummary(pad) + " score=" + DeparturePadScore(map, record, pad, pawns));
                     return pad;
                 }
+                ServiceDebugUtility.LogAudit("TryReserveBestDeparturePad candidate could not reserve record=" + record.id + " use=" + use + " pad=" + ServiceDebugUtility.ThingAuditSummary(pad));
             }
+            ServiceDebugUtility.LogAudit("TryReserveBestDeparturePad no candidates record=" + record.id + " use=" + use + " pawns=" + PawnSummary(pawns));
             return null;
         }
 
@@ -702,6 +722,7 @@ namespace SpaceServices
                 }
                 if (pawn.Spawned && !PawnReadyForPickupCall(pawn, record))
                 {
+                    ServiceDebugUtility.LogAudit("ReadyForExtraction false waiting pawn=" + ServiceDebugUtility.PawnAuditSummary(pawn) + " record=" + RecordAudit(record));
                     return false;
                 }
             }
@@ -810,12 +831,15 @@ namespace SpaceServices
                 IntVec3 waitCell = DepartureWaitCell(record.reservedPad, pawn, bypassGuestArea);
                 if (!waitCell.IsValid || pawn.Position == waitCell)
                 {
+                    ServiceDebugUtility.LogAudit("GuideDepartingPawnsToPad skip invalid/same waitCell=" + waitCell + " pawn=" + ServiceDebugUtility.PawnAuditSummary(pawn) + " record=" + RecordAudit(record));
                     continue;
                 }
                 if (!bypassGuestArea && !pawn.CanReach(waitCell, PathEndMode.OnCell, Danger.Deadly))
                 {
+                    ServiceDebugUtility.LogAudit("GuideDepartingPawnsToPad cannot reach waitCell=" + waitCell + " pawn=" + ServiceDebugUtility.PawnAuditSummary(pawn) + " record=" + RecordAudit(record));
                     continue;
                 }
+                ServiceDebugUtility.LogAudit("GuideDepartingPawnsToPad ordered waitCell=" + waitCell + " pawn=" + ServiceDebugUtility.PawnAuditSummary(pawn) + " record=" + RecordAudit(record));
                 pawn.jobs.TryTakeOrderedJob(ServiceGotoJob(waitCell, bypassGuestArea), JobTag.Misc);
             }
         }
@@ -845,12 +869,15 @@ namespace SpaceServices
                 IntVec3 boardCell = PickupBoardingCell(record.reservedPad, pawn, bypassGuestArea);
                 if (!boardCell.IsValid || pawn.Position == boardCell)
                 {
+                    ServiceDebugUtility.LogAudit("GuideBoardingPawnsToShuttle skip invalid/same boardCell=" + boardCell + " pawn=" + ServiceDebugUtility.PawnAuditSummary(pawn) + " record=" + RecordAudit(record));
                     continue;
                 }
                 if (!bypassGuestArea && !pawn.CanReach(boardCell, PathEndMode.OnCell, Danger.Deadly))
                 {
+                    ServiceDebugUtility.LogAudit("GuideBoardingPawnsToShuttle cannot reach boardCell=" + boardCell + " pawn=" + ServiceDebugUtility.PawnAuditSummary(pawn) + " record=" + RecordAudit(record));
                     continue;
                 }
+                ServiceDebugUtility.LogAudit("GuideBoardingPawnsToShuttle ordered boardCell=" + boardCell + " pawn=" + ServiceDebugUtility.PawnAuditSummary(pawn) + " record=" + RecordAudit(record));
                 pawn.jobs.TryTakeOrderedJob(ServiceGotoJob(boardCell, bypassGuestArea), JobTag.Misc);
             }
         }
@@ -1162,6 +1189,23 @@ namespace SpaceServices
                 labels.Add(pawn.LabelShortCap + "(spawned=" + pawn.Spawned + ", destroyed=" + pawn.Destroyed + ")");
             }
             return labels.Count == 0 ? "none" : string.Join(", ", labels.ToArray());
+        }
+
+        private static string RecordAudit(ServiceGroupRecord record)
+        {
+            if (record == null)
+            {
+                return "record=null";
+            }
+            return "id=" + record.id +
+                " kind=" + record.serviceKind +
+                " state=" + record.state +
+                " pawns=" + (record.pawns == null ? 0 : record.pawns.Count) +
+                " prepared=" + record.hospitalityDeparturePrepared +
+                " arrivalTick=" + record.arrivalTick +
+                " departureTick=" + record.departureRequestedTick +
+                " pickupTick=" + record.pickupShuttleTouchdownTick +
+                " reservedPad=" + ServiceDebugUtility.ThingAuditSummary(record.reservedPad);
         }
 
         private static bool ShouldBypassGuestArea(ServiceGroupRecord record)

@@ -24,12 +24,14 @@ namespace SpaceServices
             {
                 return true;
             }
+            ServiceDebugUtility.LogAudit("Hospitality VisitorGroup prefix map=" + map.uniqueID + " parmsSpawn=" + (parms == null ? IntVec3.Invalid : parms.spawnCenter) + " faction=" + (parms == null || parms.faction == null ? "null" : parms.faction.Name));
 
             IncidentDef incident = Reflect.GetMember(__instance, "def") as IncidentDef;
             string incidentDefName = incident == null ? "VisitorGroup" : incident.defName;
             if (!HospitalityIncidentGate.CanAcceptHospitalityIncident(incidentDefName, map, __instance))
             {
                 string report = HospitalityIncidentGate.ReadinessReport(incidentDefName, map, __instance);
+                ServiceDebugUtility.LogAudit("Hospitality VisitorGroup blocked incident=" + incidentDefName + " report=" + report);
                 ServiceDebugUtility.LogThrottled("hospitality-block-" + incidentDefName + "-" + report, "Hospitality visitor incident blocked: " + report, GenDate.TicksPerHour);
                 __result = false;
                 return false;
@@ -39,6 +41,7 @@ namespace SpaceServices
             {
                 parms.spawnCenter = delayedPad.Position;
                 HospitalityArrivalContext.Push(map, delayedPad, true);
+                ServiceDebugUtility.LogAudit("Hospitality VisitorGroup executing delayed touchdown pad=" + ServiceDebugUtility.ThingAuditSummary(delayedPad));
                 return true;
             }
 
@@ -50,6 +53,7 @@ namespace SpaceServices
                 SpaceServicesMapComponent comp = map.GetComponent<SpaceServicesMapComponent>();
                 if (comp != null && comp.ScheduleHospitalityIncident(__instance, parms, pad, visual.shipThingDef == null ? null : visual.shipThingDef.defName))
                 {
+                    ServiceDebugUtility.LogAudit("Hospitality VisitorGroup scheduled shuttle arrival pad=" + ServiceDebugUtility.ThingAuditSummary(pad) + " visual=" + (visual.shipThingDef == null ? "none" : visual.shipThingDef.defName));
                     ServiceShuttleUtility.SpawnArrival(map, pad.Position);
                     Messages.Message("Space Services: visitors inbound", pad, MessageTypeDefOf.NeutralEvent, false);
                     __result = true;
@@ -62,6 +66,7 @@ namespace SpaceServices
                 parms.spawnCenter = cell;
             }
             HospitalityArrivalContext.Push(map);
+            ServiceDebugUtility.LogAudit("Hospitality VisitorGroup falling through to immediate spawn cell=" + parms.spawnCenter);
             return true;
         }
 
@@ -120,6 +125,7 @@ namespace SpaceServices
                 location = cell;
             }
             VacSuitUtility.SuitPawnForEnvironment(pawn, map, location);
+            ServiceDebugUtility.LogAudit("Hospitality SpawnVisitor prefix pawn=" + ServiceDebugUtility.PawnAuditSummary(pawn) + " location=" + location);
         }
 
         public static void SpawnVisitorPostfix(List<Pawn> spawned, Pawn pawn, Map map, Pawn __result)
@@ -146,6 +152,7 @@ namespace SpaceServices
             {
                 pawns.Add(__result);
             }
+            ServiceDebugUtility.LogAudit("Hospitality SpawnVisitor postfix registeredCount=" + pawns.Distinct().Count() + " pad=" + ServiceDebugUtility.ThingAuditSummary(arrivalPad));
             ServiceLifecycleUtility.RegisterPawns(map, "hospitality", pawns.Distinct(), arrivalPad);
         }
 
@@ -160,6 +167,7 @@ namespace SpaceServices
                 ServiceDebugUtility.LogVerbose("Ignored Hospitality CreateLordPostfix outside Space Services arrival context.");
                 return;
             }
+            ServiceDebugUtility.LogAudit("Hospitality CreateLord postfix pawns=" + (pawns == null ? 0 : pawns.Count) + " pad=" + ServiceDebugUtility.ThingAuditSummary(arrivalPad));
             ServiceLifecycleUtility.RegisterPawns(map, "hospitality", pawns, arrivalPad);
         }
 
@@ -167,12 +175,15 @@ namespace SpaceServices
         {
             if (pawn != null && NativeGuestLeaveAllowed.Remove(pawn))
             {
+                ServiceDebugUtility.LogAudit("Hospitality GuestUtility.Leave allowed through Space Services bypass: " + HospitalityBedUtility.GuestDebugSummary(pawn));
                 return true;
             }
             if (ServiceLifecycleUtility.RequestDepartureForPawn(pawn, "Hospitality marked guest leaving"))
             {
+                ServiceDebugUtility.LogAudit("Hospitality GuestUtility.Leave blocked; Space Services owns departure: " + HospitalityBedUtility.GuestDebugSummary(pawn));
                 return false;
             }
+            ServiceDebugUtility.LogAudit("Hospitality GuestUtility.Leave passed through unmanaged: " + HospitalityBedUtility.GuestDebugSummary(pawn));
             return true;
         }
 
@@ -190,13 +201,15 @@ namespace SpaceServices
             }
             try
             {
+                ServiceDebugUtility.LogAudit("Before native Hospitality GuestUtility.Leave: " + HospitalityBedUtility.GuestDebugSummary(pawn));
                 NativeGuestLeaveAllowed.Add(pawn);
                 leave.Invoke(null, new object[] { pawn });
+                ServiceDebugUtility.LogAudit("After native Hospitality GuestUtility.Leave: " + HospitalityBedUtility.GuestDebugSummary(pawn));
                 return true;
             }
             catch (Exception ex)
             {
-                ServiceDebugUtility.LogVerbose("Hospitality GuestUtility.Leave failed during service departure: " + ex.Message);
+                ServiceDebugUtility.LogAudit("Hospitality GuestUtility.Leave failed during service departure: " + ex);
                 return false;
             }
             finally

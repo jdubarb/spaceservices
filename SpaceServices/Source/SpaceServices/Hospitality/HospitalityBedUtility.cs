@@ -6,6 +6,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
 using Verse;
+using Verse.AI;
 using Verse.AI.Group;
 
 namespace SpaceServices
@@ -75,22 +76,27 @@ namespace SpaceServices
             {
                 return;
             }
+            ServiceDebugUtility.LogAudit("Preparing Hospitality service departure " + record.id + " pawns=" + record.pawns.Count);
             foreach (Pawn pawn in record.pawns)
             {
                 object comp = CompGuest(pawn);
                 if (comp == null)
                 {
+                    ServiceDebugUtility.LogAudit("Hospitality departure pawn has no CompGuest: " + GuestDebugSummary(pawn));
                     continue;
                 }
 
+                ServiceDebugUtility.LogAudit("Before Hospitality departure prep: " + GuestDebugSummary(pawn));
                 MarkLordLeaving(pawn, comp);
+                ServiceDebugUtility.LogAudit("After Hospitality lord leaving prep: " + GuestDebugSummary(pawn));
                 if (!Reflect.BoolMember(comp, "arrived"))
                 {
+                    ServiceDebugUtility.LogAudit("Skipping native Hospitality leave because arrived=false: " + GuestDebugSummary(pawn));
                     continue;
                 }
                 if (HospitalityPatchHandlers.TryRunNativeGuestLeave(pawn))
                 {
-                    ServiceDebugUtility.LogVerbose("Ran Hospitality GuestUtility.Leave for service departure: " + pawn.LabelShortCap);
+                    ServiceDebugUtility.LogAudit("Ran Hospitality GuestUtility.Leave for service departure: " + GuestDebugSummary(pawn));
                     continue;
                 }
                 MethodInfo leave = AccessTools.Method(comp.GetType(), "Leave", new[] { typeof(bool) });
@@ -110,7 +116,67 @@ namespace SpaceServices
                 {
                     Reflect.SetMember(comp, "arrived", false);
                 }
+                ServiceDebugUtility.LogAudit("After Hospitality fallback departure prep: " + GuestDebugSummary(pawn));
             }
+        }
+
+        public static string GuestDebugSummary(Pawn pawn)
+        {
+            if (pawn == null)
+            {
+                return "pawn=null";
+            }
+            object comp = CompGuest(pawn);
+            object bed = comp == null ? null : Reflect.GetMember(comp, "bed");
+            object compLord = comp == null ? null : Reflect.GetMember(comp, "lord");
+            return pawn.LabelShortCap +
+                " [" + pawn.ThingID + "]" +
+                " spawned=" + pawn.Spawned +
+                " destroyed=" + pawn.Destroyed +
+                " pos=" + (pawn.Spawned ? pawn.Position.ToString() : "unspawned") +
+                " guestStatus=" + GuestStatusLabel(pawn) +
+                " arrived=" + (comp == null ? "n/a" : Reflect.BoolMember(comp, "arrived").ToString()) +
+                " sentAway=" + (comp == null ? "n/a" : Reflect.BoolMember(comp, "sentAway").ToString()) +
+                " rescued=" + (comp == null ? "n/a" : Reflect.BoolMember(comp, "rescued").ToString()) +
+                " bed=" + ThingLabel(bed) +
+                " compLord=" + LordLabel(compLord as Lord) +
+                " pawnLord=" + LordLabel(pawn.GetLord()) +
+                " curJob=" + JobLabel(pawn.CurJob);
+        }
+
+        private static string GuestStatusLabel(Pawn pawn)
+        {
+            object status = pawn == null || pawn.guest == null ? null : Reflect.GetMember(pawn.guest, "GuestStatus");
+            return status == null ? "null" : status.ToString();
+        }
+
+        private static string ThingLabel(object thing)
+        {
+            Thing t = thing as Thing;
+            if (t == null)
+            {
+                return thing == null ? "null" : thing.ToString();
+            }
+            return t.def.defName + "[" + t.ThingID + "]";
+        }
+
+        private static string LordLabel(Lord lord)
+        {
+            if (lord == null)
+            {
+                return "null";
+            }
+            string job = lord.LordJob == null ? "nullJob" : lord.LordJob.GetType().Name;
+            return lord.loadID + "/" + job + "/pawns=" + (lord.ownedPawns == null ? 0 : lord.ownedPawns.Count);
+        }
+
+        private static string JobLabel(Job job)
+        {
+            if (job == null)
+            {
+                return "null";
+            }
+            return job.def.defName + "/lord=" + LordLabel(job.lord);
         }
 
         private static IEnumerable<Thing> GuestBeds(Map map)
@@ -247,15 +313,18 @@ namespace SpaceServices
             {
                 try
                 {
+                    ServiceDebugUtility.LogAudit("Hospitality LordJob.OnLeaveTriggered before pawn=" + GuestDebugSummary(pawn));
                     onLeave.Invoke(lordJob, null);
+                    ServiceDebugUtility.LogAudit("Hospitality LordJob.OnLeaveTriggered after pawn=" + GuestDebugSummary(pawn));
                     return;
                 }
                 catch (Exception ex)
                 {
-                    ServiceDebugUtility.LogVerbose("Hospitality LordJob.OnLeaveTriggered failed during service departure: " + ex.Message);
+                    ServiceDebugUtility.LogAudit("Hospitality LordJob.OnLeaveTriggered failed during service departure: " + ex);
                 }
             }
             Reflect.SetMember(lordJob, "leaving", true);
+            ServiceDebugUtility.LogAudit("Hospitality lord leaving field set pawn=" + GuestDebugSummary(pawn));
         }
 
         private static bool IsGuestBed(Thing thing)

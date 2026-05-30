@@ -25,11 +25,13 @@ namespace SpaceServices
             record.state = "departing";
             record.departureRequestedTick = Find.TickManager.TicksGame;
             Log.Message("[Space Services] Departing " + record.serviceKind + " service group " + record.id + ": " + reason);
+            ServiceDebugUtility.LogAudit("CompleteDeparture begin id=" + record.id + " kind=" + record.serviceKind + " state=" + record.state + " reason=" + (reason ?? "none") + " pawns=" + PawnListAudit(record.pawns) + " pad=" + ServiceDebugUtility.ThingAuditSummary(record.reservedPad));
             Map padMap = record.reservedPad == null ? null : record.reservedPad.Map;
             IntVec3 padCell = record.reservedPad == null ? IntVec3.Invalid : record.reservedPad.Position;
             ServiceShuttleUtility.CleanupTouchdownShuttle(padMap, padCell, record.pickupShuttleThingDefName);
 
             bool completed = TryAutoExtract(map, record.pawns, reason);
+            ServiceDebugUtility.LogAudit("CompleteDeparture extraction result id=" + record.id + " completed=" + completed + " pawns=" + PawnListAudit(record.pawns));
             if (completed)
             {
                 if (record.reservedPad != null && record.reservedPad.Spawned)
@@ -42,6 +44,7 @@ namespace SpaceServices
                     NotifyHospitalPatientsLeft(map, record.pawns);
                 }
                 ReleaseReservation(record);
+                ServiceDebugUtility.LogAudit("CompleteDeparture finished id=" + record.id + " state=" + record.state);
                 Messages.Message("Space Services: service group departed", MessageTypeDefOf.NeutralEvent, false);
             }
             return completed;
@@ -58,13 +61,16 @@ namespace SpaceServices
             {
                 if (pawn == null || pawn.Destroyed)
                 {
+                    ServiceDebugUtility.LogAudit("TryAutoExtract skip destroyed/null pawn=" + ServiceDebugUtility.PawnAuditSummary(pawn));
                     continue;
                 }
                 any = true;
+                ServiceDebugUtility.LogAudit("TryAutoExtract considering " + ServiceDebugUtility.PawnAuditSummary(pawn) + " reason=" + (reason ?? "none"));
                 if (pawn.Spawned)
                 {
                     if (!TryExitSpawnedPawn(pawn, reason))
                     {
+                        ServiceDebugUtility.LogAudit("TryAutoExtract falling back to despawn for " + ServiceDebugUtility.PawnAuditSummary(pawn));
                         LogServicePawnRemoval(pawn, "despawn fallback", reason);
                         NotifyLordPawnExited(pawn);
                         CleanupDepartingPawnReferences(map ?? pawn.MapHeld, pawn);
@@ -73,6 +79,7 @@ namespace SpaceServices
                 }
                 else if (pawn.MapHeld != null)
                 {
+                    ServiceDebugUtility.LogAudit("TryAutoExtract destroying unspawned held pawn " + ServiceDebugUtility.PawnAuditSummary(pawn));
                     LogServicePawnRemoval(pawn, "destroy unspawned", reason);
                     NotifyLordPawnExited(pawn);
                     CleanupDepartingPawnReferences(map ?? pawn.MapHeld, pawn);
@@ -95,9 +102,12 @@ namespace SpaceServices
             try
             {
                 // A real map exit keeps RimWorld's play logs, tales, relations, and lords consistent.
+                ServiceDebugUtility.LogAudit("TryExitSpawnedPawn before prep " + ServiceDebugUtility.PawnAuditSummary(pawn));
                 PreparePawnJobsForExit(pawn);
+                ServiceDebugUtility.LogAudit("TryExitSpawnedPawn after prep " + ServiceDebugUtility.PawnAuditSummary(pawn));
                 LogServicePawnRemoval(pawn, "ExitMap", reason);
                 pawn.ExitMap(false, Rot4.Invalid);
+                ServiceDebugUtility.LogAudit("TryExitSpawnedPawn after ExitMap " + ServiceDebugUtility.PawnAuditSummary(pawn));
                 return true;
             }
             catch (Exception ex)
@@ -119,6 +129,7 @@ namespace SpaceServices
             object hospital = HospitalIncidentGate.FindHospitalComponent(map);
             MethodInfo patientLeftTheMap = hospital == null ? null : AccessTools.Method(hospital.GetType(), "PatientLeftTheMap", new[] { typeof(Pawn) });
             IDictionary patients = hospital == null ? null : Reflect.GetMember(hospital, "Patients") as IDictionary;
+            ServiceDebugUtility.LogAudit("NotifyHospitalPatientsLeft hospital=" + (hospital == null ? "null" : hospital.GetType().FullName) + " ownerMethod=" + (patientLeftTheMap != null) + " patientsDict=" + (patients != null));
             if (patients == null && patientLeftTheMap == null)
             {
                 return;
@@ -133,7 +144,9 @@ namespace SpaceServices
                 {
                     try
                     {
+                        ServiceDebugUtility.LogAudit("Hospital PatientLeftTheMap before pawn=" + ServiceDebugUtility.PawnAuditSummary(pawn) + " contains=" + (patients != null && patients.Contains(pawn)));
                         patientLeftTheMap.Invoke(hospital, new object[] { pawn });
+                        ServiceDebugUtility.LogAudit("Hospital PatientLeftTheMap after pawn=" + ServiceDebugUtility.PawnAuditSummary(pawn) + " contains=" + (patients != null && patients.Contains(pawn)));
                         continue;
                     }
                     catch (Exception ex)
@@ -143,6 +156,7 @@ namespace SpaceServices
                 }
                 if (patients != null && patients.Contains(pawn))
                 {
+                    ServiceDebugUtility.LogAudit("Hospital fallback Patients.Remove pawn=" + ServiceDebugUtility.PawnAuditSummary(pawn));
                     patients.Remove(pawn);
                 }
             }
@@ -156,10 +170,12 @@ namespace SpaceServices
             }
             try
             {
-                ClearJobLord(pawn.CurJob);
-                ClearQueuedJobLords(pawn);
+                ServiceDebugUtility.LogAudit("PreparePawnJobsForExit before " + ServiceDebugUtility.PawnAuditSummary(pawn) + " queue=" + JobQueueAudit(pawn));
+                bool clearedCurrentBefore = ClearJobLord(pawn.CurJob);
+                int clearedQueued = ClearQueuedJobLords(pawn);
                 pawn.jobs.StopAll(false);
-                ClearJobLord(pawn.CurJob);
+                bool clearedCurrentAfter = ClearJobLord(pawn.CurJob);
+                ServiceDebugUtility.LogAudit("PreparePawnJobsForExit after " + ServiceDebugUtility.PawnAuditSummary(pawn) + " clearedCurrentBefore=" + clearedCurrentBefore + " clearedQueued=" + clearedQueued + " clearedCurrentAfter=" + clearedCurrentAfter + " queue=" + JobQueueAudit(pawn));
             }
             catch (Exception ex)
             {
@@ -167,15 +183,19 @@ namespace SpaceServices
             }
         }
 
-        private static void ClearQueuedJobLords(Pawn pawn)
+        private static int ClearQueuedJobLords(Pawn pawn)
         {
             object queue = pawn == null || pawn.jobs == null ? null : Reflect.GetMember(pawn.jobs, "jobQueue");
+            int cleared = 0;
             IEnumerable enumerable = queue as IEnumerable;
             if (enumerable != null)
             {
                 foreach (object queued in enumerable)
                 {
-                    ClearJobLord(Reflect.GetMember(queued, "job") as Job);
+                    if (ClearJobLord(Reflect.GetMember(queued, "job") as Job))
+                    {
+                        cleared++;
+                    }
                 }
             }
             MethodInfo clear = queue == null ? null : AccessTools.Method(queue.GetType(), "Clear");
@@ -183,14 +203,17 @@ namespace SpaceServices
             {
                 clear.Invoke(queue, null);
             }
+            return cleared;
         }
 
-        private static void ClearJobLord(Job job)
+        private static bool ClearJobLord(Job job)
         {
-            if (job != null)
+            if (job != null && job.lord != null)
             {
                 job.lord = null;
+                return true;
             }
+            return false;
         }
 
         private static void CleanupDepartingPawnReferences(Map map, Pawn departingPawn)
@@ -299,11 +322,13 @@ namespace SpaceServices
                 Lord lord = pawn.GetLord();
                 if (lord == null)
                 {
+                    ServiceDebugUtility.LogAudit("NotifyLordPawnExited no lord for " + ServiceDebugUtility.PawnAuditSummary(pawn));
                     return;
                 }
                 MethodInfo method = AccessTools.Method(typeof(Lord), "Notify_PawnLost", new[] { typeof(Pawn), typeof(PawnLostCondition) });
                 if (method != null)
                 {
+                    ServiceDebugUtility.LogAudit("NotifyLordPawnExited invoking lord=" + ServiceDebugUtility.LordAuditSummary(lord) + " pawn=" + ServiceDebugUtility.PawnAuditSummary(pawn));
                     method.Invoke(lord, new object[] { pawn, PawnLostCondition.ExitedMap });
                 }
             }
@@ -311,6 +336,32 @@ namespace SpaceServices
             {
                 Log.Warning("[Space Services] Could not notify lord before service departure: " + ex.Message);
             }
+        }
+
+        private static string PawnListAudit(IEnumerable<Pawn> pawns)
+        {
+            List<string> labels = new List<string>();
+            foreach (Pawn pawn in pawns ?? Enumerable.Empty<Pawn>())
+            {
+                labels.Add(ServiceDebugUtility.PawnAuditSummary(pawn));
+            }
+            return labels.Count == 0 ? "none" : string.Join(" | ", labels.ToArray());
+        }
+
+        private static string JobQueueAudit(Pawn pawn)
+        {
+            object queue = pawn == null || pawn.jobs == null ? null : Reflect.GetMember(pawn.jobs, "jobQueue");
+            IEnumerable enumerable = queue as IEnumerable;
+            if (enumerable == null)
+            {
+                return "null";
+            }
+            List<string> jobs = new List<string>();
+            foreach (object queued in enumerable)
+            {
+                jobs.Add(ServiceDebugUtility.JobAuditSummary(Reflect.GetMember(queued, "job") as Job));
+            }
+            return jobs.Count == 0 ? "empty" : string.Join(" -> ", jobs.ToArray());
         }
     }
 }

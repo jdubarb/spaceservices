@@ -130,17 +130,20 @@ namespace SpaceServices
         {
             if (worker == null || parms == null || pad == null || pad.Destroyed || !pad.Spawned)
             {
+                ServiceDebugUtility.LogAudit("ScheduleHospitalityIncident rejected invalid input worker=" + (worker != null) + " parms=" + (parms != null) + " pad=" + ServiceDebugUtility.ThingAuditSummary(pad));
                 return false;
             }
             int expectedBedDemand = HospitalityIncidentGate.EstimatedBedDemand(IncidentDefName(worker), worker);
             if (HospitalityIncidentGate.RequiresGuestBedCapacity() && HospitalityBedUtility.Report(map).freeBeds < expectedBedDemand)
             {
+                ServiceDebugUtility.LogAudit("ScheduleHospitalityIncident rejected beds need=" + expectedBedDemand + " " + HospitalityBedUtility.Report(map).ToSummary());
                 return false;
             }
             string reservationId = "hospitality-arrival-" + Find.UniqueIDsManager.GetNextThingID();
             CompSpaceServicePad comp = pad.TryGetComp<CompSpaceServicePad>();
             if (comp == null || !comp.TryReserve(reservationId))
             {
+                ServiceDebugUtility.LogAudit("ScheduleHospitalityIncident rejected reservation id=" + reservationId + " pad=" + ServiceDebugUtility.ThingAuditSummary(pad) + " comp=" + (comp != null));
                 return false;
             }
             pendingHospitalityIncidents.Add(new ScheduledHospitalityIncident
@@ -154,6 +157,7 @@ namespace SpaceServices
                 shuttleThingDefName = shuttleThingDefName,
                 touchdownTick = Find.TickManager.TicksGame + ServiceShuttleUtility.ArrivalTouchdownDelayTicks
             });
+            ServiceDebugUtility.LogAudit("ScheduleHospitalityIncident queued id=" + reservationId + " incident=" + IncidentDefName(worker) + " beds=" + expectedBedDemand + " pad=" + ServiceDebugUtility.ThingAuditSummary(pad) + " touchdownTick=" + (Find.TickManager.TicksGame + ServiceShuttleUtility.ArrivalTouchdownDelayTicks));
             return true;
         }
 
@@ -173,10 +177,12 @@ namespace SpaceServices
                 pendingHospitalityIncidents.RemoveAt(i);
                 if (incident.pad == null || incident.pad.Destroyed || !incident.pad.Spawned || incident.worker == null || incident.parms == null)
                 {
+                    ServiceDebugUtility.LogAudit("TickPendingHospitalityIncidents dropping invalid pending incident reservation=" + incident.reservationId + " pad=" + ServiceDebugUtility.ThingAuditSummary(incident.pad) + " worker=" + (incident.worker != null) + " parms=" + (incident.parms != null));
                     continue;
                 }
                 if (!HospitalityStillEnabledForMap(map) || !PadStillUsableForGuests(incident.pad))
                 {
+                    ServiceDebugUtility.LogAudit("TickPendingHospitalityIncidents canceled unusable pad reservation=" + incident.reservationId + " pad=" + ServiceDebugUtility.ThingAuditSummary(incident.pad));
                     Messages.Message("Space Services: visitor arrival canceled, landing pad is no longer usable", incident.pad, MessageTypeDefOf.RejectInput, false);
                     ServiceShuttleUtility.CleanupTouchdownShuttle(map, incident.pad.Position, incident.shuttleThingDefName);
                     ServiceShuttleUtility.SpawnDeparture(map, incident.pad.Position);
@@ -188,6 +194,7 @@ namespace SpaceServices
                 if (HospitalityIncidentGate.RequiresGuestBedCapacity() && beds.freeBeds < expectedBedDemand)
                 {
                     Messages.Message("Space Services: visitor arrival canceled, no free guest beds", incident.pad, MessageTypeDefOf.RejectInput, false);
+                    ServiceDebugUtility.LogAudit("TickPendingHospitalityIncidents canceled beds reservation=" + incident.reservationId + " need=" + expectedBedDemand + " " + beds.ToSummary());
                     ServiceDebugUtility.LogThrottled("hospitality-touchdown-beds-" + (incident.incidentDefName ?? ""), "Hospitality visitor arrival canceled at touchdown: need " + expectedBedDemand + ", " + beds.ToSummary(), GenDate.TicksPerHour);
                     ServiceShuttleUtility.CleanupTouchdownShuttle(map, incident.pad.Position, incident.shuttleThingDefName);
                     ServiceShuttleUtility.SpawnDeparture(map, incident.pad.Position);
@@ -197,6 +204,7 @@ namespace SpaceServices
 
                 ServiceShuttleUtility.CleanupTouchdownShuttle(map, incident.pad.Position, incident.shuttleThingDefName);
                 incident.parms.spawnCenter = incident.pad.Position;
+                ServiceDebugUtility.LogAudit("TickPendingHospitalityIncidents executing reservation=" + incident.reservationId + " incident=" + incident.incidentDefName + " spawnCenter=" + incident.parms.spawnCenter + " pad=" + ServiceDebugUtility.ThingAuditSummary(incident.pad));
                 ReleaseArrivalReservation(incident);
                 HospitalityDelayedIncidentContext.Push(map, incident.pad);
                 try
