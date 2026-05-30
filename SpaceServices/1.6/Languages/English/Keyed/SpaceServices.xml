@@ -5,6 +5,8 @@
   <MLT_SpaceServices_Settings_AutoExtract>Auto-extract fallback</MLT_SpaceServices_Settings_AutoExtract>
   <MLT_SpaceServices_Settings_Hospital>Hospital support</MLT_SpaceServices_Settings_Hospital>
   <MLT_SpaceServices_Settings_Hospitality>Hospitality support</MLT_SpaceServices_Settings_Hospitality>
+  <MLT_SpaceServices_Settings_HospitalityRequireBeds>Require free guest beds for Hospitality arrivals</MLT_SpaceServices_Settings_HospitalityRequireBeds>
+  <MLT_SpaceServices_Settings_HospitalityAutoDepartBedless>Auto-depart Hospitality guests without beds</MLT_SpaceServices_Settings_HospitalityAutoDepartBedless>
   <MLT_SpaceServices_Settings_HospitalityVacuumGuard>Hospitality vacuum guard (periodic tick interrupt)</MLT_SpaceServices_Settings_HospitalityVacuumGuard>
   <MLT_SpaceServices_Settings_Spaceports>Spaceports bridge</MLT_SpaceServices_Settings_Spaceports>
   <MLT_SpaceServices_Settings_RequirePad>Require service pad for arrivals</MLT_SpaceServices_Settings_RequirePad>

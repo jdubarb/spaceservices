@@ -25,9 +25,9 @@ namespace SpaceServices
 
             IncidentDef incident = Reflect.GetMember(__instance, "def") as IncidentDef;
             string incidentDefName = incident == null ? "VisitorGroup" : incident.defName;
-            if (!HospitalityIncidentGate.CanAcceptHospitalityIncident(incidentDefName, map))
+            if (!HospitalityIncidentGate.CanAcceptHospitalityIncident(incidentDefName, map, __instance))
             {
-                string report = HospitalityIncidentGate.ReadinessReport(incidentDefName, map);
+                string report = HospitalityIncidentGate.ReadinessReport(incidentDefName, map, __instance);
                 ServiceDebugUtility.LogThrottled("hospitality-block-" + incidentDefName + "-" + report, "Hospitality visitor incident blocked: " + report, GenDate.TicksPerHour);
                 __result = false;
                 return false;

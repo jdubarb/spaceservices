@@ -200,6 +200,15 @@ namespace SpaceServices
                 {
                     GuardHospitalityGuestsFromVacuum(map, record);
                 }
+                if (record.serviceKind == "hospitality" && record.state == "arrived" &&
+                    SpaceServicesMod.Settings != null && SpaceServicesMod.Settings.hospitalityAutoDepartBedlessGuests &&
+                    Find.TickManager.TicksGame > record.arrivalTick + GenDate.TicksPerHour &&
+                    HospitalityBedUtility.TryFindBedlessServiceGuest(record, out Pawn bedlessGuest, out string bedlessReason))
+                {
+                    BeginDeparture(map, record, "Hospitality guest without usable bed: " + bedlessReason);
+                    ServiceDebugUtility.Log("Routing hospitality group " + record.id + " home because " + bedlessReason + " (" + bedlessGuest.LabelShortCap + ")");
+                    continue;
+                }
                 if (record.state == "pickupInbound")
                 {
                     if (Find.TickManager.TicksGame >= record.pickupShuttleTouchdownTick)

@@ -118,6 +118,11 @@ namespace SpaceServices
             {
                 return false;
             }
+            int expectedBedDemand = HospitalityIncidentGate.EstimatedBedDemand(IncidentDefName(worker), worker);
+            if (HospitalityIncidentGate.RequiresGuestBedCapacity() && HospitalityBedUtility.Report(map).freeBeds < expectedBedDemand)
+            {
+                return false;
+            }
             string reservationId = "hospitality-arrival-" + Find.UniqueIDsManager.GetNextThingID();
             CompSpaceServicePad comp = pad.TryGetComp<CompSpaceServicePad>();
             if (comp == null || !comp.TryReserve(reservationId))
@@ -130,6 +135,8 @@ namespace SpaceServices
                 parms = parms,
                 pad = pad,
                 reservationId = reservationId,
+                incidentDefName = IncidentDefName(worker),
+                expectedBedDemand = expectedBedDemand,
                 shuttleThingDefName = shuttleThingDefName,
                 touchdownTick = Find.TickManager.TicksGame + ServiceShuttleUtility.ArrivalTouchdownDelayTicks
             });
@@ -157,6 +164,17 @@ namespace SpaceServices
                 if (!HospitalityStillEnabledForMap(map) || !PadStillUsableForGuests(incident.pad))
                 {
                     Messages.Message("Space Services: visitor arrival canceled, landing pad is no longer usable", incident.pad, MessageTypeDefOf.RejectInput, false);
+                    ServiceShuttleUtility.CleanupTouchdownShuttle(map, incident.pad.Position, incident.shuttleThingDefName);
+                    ServiceShuttleUtility.SpawnDeparture(map, incident.pad.Position);
+                    ReleaseArrivalReservation(incident);
+                    continue;
+                }
+                HospitalityBedReport beds = HospitalityBedUtility.Report(map);
+                int expectedBedDemand = Math.Max(1, incident.expectedBedDemand);
+                if (HospitalityIncidentGate.RequiresGuestBedCapacity() && beds.freeBeds < expectedBedDemand)
+                {
+                    Messages.Message("Space Services: visitor arrival canceled, no free guest beds", incident.pad, MessageTypeDefOf.RejectInput, false);
+                    ServiceDebugUtility.LogThrottled("hospitality-touchdown-beds-" + (incident.incidentDefName ?? ""), "Hospitality visitor arrival canceled at touchdown: need " + expectedBedDemand + ", " + beds.ToSummary(), GenDate.TicksPerHour);
                     ServiceShuttleUtility.CleanupTouchdownShuttle(map, incident.pad.Position, incident.shuttleThingDefName);
                     ServiceShuttleUtility.SpawnDeparture(map, incident.pad.Position);
                     ReleaseArrivalReservation(incident);
@@ -207,6 +225,12 @@ namespace SpaceServices
                 comp.Release(incident.reservationId);
             }
         }
+
+        private static string IncidentDefName(object worker)
+        {
+            IncidentDef incident = Reflect.GetMember(worker, "def") as IncidentDef;
+            return incident == null ? "" : incident.defName;
+        }
     }
 
     public sealed class ScheduledServiceShuttleArrival
@@ -224,6 +248,8 @@ namespace SpaceServices
         public IncidentParms parms;
         public Thing pad;
         public string reservationId;
+        public string incidentDefName;
+        public int expectedBedDemand;
         public string shuttleThingDefName;
         public int touchdownTick;
     }

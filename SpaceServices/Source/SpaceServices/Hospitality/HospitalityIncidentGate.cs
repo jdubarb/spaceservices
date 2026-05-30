@@ -17,6 +17,11 @@ namespace SpaceServices
     {
         public static bool CanAcceptHospitalityIncident(string incidentDefName, Map map)
         {
+            return CanAcceptHospitalityIncident(incidentDefName, map, null);
+        }
+
+        public static bool CanAcceptHospitalityIncident(string incidentDefName, Map map, object worker)
+        {
             if (SpaceServicesMod.Settings != null && !SpaceServicesMod.Settings.enableHospitality)
             {
                 return false;
@@ -25,10 +30,19 @@ namespace SpaceServices
             {
                 return false;
             }
-            return ServicePadUtility.TryFindServicePad(map, ServiceUse.Guest) != null;
+            if (ServicePadUtility.TryFindServicePad(map, ServiceUse.Guest) == null)
+            {
+                return false;
+            }
+            return !RequiresGuestBedCapacity() || HospitalityBedUtility.Report(map).freeBeds >= EstimatedBedDemand(incidentDefName, worker);
         }
 
         public static string ReadinessReport(string incidentDefName, Map map)
+        {
+            return ReadinessReport(incidentDefName, map, null);
+        }
+
+        public static string ReadinessReport(string incidentDefName, Map map, object worker)
         {
             if (SpaceServicesMod.Settings != null && !SpaceServicesMod.Settings.enableHospitality)
             {
@@ -47,7 +61,48 @@ namespace SpaceServices
             {
                 return "no usable guest service pad";
             }
+            if (RequiresGuestBedCapacity())
+            {
+                HospitalityBedReport beds = HospitalityBedUtility.Report(map);
+                int demand = EstimatedBedDemand(incidentDefName, worker);
+                if (beds.freeBeds < demand)
+                {
+                    return "not enough free guest beds, need " + demand + " (" + beds.ToSummary() + ")";
+                }
+            }
             return "ready";
+        }
+
+        public static bool RequiresGuestBedCapacity()
+        {
+            return SpaceServicesMod.Settings == null || SpaceServicesMod.Settings.hospitalityRequireGuestBeds;
+        }
+
+        public static int EstimatedBedDemand(string incidentDefName, object worker)
+        {
+            int max = IntMember(worker, "maxGuestGroupSize");
+            if (max > 0)
+            {
+                return max;
+            }
+            return 1;
+        }
+
+        private static int IntMember(object obj, string name)
+        {
+            object value = Reflect.GetMember(obj, name);
+            if (value == null)
+            {
+                return 0;
+            }
+            try
+            {
+                return Convert.ToInt32(value);
+            }
+            catch
+            {
+                return 0;
+            }
         }
     }
 }
