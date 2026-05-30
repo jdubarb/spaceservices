@@ -46,8 +46,9 @@ namespace SpaceServices
             OptionalModPatches.PatchIfExists(harmony, AccessTools.Method(selectFaction, "TryExecuteWorker"), typeof(HospitalityPatchHandlers), prefix: nameof(HospitalityPatchHandlers.VisitorGroupTryExecutePrefix), postfix: nameof(HospitalityPatchHandlers.VisitorGroupTryExecutePostfix));
             OptionalModPatches.PatchIfExists(harmony, AccessTools.Method(visitorGroup, "AskForSafety"), typeof(HospitalityPatchHandlers), prefix: nameof(HospitalityPatchHandlers.AskForSafetyPrefix));
             OptionalModPatches.PatchIfExists(harmony, AccessTools.Method(visitorGroup, "SpawnGroup"), typeof(HospitalityPatchHandlers), prefix: nameof(HospitalityPatchHandlers.SpawnGroupPrefix), postfix: nameof(HospitalityPatchHandlers.SpawnGroupPostfix));
+            OptionalModPatches.PatchIfExists(harmony, AccessTools.Method(visitorGroup, "CreateLord"), typeof(HospitalityPatchHandlers), postfix: nameof(HospitalityPatchHandlers.CreateLordPostfix));
             OptionalModPatches.PatchIfExists(harmony, AccessTools.Method(spawnUtility, "SpawnVisitor"), typeof(HospitalityPatchHandlers), prefix: nameof(HospitalityPatchHandlers.SpawnVisitorPrefix), postfix: nameof(HospitalityPatchHandlers.SpawnVisitorPostfix));
-            OptionalModPatches.PatchIfExists(harmony, AccessTools.Method(guestUtility, "Leave"), typeof(HospitalityPatchHandlers), postfix: nameof(HospitalityPatchHandlers.GuestLeavePostfix));
+            OptionalModPatches.PatchIfExists(harmony, AccessTools.Method(guestUtility, "Leave"), typeof(HospitalityPatchHandlers), prefix: nameof(HospitalityPatchHandlers.GuestLeavePrefix));
             OptionalModPatches.PatchIfExists(harmony, AccessTools.Method(visitPoint, "Leave"), typeof(HospitalityPatchHandlers), postfix: nameof(HospitalityPatchHandlers.VisitPointLeavePostfix));
         }
     }

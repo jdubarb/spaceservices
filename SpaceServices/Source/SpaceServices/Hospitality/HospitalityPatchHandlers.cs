@@ -92,6 +92,19 @@ namespace SpaceServices
             {
                 location = cell;
             }
+            if (HospitalityArrivalContext.TryUseArrivalVisual(map, out IntVec3 visualCell))
+            {
+                ShuttleVisual visual = ShuttleVisual.Resolve();
+                if (visual != null)
+                {
+                    ServiceShuttleUtility.SpawnArrival(map, visualCell);
+                    SpaceServicesMapComponent comp = map.GetComponent<SpaceServicesMapComponent>();
+                    if (comp != null)
+                    {
+                        comp.ScheduleShuttleArrival(visualCell, visual.shipThingDef == null ? null : visual.shipThingDef.defName, new List<Thing>(), true);
+                    }
+                }
+            }
             VacSuitUtility.SuitPawnForEnvironment(pawn, map, location);
         }
 
@@ -117,9 +130,22 @@ namespace SpaceServices
             ServiceLifecycleUtility.RegisterPawns(map, "hospitality", pawns.Distinct());
         }
 
-        public static void GuestLeavePostfix(Pawn pawn)
+        public static void CreateLordPostfix(List<Pawn> pawns, Map map)
         {
-            ServiceLifecycleUtility.RequestDepartureForPawn(pawn, "Hospitality marked guest leaving");
+            if (map == null || !SpaceServiceMapDetector.IsServiceEligible(map))
+            {
+                return;
+            }
+            ServiceLifecycleUtility.RegisterPawns(map, "hospitality", pawns);
+        }
+
+        public static bool GuestLeavePrefix(Pawn pawn)
+        {
+            if (ServiceLifecycleUtility.RequestDepartureForPawn(pawn, "Hospitality marked guest leaving"))
+            {
+                return false;
+            }
+            return true;
         }
 
         public static void VisitPointLeavePostfix(object __instance)

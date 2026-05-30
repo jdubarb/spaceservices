@@ -241,7 +241,7 @@ namespace SpaceServices
                     {
                         GuideDepartingPawnsToPad(record);
                     }
-                    if (record.serviceKind != "hospital" && Find.TickManager.TicksGame > record.departureRequestedTick + GenDate.TicksPerHour)
+                    if (record.serviceKind != "hospital" && record.serviceKind != "hospitality" && Find.TickManager.TicksGame > record.departureRequestedTick + GenDate.TicksPerHour)
                     {
                         DepartureUtility.CompleteDeparture(map, record, "departure timeout fallback");
                     }

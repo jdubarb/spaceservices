@@ -79,7 +79,11 @@ namespace SpaceServices
 
         public void ScheduleShuttleArrival(IntVec3 cell, string shuttleThingDefName, List<Thing> things, bool showDeparture)
         {
-            if (!cell.IsValid || things == null || things.Count == 0)
+            if (!cell.IsValid)
+            {
+                return;
+            }
+            if ((things == null || things.Count == 0) && !showDeparture)
             {
                 return;
             }
@@ -88,7 +92,7 @@ namespace SpaceServices
                 cell = cell,
                 touchdownTick = Find.TickManager.TicksGame + ServiceShuttleUtility.ArrivalTouchdownDelayTicks,
                 shuttleThingDefName = shuttleThingDefName,
-                things = things,
+                things = things ?? new List<Thing>(),
                 showDeparture = showDeparture
             });
         }

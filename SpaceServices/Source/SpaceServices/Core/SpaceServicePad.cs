@@ -114,27 +114,112 @@ namespace SpaceServices
                 return null;
             }
 
-            StringBuilder builder = new StringBuilder();
-            SpaceServiceEligibility eligibility = SpaceServiceMapDetector.Evaluate(parent.Map);
-            float vacuum = ServiceEnvironmentUtility.GetMaxVacuum(parent);
-            bool roofAccessible = ServiceEnvironmentUtility.IsRoofAccessible(parent, out string roofReason);
-            string vacRoofReason;
-            bool vacRoofOk = !requireVacSafeRoof || ServiceEnvironmentUtility.HasFullFlyThroughRoof(parent, out vacRoofReason);
-            bool usable = IsGenerallyUsable(out string usableReason);
-
-            builder.AppendLine("Space Services");
-            builder.AppendLine("Mode: " + ModeLabel());
-            builder.AppendLine("Reservation: " + (string.IsNullOrEmpty(reservedForGroup) ? "free" : "reserved"));
-            builder.AppendLine("Damage: immune");
-            builder.AppendLine("Vacuum exposed: " + (vacuum > 0.001f ? "yes (" + vacuum.ToStringPercent() + ")" : "no"));
-            builder.AppendLine("Roof accessible: " + (roofAccessible ? "yes, " + ServiceEnvironmentUtility.RoofAccessReport(parent) : "no, " + roofReason));
-            if (requireVacSafeRoof)
+            try
             {
-                builder.AppendLine("Vac-safe roof required: " + (vacRoofOk ? "satisfied" : "not satisfied"));
+                StringBuilder builder = new StringBuilder();
+                SpaceServiceEligibility eligibility = SafeEligibility(parent.Map);
+                float vacuum = SafeMaxVacuum();
+                bool roofAccessible = SafeRoofAccessible(out string roofReason);
+                string vacRoofReason;
+                bool vacRoofOk = !requireVacSafeRoof || SafeFullFlyThroughRoof(out vacRoofReason);
+                bool usable = SafeGenerallyUsable(out string usableReason);
+
+                builder.AppendLine("Space Services");
+                builder.AppendLine("Mode: " + ModeLabel());
+                builder.AppendLine("Reservation: " + (string.IsNullOrEmpty(reservedForGroup) ? "free" : "reserved"));
+                builder.AppendLine("Damage: immune");
+                builder.AppendLine("Vacuum exposed: " + (vacuum > 0.001f ? "yes (" + vacuum.ToStringPercent() + ")" : "no"));
+                builder.AppendLine("Roof accessible: " + (roofAccessible ? "yes, " + SafeRoofAccessReport() : "no, " + roofReason));
+                if (requireVacSafeRoof)
+                {
+                    builder.AppendLine("Vac-safe roof required: " + (vacRoofOk ? "satisfied" : "not satisfied"));
+                }
+                builder.AppendLine("Map: " + (eligibility.allowed ? "eligible" : "blocked"));
+                builder.Append("Overall: " + (usable ? "usable" : "not usable, " + usableReason));
+                return builder.ToString().TrimEnd();
             }
-            builder.AppendLine("Map: " + (eligibility.allowed ? "eligible" : "blocked"));
-            builder.Append("Overall: " + (usable ? "usable" : "not usable, " + usableReason));
-            return builder.ToString().TrimEnd();
+            catch (Exception ex)
+            {
+                Log.Warning("[Space Services] Service pad inspect failed: " + ex.Message);
+                return "Space Services\nStatus unavailable; see log.";
+            }
+        }
+
+        private SpaceServiceEligibility SafeEligibility(Map map)
+        {
+            try
+            {
+                return SpaceServiceMapDetector.Evaluate(map);
+            }
+            catch (Exception ex)
+            {
+                SpaceServiceEligibility fallback = new SpaceServiceEligibility();
+                fallback.blockReasons.Add("map check failed: " + ex.Message);
+                return fallback;
+            }
+        }
+
+        private float SafeMaxVacuum()
+        {
+            try
+            {
+                return ServiceEnvironmentUtility.GetMaxVacuum(parent);
+            }
+            catch
+            {
+                return 0f;
+            }
+        }
+
+        private bool SafeRoofAccessible(out string reason)
+        {
+            try
+            {
+                return ServiceEnvironmentUtility.IsRoofAccessible(parent, out reason);
+            }
+            catch (Exception ex)
+            {
+                reason = "roof check failed: " + ex.Message;
+                return false;
+            }
+        }
+
+        private bool SafeFullFlyThroughRoof(out string reason)
+        {
+            try
+            {
+                return ServiceEnvironmentUtility.HasFullFlyThroughRoof(parent, out reason);
+            }
+            catch (Exception ex)
+            {
+                reason = "roof check failed: " + ex.Message;
+                return false;
+            }
+        }
+
+        private string SafeRoofAccessReport()
+        {
+            try
+            {
+                return ServiceEnvironmentUtility.RoofAccessReport(parent);
+            }
+            catch (Exception ex)
+            {
+                return "roof report failed: " + ex.Message;
+            }
+        }
+
+        private bool SafeGenerallyUsable(out string reason)
+        {
+            try
+            {
+                return IsGenerallyUsable(out reason);
+            }
+            catch (Exception ex)
+            {
+                reason = "status check failed: " + ex.Message;
+                return false;
+            }
         }
 
         private bool IsGenerallyUsable(out string reason)
