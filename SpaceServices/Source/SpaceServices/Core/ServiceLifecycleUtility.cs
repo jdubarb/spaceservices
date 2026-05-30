@@ -26,6 +26,11 @@ namespace SpaceServices
 
         public static void RegisterPawns(Map map, string kind, IEnumerable<Pawn> pawns)
         {
+            RegisterPawns(map, kind, pawns, null);
+        }
+
+        public static void RegisterPawns(Map map, string kind, IEnumerable<Pawn> pawns, Thing arrivalPad)
+        {
             if (map == null || pawns == null || !SpaceServiceMapDetector.IsServiceEligible(map))
             {
                 return;
@@ -57,6 +62,10 @@ namespace SpaceServices
                     }
                 }
                 existing.timeoutTick = Math.Max(existing.timeoutTick, Find.TickManager.TicksGame + GenDate.TicksPerDay * 3);
+                if (existing.arrivalPad == null && arrivalPad != null && !arrivalPad.Destroyed)
+                {
+                    existing.arrivalPad = arrivalPad;
+                }
                 return;
             }
 
@@ -67,10 +76,11 @@ namespace SpaceServices
                 state = "arrived",
                 arrivalTick = Find.TickManager.TicksGame,
                 timeoutTick = Find.TickManager.TicksGame + GenDate.TicksPerDay * 3,
+                arrivalPad = arrivalPad,
                 pawns = list
             };
 
-            if (kind != "hospital")
+            if (kind != "hospital" && kind != "hospitality")
             {
                 ServiceUse use = kind == "hospitality" ? ServiceUse.Guest : ServiceUse.Patient;
                 Thing pad = ServicePadUtility.TryReserveServicePad(map, use, record.id);
@@ -376,8 +386,17 @@ namespace SpaceServices
             }
             if (record.reservedPad == null)
             {
-                DepartureUtility.CompleteDeparture(map, record, reason);
-                return;
+                record.reservedPad = TryReserveBestDeparturePad(map, ServiceUse.Guest, record);
+                if (record.reservedPad == null)
+                {
+                    if (record.state != "departing")
+                    {
+                        record.state = "departing";
+                        record.departureRequestedTick = Find.TickManager.TicksGame;
+                        Log.Message("[Space Services] Hospitality visitors waiting for free departure pad: " + reason);
+                    }
+                    return;
+                }
             }
             if (ReadyForExtraction(record))
             {

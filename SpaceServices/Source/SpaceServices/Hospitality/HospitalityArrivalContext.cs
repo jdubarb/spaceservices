@@ -62,6 +62,13 @@ namespace SpaceServices
             return false;
         }
 
+        public static bool TryGetArrivalPad(Map map, out Thing pad)
+        {
+            Request request = CurrentRequest(map);
+            pad = request == null ? null : request.pad;
+            return pad != null && !pad.Destroyed;
+        }
+
         public static void FinalizeArrival(Map map)
         {
             Request request = CurrentRequest(map);

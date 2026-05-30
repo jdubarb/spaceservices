@@ -133,6 +133,13 @@ namespace SpaceServices
                 {
                     continue;
                 }
+                if (!HospitalityIncidentGate.CanAcceptHospitalityIncident("VisitorGroup", map) || !PadStillUsableForGuests(incident.pad))
+                {
+                    Messages.Message("Space Services: visitor arrival canceled, landing pad is no longer usable", incident.pad, MessageTypeDefOf.RejectInput, false);
+                    ServiceShuttleUtility.CleanupTouchdownShuttle(map, incident.pad.Position, incident.shuttleThingDefName);
+                    ServiceShuttleUtility.SpawnDeparture(map, incident.pad.Position);
+                    continue;
+                }
 
                 ServiceShuttleUtility.CleanupTouchdownShuttle(map, incident.pad.Position, incident.shuttleThingDefName);
                 incident.parms.spawnCenter = incident.pad.Position;
@@ -152,6 +159,12 @@ namespace SpaceServices
                 }
                 ServiceShuttleUtility.SpawnDeparture(map, incident.pad.Position);
             }
+        }
+
+        private static bool PadStillUsableForGuests(Thing pad)
+        {
+            CompSpaceServicePad comp = pad == null ? null : pad.TryGetComp<CompSpaceServicePad>();
+            return comp != null && comp.IsUsableFor(ServiceUse.Guest);
         }
     }
 

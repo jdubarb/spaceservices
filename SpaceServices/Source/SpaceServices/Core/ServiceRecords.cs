@@ -23,6 +23,7 @@ namespace SpaceServices
         public int departureRequestedTick;
         public int pickupShuttleTouchdownTick;
         public string pickupShuttleThingDefName;
+        public Thing arrivalPad;
         public Thing reservedPad;
         public List<Pawn> pawns = new List<Pawn>();
 
@@ -36,6 +37,7 @@ namespace SpaceServices
             Scribe_Values.Look(ref departureRequestedTick, "departureRequestedTick", 0);
             Scribe_Values.Look(ref pickupShuttleTouchdownTick, "pickupShuttleTouchdownTick", 0);
             Scribe_Values.Look(ref pickupShuttleThingDefName, "pickupShuttleThingDefName");
+            Scribe_References.Look(ref arrivalPad, "arrivalPad");
             Scribe_References.Look(ref reservedPad, "reservedPad");
             Scribe_Collections.Look(ref pawns, "pawns", LookMode.Reference);
         }

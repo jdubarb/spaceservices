@@ -45,6 +45,7 @@ namespace SpaceServices
             {
                 parms.spawnCenter = pad.Position;
                 ServiceShuttleUtility.SpawnArrival(map, pad.Position);
+                Messages.Message("Space Services: visitors inbound", pad, MessageTypeDefOf.NeutralEvent, false);
                 SpaceServicesMapComponent comp = map.GetComponent<SpaceServicesMapComponent>();
                 if (comp != null)
                 {
@@ -138,7 +139,8 @@ namespace SpaceServices
             {
                 pawns.Add(__result);
             }
-            ServiceLifecycleUtility.RegisterPawns(map, "hospitality", pawns.Distinct());
+            HospitalityArrivalContext.TryGetArrivalPad(map, out Thing arrivalPad);
+            ServiceLifecycleUtility.RegisterPawns(map, "hospitality", pawns.Distinct(), arrivalPad);
         }
 
         public static void CreateLordPostfix(List<Pawn> pawns, Map map)
@@ -147,7 +149,8 @@ namespace SpaceServices
             {
                 return;
             }
-            ServiceLifecycleUtility.RegisterPawns(map, "hospitality", pawns);
+            HospitalityArrivalContext.TryGetArrivalPad(map, out Thing arrivalPad);
+            ServiceLifecycleUtility.RegisterPawns(map, "hospitality", pawns, arrivalPad);
         }
 
         public static bool GuestLeavePrefix(Pawn pawn)
