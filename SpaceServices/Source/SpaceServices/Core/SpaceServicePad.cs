@@ -29,10 +29,14 @@ namespace SpaceServices
         private static readonly Graphic HospitalOverlay = GraphicDatabase.Get<Graphic_Single>("Things/Building/SpaceServices/ServiceLandingPad_Hospital", ShaderDatabase.Cutout, OverlaySize, Color.white);
         private static readonly Graphic HospitalityOverlay = GraphicDatabase.Get<Graphic_Single>("Things/Building/SpaceServices/ServiceLandingPad_Hospitality", ShaderDatabase.Cutout, OverlaySize, Color.white);
         private static readonly Graphic TradeOverlay = GraphicDatabase.Get<Graphic_Single>("Things/Building/SpaceServices/ServiceLandingPad_Trade", ShaderDatabase.Cutout, OverlaySize, Color.white);
+        private static readonly Texture2D HospitalIcon = ContentFinder<Texture2D>.Get("Things/Building/SpaceServices/ServiceLandingPad_Hospital");
+        private static readonly Texture2D HospitalityIcon = ContentFinder<Texture2D>.Get("Things/Building/SpaceServices/ServiceLandingPad_Hospitality");
+        private static readonly Texture2D TradeIcon = ContentFinder<Texture2D>.Get("Things/Building/SpaceServices/ServiceLandingPad_Trade");
 
-        public bool allowGuests = true;
-        public bool allowPatients = true;
-        public bool allowEmergency = true;
+        public ServicePadMode activeMode = ServicePadMode.Hospital;
+        private bool legacyAllowGuests = true;
+        private bool legacyAllowPatients = true;
+        private bool legacyAllowEmergency = true;
         public bool requireVacSafeRoof = false;
         public bool preferShuttle = true;
         public bool requirePower = false;
@@ -41,14 +45,25 @@ namespace SpaceServices
 
         public override void PostExposeData()
         {
-            Scribe_Values.Look(ref allowGuests, "allowGuests", true);
-            Scribe_Values.Look(ref allowPatients, "allowPatients", true);
-            Scribe_Values.Look(ref allowEmergency, "allowEmergency", true);
+            if (Scribe.mode == LoadSaveMode.Saving)
+            {
+                SyncLegacyModeFlags();
+            }
+
+            Scribe_Values.Look(ref activeMode, "activeMode", ServicePadMode.Hospital);
+            Scribe_Values.Look(ref legacyAllowGuests, "allowGuests", true);
+            Scribe_Values.Look(ref legacyAllowPatients, "allowPatients", true);
+            Scribe_Values.Look(ref legacyAllowEmergency, "allowEmergency", true);
             Scribe_Values.Look(ref requireVacSafeRoof, "requireVacSafeRoof", false);
             Scribe_Values.Look(ref preferShuttle, "preferShuttle", true);
             Scribe_Values.Look(ref requirePower, "requirePower", false);
             Scribe_Values.Look(ref reservedForGroup, "reservedForGroup");
             Scribe_Values.Look(ref reservedAtTick, "reservedAtTick", 0);
+
+            if (Scribe.mode == LoadSaveMode.PostLoadInit)
+            {
+                MigrateLegacyModeFlags();
+            }
         }
 
         public bool IsUsableFor(ServiceUse use)
@@ -83,19 +98,9 @@ namespace SpaceServices
                     return false;
                 }
             }
-            if (use == ServiceUse.Patient && !allowPatients)
+            if (!AllowsUse(use))
             {
-                reason = "patients are disabled";
-                return false;
-            }
-            if (use == ServiceUse.Guest && !allowGuests)
-            {
-                reason = "guests are disabled";
-                return false;
-            }
-            if (use == ServiceUse.Emergency && !allowEmergency)
-            {
-                reason = "emergency arrivals are disabled";
+                reason = "pad mode is " + ModeLabel();
                 return false;
             }
             if (!ServiceEnvironmentUtility.IsRoofAccessible(parent, out reason))
@@ -236,51 +241,30 @@ namespace SpaceServices
                 reason = "reserved";
                 return false;
             }
-            if (!allowGuests && !allowPatients && !allowEmergency)
-            {
-                reason = "all service modes disabled";
-                return false;
-            }
-
-            string firstReason = null;
-            string modeReason = null;
-            if (allowPatients && MeetsUseRequirements(ServiceUse.Patient, out modeReason))
+            if (MeetsUseRequirements(ActiveUse(), out string modeReason))
             {
                 reason = null;
                 return true;
             }
-            firstReason = firstReason ?? modeReason;
-            if (allowGuests && MeetsUseRequirements(ServiceUse.Guest, out modeReason))
-            {
-                reason = null;
-                return true;
-            }
-            firstReason = firstReason ?? modeReason;
-            if (allowEmergency && MeetsUseRequirements(ServiceUse.Emergency, out modeReason))
-            {
-                reason = null;
-                return true;
-            }
-            reason = firstReason ?? "service settings block all modes";
+            reason = modeReason ?? "service settings block " + ModeLabel() + " mode";
             return false;
         }
 
         private string ModeLabel()
         {
-            List<string> modes = new List<string>();
-            if (allowPatients)
+            if (activeMode == ServicePadMode.Hospital)
             {
-                modes.Add("patients");
+                return "hospital";
             }
-            if (allowGuests)
+            if (activeMode == ServicePadMode.Hospitality)
             {
-                modes.Add("guests");
+                return "hospitality";
             }
-            if (allowEmergency)
+            if (activeMode == ServicePadMode.Trade)
             {
-                modes.Add("emergency");
+                return "trade";
             }
-            return modes.Count == 0 ? "disabled" : string.Join(", ", modes.ToArray());
+            return activeMode.ToString();
         }
 
         public bool TryReserve(string groupId)
@@ -371,9 +355,7 @@ namespace SpaceServices
 
         private bool IsWatchdogEligible()
         {
-            return (allowGuests && MeetsUseRequirements(ServiceUse.Guest)) ||
-                (allowPatients && MeetsUseRequirements(ServiceUse.Patient)) ||
-                (allowEmergency && MeetsUseRequirements(ServiceUse.Emergency));
+            return MeetsUseRequirements(ActiveUse());
         }
 
         private void ClearWatchedReservation(string reason)
@@ -403,25 +385,24 @@ namespace SpaceServices
             {
                 yield return gizmo;
             }
-            yield return Toggle("MLT_SpaceServices_Gizmo_AllowGuests", () => allowGuests, v => allowGuests = v);
-            yield return Toggle("MLT_SpaceServices_Gizmo_AllowPatients", () => allowPatients, v => allowPatients = v);
-            yield return Toggle("MLT_SpaceServices_Gizmo_AllowEmergency", () => allowEmergency, v => allowEmergency = v);
+            yield return ModeCommand(ServicePadMode.Hospital, "MLT_SpaceServices_Gizmo_ModeHospital", "MLT_SpaceServices_Gizmo_ModeHospitalDesc", HospitalIcon);
+            yield return ModeCommand(ServicePadMode.Hospitality, "MLT_SpaceServices_Gizmo_ModeHospitality", "MLT_SpaceServices_Gizmo_ModeHospitalityDesc", HospitalityIcon);
+            yield return ModeCommand(ServicePadMode.Trade, "MLT_SpaceServices_Gizmo_ModeTrade", "MLT_SpaceServices_Gizmo_ModeTradeDesc", TradeIcon);
             yield return Toggle("MLT_SpaceServices_Gizmo_RequireVacRoof", () => requireVacSafeRoof, v => requireVacSafeRoof = v);
-            yield return Toggle("MLT_SpaceServices_Gizmo_PreferShuttle", () => preferShuttle, v => preferShuttle = v);
             yield return Toggle("MLT_SpaceServices_Gizmo_RequirePower", () => requirePower, v => requirePower = v);
-            yield return new Command_Action
-            {
-                defaultLabel = "MLT_SpaceServices_Gizmo_ReportMap".Translate(),
-                defaultDesc = "MLT_SpaceServices_Gizmo_ReportMapDesc".Translate(),
-                action = delegate
-                {
-                    SpaceServiceEligibility eligibility = SpaceServiceMapDetector.Evaluate(parent.MapHeld);
-                    Log.Message("[Space Services] " + eligibility.ToLogString(parent.MapHeld));
-                    Messages.Message(eligibility.allowed ? "Space Services: map eligible" : "Space Services: map blocked", parent, MessageTypeDefOf.NeutralEvent, false);
-                }
-            };
             if (Prefs.DevMode)
             {
+                yield return new Command_Action
+                {
+                    defaultLabel = "MLT_SpaceServices_Gizmo_ReportMap".Translate(),
+                    defaultDesc = "MLT_SpaceServices_Gizmo_ReportMapDesc".Translate(),
+                    action = delegate
+                    {
+                        SpaceServiceEligibility eligibility = SpaceServiceMapDetector.Evaluate(parent.MapHeld);
+                        Log.Message("[Space Services] " + eligibility.ToLogString(parent.MapHeld));
+                        Messages.Message(eligibility.allowed ? "Space Services: map eligible" : "Space Services: map blocked", parent, MessageTypeDefOf.NeutralEvent, false);
+                    }
+                };
                 yield return new Command_Action
                 {
                     defaultLabel = "DEV: Clear service reservation",
@@ -431,20 +412,6 @@ namespace SpaceServices
                         ForceRelease();
                         ServiceLifecycleUtility.ClearGroupReservation(parent.MapHeld, oldReservation, "dev cleared pad reservation");
                         Messages.Message("Space Services: pad reservation cleared", parent, MessageTypeDefOf.NeutralEvent, false);
-                    }
-                };
-                yield return new Command_Action
-                {
-                    defaultLabel = "DEV: Spawn patient here",
-                    action = delegate
-                    {
-                        if (!MeetsUseRequirements(ServiceUse.Patient, out string reason))
-                        {
-                            Messages.Message("Space Services: dev patient spawn blocked, " + reason, parent, MessageTypeDefOf.RejectInput, false);
-                            return;
-                        }
-                        bool spawned = HospitalPatientFallback.TryExecutePatientArrival(null, ServiceDebugUtility.PatientArrivalParms(parent.MapHeld), parent.MapHeld, parent.Position);
-                        Messages.Message(spawned ? "Space Services: dev patient spawned" : "Space Services: dev patient spawn failed", parent, MessageTypeDefOf.NeutralEvent, false);
                     }
                 };
             }
@@ -465,19 +432,61 @@ namespace SpaceServices
 
         private Graphic CurrentOverlay()
         {
-            if (allowPatients && !allowGuests)
+            if (activeMode == ServicePadMode.Hospital)
             {
                 return HospitalOverlay;
             }
-            if (allowGuests && !allowPatients)
+            if (activeMode == ServicePadMode.Hospitality)
             {
                 return HospitalityOverlay;
             }
-            if (!allowGuests && !allowPatients && allowEmergency)
+            if (activeMode == ServicePadMode.Trade)
             {
                 return TradeOverlay;
             }
             return null;
+        }
+
+        private bool AllowsUse(ServiceUse use)
+        {
+            return ActiveUse() == use;
+        }
+
+        private ServiceUse ActiveUse()
+        {
+            if (activeMode == ServicePadMode.Hospitality)
+            {
+                return ServiceUse.Guest;
+            }
+            if (activeMode == ServicePadMode.Trade)
+            {
+                return ServiceUse.Emergency;
+            }
+            return ServiceUse.Patient;
+        }
+
+        private void MigrateLegacyModeFlags()
+        {
+            if (legacyAllowGuests && !legacyAllowPatients)
+            {
+                activeMode = ServicePadMode.Hospitality;
+            }
+            else if (legacyAllowEmergency && !legacyAllowGuests && !legacyAllowPatients)
+            {
+                activeMode = ServicePadMode.Trade;
+            }
+            else
+            {
+                activeMode = ServicePadMode.Hospital;
+            }
+            SyncLegacyModeFlags();
+        }
+
+        private void SyncLegacyModeFlags()
+        {
+            legacyAllowPatients = activeMode == ServicePadMode.Hospital;
+            legacyAllowGuests = activeMode == ServicePadMode.Hospitality;
+            legacyAllowEmergency = activeMode == ServicePadMode.Trade;
         }
 
         private static Command_Toggle Toggle(string labelKey, Func<bool> getter, Action<bool> setter)
@@ -487,6 +496,18 @@ namespace SpaceServices
                 defaultLabel = labelKey.Translate(),
                 isActive = getter,
                 toggleAction = delegate { setter(!getter()); }
+            };
+        }
+
+        private Command_Toggle ModeCommand(ServicePadMode mode, string labelKey, string descKey, Texture2D icon)
+        {
+            return new Command_Toggle
+            {
+                defaultLabel = labelKey.Translate(),
+                defaultDesc = descKey.Translate(),
+                icon = icon,
+                isActive = () => activeMode == mode,
+                toggleAction = delegate { activeMode = mode; }
             };
         }
     }
@@ -510,6 +531,13 @@ namespace SpaceServices
         Guest,
         Patient,
         Emergency
+    }
+
+    public enum ServicePadMode
+    {
+        Hospital,
+        Hospitality,
+        Trade
     }
 
     public static class ServicePadUtility

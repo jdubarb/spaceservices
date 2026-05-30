@@ -14,11 +14,13 @@
   <MLT_SpaceServices_Settings_RequirePad>Require service pad for arrivals</MLT_SpaceServices_Settings_RequirePad>
   <MLT_SpaceServices_Settings_SealedNoSuit>Allow sealed non-vacsuit arrivals</MLT_SpaceServices_Settings_SealedNoSuit>
 
-  <MLT_SpaceServices_Gizmo_AllowGuests>Allow guests</MLT_SpaceServices_Gizmo_AllowGuests>
-  <MLT_SpaceServices_Gizmo_AllowPatients>Allow patients</MLT_SpaceServices_Gizmo_AllowPatients>
-  <MLT_SpaceServices_Gizmo_AllowEmergency>Allow emergency arrivals</MLT_SpaceServices_Gizmo_AllowEmergency>
+  <MLT_SpaceServices_Gizmo_ModeHospital>Hospital</MLT_SpaceServices_Gizmo_ModeHospital>
+  <MLT_SpaceServices_Gizmo_ModeHospitalDesc>Use this pad for Hospital patient arrivals and departures.</MLT_SpaceServices_Gizmo_ModeHospitalDesc>
+  <MLT_SpaceServices_Gizmo_ModeHospitality>Hospitality</MLT_SpaceServices_Gizmo_ModeHospitality>
+  <MLT_SpaceServices_Gizmo_ModeHospitalityDesc>Use this pad for Hospitality guest arrivals and departures.</MLT_SpaceServices_Gizmo_ModeHospitalityDesc>
+  <MLT_SpaceServices_Gizmo_ModeTrade>Trade</MLT_SpaceServices_Gizmo_ModeTrade>
+  <MLT_SpaceServices_Gizmo_ModeTradeDesc>Reserve this pad for future trade and spaceport service traffic.</MLT_SpaceServices_Gizmo_ModeTradeDesc>
   <MLT_SpaceServices_Gizmo_RequireVacRoof>Require vac-safe roof</MLT_SpaceServices_Gizmo_RequireVacRoof>
-  <MLT_SpaceServices_Gizmo_PreferShuttle>Prefer shuttle</MLT_SpaceServices_Gizmo_PreferShuttle>
   <MLT_SpaceServices_Gizmo_RequirePower>Require power</MLT_SpaceServices_Gizmo_RequirePower>
   <MLT_SpaceServices_Gizmo_ReportMap>Report service map status</MLT_SpaceServices_Gizmo_ReportMap>
   <MLT_SpaceServices_Gizmo_ReportMapDesc>Write the current map's Space Services eligibility reasons to the log.</MLT_SpaceServices_Gizmo_ReportMapDesc>
