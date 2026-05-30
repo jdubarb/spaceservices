@@ -82,14 +82,6 @@ namespace SpaceServices
             }
         }
 
-        public static void GetSpotPostfix(Map map, ref IntVec3 __result)
-        {
-            if (map != null && SpaceServiceMapDetector.IsServiceEligible(map) && HospitalityArrivalContext.TryGetArrivalCell(map, out IntVec3 cell))
-            {
-                __result = cell;
-            }
-        }
-
         public static void SpawnVisitorPrefix(Pawn pawn, Map map, ref IntVec3 location)
         {
             if (map == null || !SpaceServiceMapDetector.IsServiceEligible(map))
