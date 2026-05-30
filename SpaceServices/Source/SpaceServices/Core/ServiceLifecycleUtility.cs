@@ -579,7 +579,7 @@ namespace SpaceServices
                 ReleaseRecord(record);
                 record.reservedPad = null;
             }
-            if (record.reservedPad != null && !PadCanSafelyServe(record.reservedPad, ServiceUse.Patient, record.pawns, record.id, false))
+            if (record.reservedPad != null && !PadCanSafelyServeDeparture(record.reservedPad, ServiceUse.Patient, record, false))
             {
                 ServiceDebugUtility.LogAudit("BeginHospitalDeparture releasing unsafe pad " + RecordAudit(record) + " pad=" + ServiceDebugUtility.ThingAuditSummary(record.reservedPad));
                 ReleaseRecord(record);
@@ -625,7 +625,7 @@ namespace SpaceServices
             {
                 return false;
             }
-            if (record.reservedPad != null && PadCanSafelyServe(record.reservedPad, use, record.pawns, record.id, ShouldBypassGuestArea(record)))
+            if (record.reservedPad != null && PadCanSafelyServeDeparture(record.reservedPad, use, record, ShouldBypassGuestArea(record)))
             {
                 ServiceDebugUtility.LogAudit("EnsureReservedDeparturePad keeping existing " + RecordAudit(record) + " pad=" + ServiceDebugUtility.ThingAuditSummary(record.reservedPad));
                 return true;
@@ -682,6 +682,16 @@ namespace SpaceServices
             List<Thing> candidates = ServicePadUtility.AllServicePads(map, use)
                 .Where(pad => PadCanSafelyServe(pad, use, pawns, record.id, ShouldBypassGuestArea(record)))
                 .ToList();
+            if (candidates.Count == 0)
+            {
+                candidates = DepartureModeFallbackPads(map, use, record)
+                    .Where(pad => PadCanSafelyServeDeparture(pad, use, record, ShouldBypassGuestArea(record)))
+                    .ToList();
+                if (candidates.Count > 0)
+                {
+                    ServiceDebugUtility.LogAudit("TryReserveBestDeparturePad using mode fallback record=" + record.id + " use=" + use + " pads=" + candidates.Count);
+                }
+            }
             foreach (Thing pad in OrderedDeparturePads(map, record, candidates, pawns, use))
             {
                 CompSpaceServicePad comp = pad.TryGetComp<CompSpaceServicePad>();
@@ -814,6 +824,70 @@ namespace SpaceServices
             }
             return ServiceEnvironmentUtility.IsPadSafeForPawns(pad, pawns, out string _) &&
                 PadReachableForPawns(pad, pawns, false, bypassGuestArea, out string _);
+        }
+
+        private static bool PadCanSafelyServeDeparture(Thing pad, ServiceUse use, ServiceGroupRecord record, bool bypassGuestArea)
+        {
+            if (pad == null || pad.Destroyed || pad.Map == null || record == null)
+            {
+                return false;
+            }
+            CompSpaceServicePad comp = pad.TryGetComp<CompSpaceServicePad>();
+            if (comp == null)
+            {
+                return false;
+            }
+            if (!string.IsNullOrEmpty(comp.reservedForGroup) && comp.reservedForGroup != record.id)
+            {
+                return false;
+            }
+            bool modeBypass = AllowsDepartureModeFallback(record, pad, use);
+            bool operational = modeBypass ? comp.MeetsOperationalRequirements(out string ignoredReason) : comp.MeetsUseRequirements(use);
+            if (!operational)
+            {
+                return false;
+            }
+            return ServiceEnvironmentUtility.IsPadSafeForPawns(pad, record.pawns, out string _) &&
+                PadReachableForPawns(pad, record.pawns, false, bypassGuestArea, out string _);
+        }
+
+        private static List<Thing> DepartureModeFallbackPads(Map map, ServiceUse use, ServiceGroupRecord record)
+        {
+            List<Thing> pads = ServicePadUtility.AllServicePadBuildings(map)
+                .Where(pad => pad != null && !pad.Destroyed && pad.TryGetComp<CompSpaceServicePad>() != null)
+                .Distinct()
+                .ToList();
+            if (pads.Count == 0 || record == null)
+            {
+                return new List<Thing>();
+            }
+            if (pads.Count == 1 && AllowsDepartureModeFallback(record, pads[0], use))
+            {
+                return pads;
+            }
+            return pads.Where(pad => AllowsDepartureModeFallback(record, pad, use)).ToList();
+        }
+
+        private static bool AllowsDepartureModeFallback(ServiceGroupRecord record, Thing pad, ServiceUse use)
+        {
+            if (record == null || pad == null || pad.Destroyed)
+            {
+                return false;
+            }
+            if (record.serviceKind != "hospital" && record.serviceKind != "hospitality")
+            {
+                return false;
+            }
+            CompSpaceServicePad comp = pad.TryGetComp<CompSpaceServicePad>();
+            if (comp == null || comp.AllowsUse(use))
+            {
+                return false;
+            }
+            if (record.reservedPad == pad || record.arrivalPad == pad)
+            {
+                return true;
+            }
+            return pad.Map != null && ServicePadUtility.AllServicePadBuildings(pad.Map).Count() == 1;
         }
 
         private static bool ReadyForExtraction(ServiceGroupRecord record)
@@ -1234,7 +1308,10 @@ namespace SpaceServices
                 {
                     continue;
                 }
-                if (!comp.MeetsUseRequirements(use, out string padReason))
+                string padReason;
+                bool modeFallback = AllowsDepartureModeFallback(record, pad, use);
+                bool requirementsMet = modeFallback ? comp.MeetsOperationalRequirements(out padReason) : comp.MeetsUseRequirements(use, out padReason);
+                if (!requirementsMet)
                 {
                     firstBlockedReason = firstBlockedReason ?? "service pad blocked: " + (padReason ?? "settings block this service");
                     continue;
@@ -1285,7 +1362,9 @@ namespace SpaceServices
                 reason = "departure pad is not a service pad";
                 return false;
             }
-            if (!comp.MeetsUseRequirements(use, out reason))
+            bool modeFallback = AllowsDepartureModeFallback(record, record.reservedPad, use);
+            bool requirementsMet = modeFallback ? comp.MeetsOperationalRequirements(out reason) : comp.MeetsUseRequirements(use, out reason);
+            if (!requirementsMet)
             {
                 reason = "departure pad blocked: " + (reason ?? "settings block this service");
                 return false;

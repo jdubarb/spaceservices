@@ -120,6 +120,34 @@ namespace SpaceServices
             return true;
         }
 
+        public bool MeetsOperationalRequirements(out string reason)
+        {
+            reason = null;
+            if (parent == null || parent.Destroyed || parent.Map == null)
+            {
+                reason = "pad unavailable";
+                return false;
+            }
+            if (requirePower)
+            {
+                CompPowerTrader power = parent.TryGetComp<CompPowerTrader>();
+                if (power != null && !power.PowerOn)
+                {
+                    reason = "power is off";
+                    return false;
+                }
+            }
+            if (!ServiceEnvironmentUtility.IsRoofAccessible(parent, out reason))
+            {
+                return false;
+            }
+            if (requireVacSafeRoof && !ServiceEnvironmentUtility.HasFullFlyThroughRoof(parent, out reason))
+            {
+                return false;
+            }
+            return true;
+        }
+
         public override string CompInspectStringExtra()
         {
             if (parent == null || parent.Map == null)
