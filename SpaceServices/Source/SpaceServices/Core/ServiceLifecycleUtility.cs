@@ -184,7 +184,7 @@ namespace SpaceServices
                     records.RemoveAt(i);
                     continue;
                 }
-                if (record.serviceKind == "hospitality" && record.state == "arrived")
+                if (record.serviceKind == "hospitality" && record.state == "arrived" && SpaceServicesMod.Settings != null && SpaceServicesMod.Settings.hospitalityVacuumGuard)
                 {
                     GuardHospitalityGuestsFromVacuum(map, record);
                 }

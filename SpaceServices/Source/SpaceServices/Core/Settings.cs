@@ -35,6 +35,7 @@ namespace SpaceServices
             listing.CheckboxLabeled("MLT_SpaceServices_Settings_AutoExtract".Translate(), ref Settings.autoExtractFallback);
             listing.CheckboxLabeled("MLT_SpaceServices_Settings_Hospital".Translate(), ref Settings.enableHospital);
             listing.CheckboxLabeled("MLT_SpaceServices_Settings_Hospitality".Translate(), ref Settings.enableHospitality);
+            listing.CheckboxLabeled("MLT_SpaceServices_Settings_HospitalityVacuumGuard".Translate(), ref Settings.hospitalityVacuumGuard);
             listing.CheckboxLabeled("MLT_SpaceServices_Settings_Spaceports".Translate(), ref Settings.enableSpaceportsBridge);
             listing.CheckboxLabeled("MLT_SpaceServices_Settings_RequirePad".Translate(), ref Settings.requireServicePadForArrivals);
             listing.CheckboxLabeled("MLT_SpaceServices_Settings_SealedNoSuit".Translate(), ref Settings.allowSealedNoSuitArrivals);
@@ -49,6 +50,7 @@ namespace SpaceServices
         public bool autoExtractFallback = true;
         public bool enableHospital = true;
         public bool enableHospitality = true;
+        public bool hospitalityVacuumGuard = false;
         public bool enableSpaceportsBridge = true;
         public bool requireServicePadForArrivals = false;
         public bool allowSealedNoSuitArrivals = false;
@@ -59,6 +61,7 @@ namespace SpaceServices
             Scribe_Values.Look(ref autoExtractFallback, "autoExtractFallback", true);
             Scribe_Values.Look(ref enableHospital, "enableHospital", true);
             Scribe_Values.Look(ref enableHospitality, "enableHospitality", true);
+            Scribe_Values.Look(ref hospitalityVacuumGuard, "hospitalityVacuumGuard", false);
             Scribe_Values.Look(ref enableSpaceportsBridge, "enableSpaceportsBridge", true);
             Scribe_Values.Look(ref requireServicePadForArrivals, "requireServicePadForArrivals", false);
             Scribe_Values.Look(ref allowSealedNoSuitArrivals, "allowSealedNoSuitArrivals", false);
