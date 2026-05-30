@@ -130,10 +130,15 @@ namespace SpaceServices
                 string vacRoofReason;
                 bool vacRoofOk = !requireVacSafeRoof || SafeFullFlyThroughRoof(out vacRoofReason);
                 bool usable = SafeGenerallyUsable(out string usableReason);
+                SpaceServicesMapComponent comp = parent.Map.GetComponent<SpaceServicesMapComponent>();
 
                 builder.AppendLine("Space Services");
                 builder.AppendLine("Mode: " + ModeLabel());
                 builder.AppendLine("Reservation: " + ReservationLabel());
+                if (comp != null && comp.debugForceHospitalityDanger)
+                {
+                    builder.AppendLine("Debug danger: forced");
+                }
                 builder.AppendLine("Damage: immune");
                 builder.AppendLine("Vacuum exposed: " + (vacuum > 0.001f ? "yes (" + vacuum.ToStringPercent() + ")" : "no"));
                 builder.AppendLine("Roof accessible: " + (roofAccessible ? "yes, " + SafeRoofAccessReport() : "no, " + roofReason));
@@ -390,8 +395,9 @@ namespace SpaceServices
             yield return ModeCommand(ServicePadMode.Trade, "MLT_SpaceServices_Gizmo_ModeTrade", "MLT_SpaceServices_Gizmo_ModeTradeDesc", TradeIcon);
             yield return Toggle("MLT_SpaceServices_Gizmo_RequireVacRoof", () => requireVacSafeRoof, v => requireVacSafeRoof = v);
             yield return Toggle("MLT_SpaceServices_Gizmo_RequirePower", () => requirePower, v => requirePower = v);
-            if (Prefs.DevMode)
+            if (ShouldShowDevGizmos())
             {
+                yield return DebugDangerToggle();
                 yield return new Command_Action
                 {
                     defaultLabel = "MLT_SpaceServices_Gizmo_ReportMap".Translate(),
@@ -508,6 +514,34 @@ namespace SpaceServices
                 icon = icon,
                 isActive = () => activeMode == mode,
                 toggleAction = delegate { activeMode = mode; }
+            };
+        }
+
+        private static bool ShouldShowDevGizmos()
+        {
+            return Prefs.DevMode || DebugSettings.godMode;
+        }
+
+        private Command_Toggle DebugDangerToggle()
+        {
+            return new Command_Toggle
+            {
+                defaultLabel = "DEV: Force Hospitality danger",
+                defaultDesc = "Pretend this map has an active Hospitality traffic threat so arrivals wave off and departures wait.",
+                isActive = delegate
+                {
+                    SpaceServicesMapComponent comp = parent == null || parent.MapHeld == null ? null : parent.MapHeld.GetComponent<SpaceServicesMapComponent>();
+                    return comp != null && comp.debugForceHospitalityDanger;
+                },
+                toggleAction = delegate
+                {
+                    SpaceServicesMapComponent comp = parent == null || parent.MapHeld == null ? null : parent.MapHeld.GetComponent<SpaceServicesMapComponent>();
+                    if (comp != null)
+                    {
+                        comp.debugForceHospitalityDanger = !comp.debugForceHospitalityDanger;
+                        Messages.Message("Space Services: debug Hospitality danger " + (comp.debugForceHospitalityDanger ? "on" : "off"), parent, MessageTypeDefOf.NeutralEvent, false);
+                    }
+                }
             };
         }
     }

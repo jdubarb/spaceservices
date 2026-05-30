@@ -25,6 +25,7 @@ namespace SpaceServices
         private int nextHospitalityServiceVisitTick;
         private bool staleReferenceCleanupDone;
         private int staleReferenceCleanupVersion;
+        public bool debugForceHospitalityDanger;
 
         public SpaceServicesMapComponent(Map map) : base(map)
         {
@@ -47,6 +48,7 @@ namespace SpaceServices
             Scribe_Values.Look(ref staleReferenceCleanupDone, "staleReferenceCleanupDone", false);
             Scribe_Values.Look(ref staleReferenceCleanupVersion, "staleReferenceCleanupVersion", 0);
             Scribe_Values.Look(ref nextHospitalityServiceVisitTick, "nextHospitalityServiceVisitTick", 0);
+            Scribe_Values.Look(ref debugForceHospitalityDanger, "debugForceHospitalityDanger", false);
         }
 
         public override void MapComponentTick()
