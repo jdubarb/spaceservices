@@ -214,9 +214,11 @@ namespace SpaceServices
                     records.RemoveAt(i);
                     continue;
                 }
+                List<Pawn> previouslyTrackedPawns = record.pawns == null ? new List<Pawn>() : record.pawns.Where(pawn => pawn != null).Distinct().ToList();
                 record.pawns = ActiveTrackedPawns(map, record);
                 if (record.pawns.Count == 0)
                 {
+                    Log.Message("[Space Services] Service group " + record.id + " has no active pawns; releasing reservation. Previously tracked: " + PawnSummary(previouslyTrackedPawns));
                     ReleaseRecord(record);
                     records.RemoveAt(i);
                     continue;
@@ -1146,6 +1148,20 @@ namespace SpaceServices
                 }
             }
             return false;
+        }
+
+        private static string PawnSummary(IEnumerable<Pawn> pawns)
+        {
+            List<string> labels = new List<string>();
+            foreach (Pawn pawn in pawns ?? Enumerable.Empty<Pawn>())
+            {
+                if (pawn == null)
+                {
+                    continue;
+                }
+                labels.Add(pawn.LabelShortCap + "(spawned=" + pawn.Spawned + ", destroyed=" + pawn.Destroyed + ")");
+            }
+            return labels.Count == 0 ? "none" : string.Join(", ", labels.ToArray());
         }
 
         private static bool ShouldBypassGuestArea(ServiceGroupRecord record)

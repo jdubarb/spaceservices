@@ -37,6 +37,7 @@ namespace SpaceServices
         public bool preferShuttle = true;
         public bool requirePower = false;
         public string reservedForGroup;
+        public int reservedAtTick;
 
         public override void PostExposeData()
         {
@@ -47,6 +48,7 @@ namespace SpaceServices
             Scribe_Values.Look(ref preferShuttle, "preferShuttle", true);
             Scribe_Values.Look(ref requirePower, "requirePower", false);
             Scribe_Values.Look(ref reservedForGroup, "reservedForGroup");
+            Scribe_Values.Look(ref reservedAtTick, "reservedAtTick", 0);
         }
 
         public bool IsUsableFor(ServiceUse use)
@@ -126,7 +128,7 @@ namespace SpaceServices
 
                 builder.AppendLine("Space Services");
                 builder.AppendLine("Mode: " + ModeLabel());
-                builder.AppendLine("Reservation: " + (string.IsNullOrEmpty(reservedForGroup) ? "free" : "reserved"));
+                builder.AppendLine("Reservation: " + ReservationLabel());
                 builder.AppendLine("Damage: immune");
                 builder.AppendLine("Vacuum exposed: " + (vacuum > 0.001f ? "yes (" + vacuum.ToStringPercent() + ")" : "no"));
                 builder.AppendLine("Roof accessible: " + (roofAccessible ? "yes, " + SafeRoofAccessReport() : "no, " + roofReason));
@@ -283,9 +285,18 @@ namespace SpaceServices
 
         public bool TryReserve(string groupId)
         {
-            if (string.IsNullOrEmpty(reservedForGroup) || reservedForGroup == groupId)
+            if (string.IsNullOrEmpty(reservedForGroup))
             {
                 reservedForGroup = groupId;
+                reservedAtTick = Find.TickManager == null ? 0 : Find.TickManager.TicksGame;
+                return true;
+            }
+            if (reservedForGroup == groupId)
+            {
+                if (reservedAtTick <= 0 && Find.TickManager != null)
+                {
+                    reservedAtTick = Find.TickManager.TicksGame;
+                }
                 return true;
             }
             return false;
@@ -296,12 +307,94 @@ namespace SpaceServices
             if (reservedForGroup == groupId)
             {
                 reservedForGroup = null;
+                reservedAtTick = 0;
             }
         }
 
         public void ForceRelease()
         {
             reservedForGroup = null;
+            reservedAtTick = 0;
+        }
+
+        public bool WatchReservation(List<ServiceGroupRecord> records)
+        {
+            if (string.IsNullOrEmpty(reservedForGroup) || parent == null || parent.Destroyed || parent.Map == null)
+            {
+                return false;
+            }
+            if (!IsWatchdogEligible())
+            {
+                return false;
+            }
+            if (reservedAtTick <= 0)
+            {
+                reservedAtTick = Find.TickManager.TicksGame;
+                return false;
+            }
+            if (Find.TickManager.TicksGame - reservedAtTick < ServicePadUtility.ReservationWatchdogTicks)
+            {
+                return false;
+            }
+
+            ServiceGroupRecord record = records == null ? null : records.FirstOrDefault(group => group != null && group.id == reservedForGroup);
+            if (record == null)
+            {
+                ClearWatchedReservation("no matching service record");
+                return true;
+            }
+            if (record.state == "completed")
+            {
+                ClearWatchedReservation("service record completed");
+                return true;
+            }
+            if (record.reservedPad != null && record.reservedPad != parent)
+            {
+                ClearWatchedReservation("service record moved to another pad");
+                return true;
+            }
+            if (record.pawns == null || !record.pawns.Any(pawn => pawn != null && !pawn.Destroyed && (pawn.Spawned || pawn.MapHeld != null)))
+            {
+                record.state = "completed";
+                ClearWatchedReservation("service record has no active pawns");
+                return true;
+            }
+            if (record.serviceKind != "hospital")
+            {
+                ServiceLifecycleUtility.ClearGroupReservation(parent.Map, record.id, "pad reservation watchdog timeout");
+                return true;
+            }
+
+            ServiceDebugUtility.LogThrottled("watchdog-kept-hospital-" + reservedForGroup, "Space Services reservation watchdog left hospital reservation intact: " + reservedForGroup, GenDate.TicksPerDay);
+            return false;
+        }
+
+        private bool IsWatchdogEligible()
+        {
+            return (allowGuests && MeetsUseRequirements(ServiceUse.Guest)) ||
+                (allowPatients && MeetsUseRequirements(ServiceUse.Patient)) ||
+                (allowEmergency && MeetsUseRequirements(ServiceUse.Emergency));
+        }
+
+        private void ClearWatchedReservation(string reason)
+        {
+            string oldReservation = reservedForGroup;
+            ForceRelease();
+            Log.Warning("[Space Services] Cleared stale service pad reservation " + oldReservation + " at " + parent.Position + ": " + reason);
+        }
+
+        private string ReservationLabel()
+        {
+            if (string.IsNullOrEmpty(reservedForGroup))
+            {
+                return "free";
+            }
+            if (reservedAtTick <= 0 || Find.TickManager == null)
+            {
+                return "reserved";
+            }
+            int ticks = Math.Max(0, Find.TickManager.TicksGame - reservedAtTick);
+            return "reserved for " + GenDate.ToStringTicksToPeriod(ticks);
         }
 
         public override IEnumerable<Gizmo> CompGetGizmosExtra()
@@ -421,6 +514,8 @@ namespace SpaceServices
 
     public static class ServicePadUtility
     {
+        public const int ReservationWatchdogTicks = GenDate.TicksPerDay * 2;
+
         public static IEnumerable<Thing> AllServicePadBuildings(Map map)
         {
             if (map == null)

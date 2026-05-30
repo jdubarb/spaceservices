@@ -63,8 +63,9 @@ namespace SpaceServices
                 any = true;
                 if (pawn.Spawned)
                 {
-                    if (!TryExitSpawnedPawn(pawn))
+                    if (!TryExitSpawnedPawn(pawn, reason))
                     {
+                        LogServicePawnRemoval(pawn, "despawn fallback", reason);
                         CleanupDepartingPawnReferences(map ?? pawn.MapHeld, pawn);
                         NotifyLordPawnExited(pawn);
                         pawn.DeSpawn(DestroyMode.Vanish);
@@ -72,6 +73,7 @@ namespace SpaceServices
                 }
                 else if (pawn.MapHeld != null)
                 {
+                    LogServicePawnRemoval(pawn, "destroy unspawned", reason);
                     CleanupDepartingPawnReferences(map ?? pawn.MapHeld, pawn);
                     pawn.Destroy(DestroyMode.Vanish);
                 }
@@ -83,7 +85,7 @@ namespace SpaceServices
             return any;
         }
 
-        private static bool TryExitSpawnedPawn(Pawn pawn)
+        private static bool TryExitSpawnedPawn(Pawn pawn, string reason)
         {
             if (pawn == null || !pawn.Spawned)
             {
@@ -92,6 +94,7 @@ namespace SpaceServices
             try
             {
                 // A real map exit keeps RimWorld's play logs, tales, relations, and lords consistent.
+                LogServicePawnRemoval(pawn, "ExitMap", reason);
                 pawn.ExitMap(false, Rot4.Invalid);
                 return true;
             }
@@ -100,6 +103,13 @@ namespace SpaceServices
                 Log.Warning("[Space Services] Could not exit service pawn cleanly, falling back to vanish: " + ex.Message);
                 return false;
             }
+        }
+
+        private static void LogServicePawnRemoval(Pawn pawn, string method, string reason)
+        {
+            string label = pawn == null ? "null pawn" : pawn.LabelShortCap + " [" + pawn.ThingID + "]";
+            IntVec3 cell = pawn != null && pawn.Spawned ? pawn.Position : IntVec3.Invalid;
+            Log.Message("[Space Services] Removing service pawn via " + method + ": " + label + ", cell=" + cell + ", reason=" + (reason ?? "none"));
         }
 
         private static void NotifyHospitalPatientsLeft(Map map, IEnumerable<Pawn> pawns)

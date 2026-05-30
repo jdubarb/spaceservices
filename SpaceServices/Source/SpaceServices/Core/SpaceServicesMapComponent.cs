@@ -60,6 +60,7 @@ namespace SpaceServices
                 nextLifecycleTick = Find.TickManager.TicksGame + ServiceLifecycleUtility.NextTickInterval(serviceGroups);
                 RunStaleReferenceCleanup();
                 ServiceLifecycleUtility.Tick(map, serviceGroups);
+                WatchServicePadReservations();
             }
             if (Find.TickManager.TicksGame < nextDebugTick)
             {
@@ -93,6 +94,15 @@ namespace SpaceServices
                 {
                     comp.ForceRelease();
                 }
+            }
+        }
+
+        private void WatchServicePadReservations()
+        {
+            foreach (Thing pad in ServicePadUtility.AllServicePadBuildings(map))
+            {
+                CompSpaceServicePad comp = pad == null ? null : pad.TryGetComp<CompSpaceServicePad>();
+                comp?.WatchReservation(serviceGroups);
             }
         }
 
