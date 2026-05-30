@@ -211,6 +211,7 @@ namespace SpaceServices
                 }
                 if (record.state == "pickupInbound")
                 {
+                    HospitalityBedUtility.PrepareGuestsForServiceDeparture(record);
                     if (Find.TickManager.TicksGame >= record.pickupShuttleTouchdownTick)
                     {
                         if (!ReservedPadCanServe(record, record.serviceKind == "hospitality" ? ServiceUse.Guest : ServiceUse.Patient, out string blockedReason))
@@ -233,6 +234,7 @@ namespace SpaceServices
                 }
                 if (record.state == "boardingPickup")
                 {
+                    HospitalityBedUtility.PrepareGuestsForServiceDeparture(record);
                     if (!ReservedPadCanServe(record, record.serviceKind == "hospitality" ? ServiceUse.Guest : ServiceUse.Patient, out string blockedReason))
                     {
                         if (ShouldLogBlockedDeparture())
@@ -253,6 +255,7 @@ namespace SpaceServices
                 }
                 if (record.state == "departing")
                 {
+                    HospitalityBedUtility.PrepareGuestsForServiceDeparture(record);
                     if (record.serviceKind == "hospital")
                     {
                         BeginHospitalDeparture(map, record, "waiting for free departure pad");
@@ -416,6 +419,7 @@ namespace SpaceServices
                     return;
                 }
             }
+            HospitalityBedUtility.PrepareGuestsForServiceDeparture(record);
             if (ReadyForExtraction(record))
             {
                 BeginPickupShuttle(record, reason);
@@ -796,7 +800,7 @@ namespace SpaceServices
         private static CellRect PickupBoardingRect(Thing pad)
         {
             // Boarding is based on the shuttle's center, not the full service pad footprint.
-            return CellRect.CenteredOn(pad.Position, 3, 3);
+            return CellRect.CenteredOn(pad.Position, 5, 5);
         }
 
         private static IntVec3 DepartureWaitCell(Thing pad, Pawn pawn, bool bypassGuestArea)

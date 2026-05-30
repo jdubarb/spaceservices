@@ -6,6 +6,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
 using Verse;
+using Verse.AI.Group;
 
 namespace SpaceServices
 {
@@ -60,6 +61,45 @@ namespace SpaceServices
                 return true;
             }
             return false;
+        }
+
+        public static void PrepareGuestsForServiceDeparture(ServiceGroupRecord record)
+        {
+            if (record == null || record.serviceKind != "hospitality" || record.pawns == null)
+            {
+                return;
+            }
+            foreach (Pawn pawn in record.pawns)
+            {
+                object comp = CompGuest(pawn);
+                if (comp == null)
+                {
+                    continue;
+                }
+
+                MarkLordLeaving(pawn, comp);
+                if (!Reflect.BoolMember(comp, "arrived"))
+                {
+                    continue;
+                }
+                MethodInfo leave = AccessTools.Method(comp.GetType(), "Leave", new[] { typeof(bool) });
+                if (leave != null)
+                {
+                    try
+                    {
+                        // Space Services owns the shuttle transfer now; leaving Hospitality prevents guest-area logic from pulling pawns back.
+                        leave.Invoke(comp, new object[] { false });
+                    }
+                    catch (Exception ex)
+                    {
+                        ServiceDebugUtility.LogVerbose("Hospitality CompGuest.Leave failed during service departure: " + ex.Message);
+                    }
+                }
+                else
+                {
+                    Reflect.SetMember(comp, "arrived", false);
+                }
+            }
         }
 
         private static IEnumerable<Thing> GuestBeds(Map map)
@@ -177,6 +217,34 @@ namespace SpaceServices
                 }
             }
             return null;
+        }
+
+        private static void MarkLordLeaving(Pawn pawn, object comp)
+        {
+            Lord lord = pawn == null ? null : pawn.GetLord();
+            if (lord == null)
+            {
+                lord = Reflect.GetMember(comp, "lord") as Lord;
+            }
+            object lordJob = lord == null ? null : lord.LordJob;
+            if (lordJob == null)
+            {
+                return;
+            }
+            MethodInfo onLeave = AccessTools.Method(lordJob.GetType(), "OnLeaveTriggered");
+            if (onLeave != null)
+            {
+                try
+                {
+                    onLeave.Invoke(lordJob, null);
+                    return;
+                }
+                catch (Exception ex)
+                {
+                    ServiceDebugUtility.LogVerbose("Hospitality LordJob.OnLeaveTriggered failed during service departure: " + ex.Message);
+                }
+            }
+            Reflect.SetMember(lordJob, "leaving", true);
         }
 
         private static bool IsGuestBed(Thing thing)
