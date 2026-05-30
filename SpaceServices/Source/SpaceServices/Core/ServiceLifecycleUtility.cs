@@ -17,6 +17,7 @@ namespace SpaceServices
     {
         private const int HospitalityDepartureDetectionGraceTicks = 2500;
         private const int HospitalityDepartureHardTimeoutTicks = 7500;
+        private const int HospitalityBedlessDepartureGraceTicks = 2500 * 16;
         private const int PickupBoardingHardTimeoutTicks = 2500;
 
         public static int NextTickInterval(List<ServiceGroupRecord> records)
@@ -237,12 +238,27 @@ namespace SpaceServices
                 }
                 if (record.serviceKind == "hospitality" && record.state == "arrived" &&
                     SpaceServicesMod.Settings != null && SpaceServicesMod.Settings.hospitalityAutoDepartBedlessGuests &&
-                    Find.TickManager.TicksGame > record.arrivalTick + GenDate.TicksPerHour &&
                     HospitalityBedUtility.TryFindBedlessServiceGuest(record, out Pawn bedlessGuest, out string bedlessReason))
                 {
-                    BeginDeparture(map, record, "Hospitality guest without usable bed: " + bedlessReason);
-                    ServiceDebugUtility.Log("Routing hospitality group " + record.id + " home because " + bedlessReason + " (" + bedlessGuest.LabelShortCap + ")");
-                    continue;
+                    if (record.hospitalityBedlessSinceTick <= 0)
+                    {
+                        record.hospitalityBedlessSinceTick = Find.TickManager.TicksGame;
+                    }
+
+                    int bedlessTicks = Find.TickManager.TicksGame - record.hospitalityBedlessSinceTick;
+                    if (bedlessTicks > HospitalityBedlessDepartureGraceTicks)
+                    {
+                        BeginDeparture(map, record, "Hospitality guest without usable bed for 16 hours: " + bedlessReason);
+                        ServiceDebugUtility.Log("Routing hospitality group " + record.id + " home after bedless grace expired because " + bedlessReason + " (" + bedlessGuest.LabelShortCap + ")");
+                        continue;
+                    }
+
+                    // Hospitality can take a while to claim beds after arrival, so give the group time before forcing them home.
+                    ServiceDebugUtility.LogThrottled("hospitality-bedless-grace-" + record.id, "Hospitality group " + record.id + " has a bedless guest during grace period: " + bedlessReason + " (" + bedlessGuest.LabelShortCap + "), waited " + (bedlessTicks / GenDate.TicksPerHour) + "/16h", GenDate.TicksPerHour);
+                }
+                else if (record.serviceKind == "hospitality")
+                {
+                    record.hospitalityBedlessSinceTick = 0;
                 }
                 if (record.state == "pickupInbound")
                 {
@@ -1269,6 +1285,7 @@ namespace SpaceServices
                 " pawns=" + (record.pawns == null ? 0 : record.pawns.Count) +
                 " prepared=" + record.hospitalityDeparturePrepared +
                 " arrivalTick=" + record.arrivalTick +
+                " bedlessSince=" + record.hospitalityBedlessSinceTick +
                 " departureTick=" + record.departureRequestedTick +
                 " pickupTick=" + record.pickupShuttleTouchdownTick +
                 " reservedPad=" + ServiceDebugUtility.ThingAuditSummary(record.reservedPad);
