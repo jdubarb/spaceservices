@@ -137,16 +137,34 @@ namespace SpaceServices
             {
                 return;
             }
-            int destroyed = 0;
-            foreach (Thing thing in cell.GetThingList(map).ToList())
-            {
-                if (thing != null && thing.def == shuttleDef)
-                {
-                    thing.Destroy(DestroyMode.Vanish);
-                    destroyed++;
-                }
-            }
+            int destroyed = CleanupShuttleThingsNear(map, shuttleDef, cell, 8f);
             ServiceDebugUtility.LogAudit("CleanupTouchdownShuttle cell=" + cell + " map=" + map.Index + " def=" + shuttleThingDefName + " destroyed=" + destroyed);
+        }
+
+        public static int CleanupServiceShuttlePayloadsNear(Map map, IntVec3 cell, float radius)
+        {
+            ThingDef shuttleDef = DefDatabase<ThingDef>.GetNamedSilentFail("JDB_ServiceShuttlePayload");
+            if (map == null || shuttleDef == null || !cell.IsValid)
+            {
+                return 0;
+            }
+            return CleanupShuttleThingsNear(map, shuttleDef, cell, radius);
+        }
+
+        private static int CleanupShuttleThingsNear(Map map, ThingDef shuttleDef, IntVec3 cell, float radius)
+        {
+            if (map == null || shuttleDef == null || !cell.IsValid)
+            {
+                return 0;
+            }
+            List<Thing> things = map.listerThings.ThingsOfDef(shuttleDef)
+                .Where(thing => thing != null && !thing.Destroyed && thing.Position.InHorDistOf(cell, radius))
+                .ToList();
+            foreach (Thing thing in things)
+            {
+                thing.Destroy(DestroyMode.Vanish);
+            }
+            return things.Count;
         }
 
         private static IntVec3 FindSpawnCell(IntVec3 center, Map map, int index)

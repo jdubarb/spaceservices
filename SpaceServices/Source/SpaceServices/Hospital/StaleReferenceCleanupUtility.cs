@@ -26,13 +26,14 @@ namespace SpaceServices
             int removedLordPawns = CleanupLordPawnLists(map);
             int removedServicePawns = CleanupServiceGroups(map);
             int removedLegacyShuttles = CleanupLegacyPassengerShuttleSkyfallers(map);
+            int removedServiceShuttles = CleanupOrphanedServiceShuttlePayloads(map);
             int removedSocialMemories = CleanupBrokenSocialMemories(map);
             int removedDirectRelations = CleanupBrokenDirectRelations(map);
             int removedRuntimeLords = CleanupUnspawnedPawnRuntimeLords(map);
 
-            if (removedHospitalPatients > 0 || removedLordPawns > 0 || removedServicePawns > 0 || removedLegacyShuttles > 0 || removedSocialMemories > 0 || removedDirectRelations > 0 || removedRuntimeLords > 0)
+            if (removedHospitalPatients > 0 || removedLordPawns > 0 || removedServicePawns > 0 || removedLegacyShuttles > 0 || removedServiceShuttles > 0 || removedSocialMemories > 0 || removedDirectRelations > 0 || removedRuntimeLords > 0)
             {
-                Log.Message("[Space Services] cleaned stale service references: hospitalPatients=" + removedHospitalPatients + ", lordPawns=" + removedLordPawns + ", servicePawns=" + removedServicePawns + ", legacyPassengerShuttles=" + removedLegacyShuttles + ", socialMemories=" + removedSocialMemories + ", directRelations=" + removedDirectRelations + ", runtimeLordRefs=" + removedRuntimeLords);
+                Log.Message("[Space Services] cleaned stale service references: hospitalPatients=" + removedHospitalPatients + ", lordPawns=" + removedLordPawns + ", servicePawns=" + removedServicePawns + ", legacyPassengerShuttles=" + removedLegacyShuttles + ", serviceShuttlePayloads=" + removedServiceShuttles + ", socialMemories=" + removedSocialMemories + ", directRelations=" + removedDirectRelations + ", runtimeLordRefs=" + removedRuntimeLords);
             }
         }
 
@@ -72,6 +73,24 @@ namespace SpaceServices
             int removed = 0;
             removed += CleanupLegacyPassengerShuttleSkyfallerDef(map, "PassengerShuttleIncoming", serviceCells);
             removed += CleanupLegacyPassengerShuttleSkyfallerDef(map, "PassengerShuttleLeaving", serviceCells);
+            return removed;
+        }
+
+        private static int CleanupOrphanedServiceShuttlePayloads(Map map)
+        {
+            if (!SpaceServiceMapDetector.IsServiceEligible(map))
+            {
+                return 0;
+            }
+
+            int removed = 0;
+            foreach (Thing pad in ServicePadUtility.AllServicePads(map, ServiceUse.Patient).Concat(ServicePadUtility.AllServicePads(map, ServiceUse.Guest)).Distinct())
+            {
+                if (pad != null && pad.Spawned)
+                {
+                    removed += ServiceShuttleUtility.CleanupServiceShuttlePayloadsNear(map, pad.Position, 10f);
+                }
+            }
             return removed;
         }
 
