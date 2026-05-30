@@ -32,6 +32,28 @@ namespace SpaceServices
                 return false;
             }
 
+            if (HospitalityDelayedIncidentContext.TryGetPad(map, out Thing delayedPad))
+            {
+                parms.spawnCenter = delayedPad.Position;
+                HospitalityArrivalContext.Push(map, delayedPad, true);
+                return true;
+            }
+
+            ShuttleVisual visual = ShuttleVisual.Resolve();
+            Thing pad = ServicePadUtility.TryFindRandomServicePad(map, ServiceUse.Guest);
+            if (visual != null && pad != null)
+            {
+                parms.spawnCenter = pad.Position;
+                ServiceShuttleUtility.SpawnArrival(map, pad.Position);
+                SpaceServicesMapComponent comp = map.GetComponent<SpaceServicesMapComponent>();
+                if (comp != null)
+                {
+                    comp.ScheduleHospitalityIncident(__instance, parms, pad, visual.shipThingDef == null ? null : visual.shipThingDef.defName);
+                    __result = true;
+                    return false;
+                }
+            }
+
             if (ServicePadUtility.TryFindServicePadCell(map, ServiceUse.Guest, out IntVec3 cell))
             {
                 parms.spawnCenter = cell;

@@ -20,16 +20,23 @@ namespace SpaceServices
             public Map map;
             public Thing pad;
             public bool finalized;
+            public bool suppressVisual;
         }
 
         private static readonly Stack<Request> Requests = new Stack<Request>();
 
         public static void Push(Map map)
         {
+            Push(map, ServicePadUtility.TryFindRandomServicePad(map, ServiceUse.Guest), false);
+        }
+
+        public static void Push(Map map, Thing pad, bool suppressVisual)
+        {
             Requests.Push(new Request
             {
                 map = map,
-                pad = ServicePadUtility.TryFindRandomServicePad(map, ServiceUse.Guest)
+                pad = pad,
+                suppressVisual = suppressVisual
             });
         }
 
@@ -63,7 +70,7 @@ namespace SpaceServices
                 return;
             }
             request.finalized = true;
-            if (request.pad == null || request.pad.Destroyed)
+            if (request.pad == null || request.pad.Destroyed || request.suppressVisual)
             {
                 return;
             }
@@ -95,6 +102,44 @@ namespace SpaceServices
                 }
             }
             return null;
+        }
+    }
+
+    public static class HospitalityDelayedIncidentContext
+    {
+        private sealed class Request
+        {
+            public Map map;
+            public Thing pad;
+        }
+
+        private static readonly Stack<Request> Requests = new Stack<Request>();
+
+        public static void Push(Map map, Thing pad)
+        {
+            Requests.Push(new Request { map = map, pad = pad });
+        }
+
+        public static void Pop()
+        {
+            if (Requests.Count > 0)
+            {
+                Requests.Pop();
+            }
+        }
+
+        public static bool TryGetPad(Map map, out Thing pad)
+        {
+            foreach (Request request in Requests)
+            {
+                if (request != null && request.map == map && request.pad != null && !request.pad.Destroyed)
+                {
+                    pad = request.pad;
+                    return true;
+                }
+            }
+            pad = null;
+            return false;
         }
     }
 }

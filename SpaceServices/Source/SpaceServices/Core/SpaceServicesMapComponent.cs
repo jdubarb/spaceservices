@@ -17,6 +17,7 @@ namespace SpaceServices
     {
         public List<ServiceGroupRecord> serviceGroups = new List<ServiceGroupRecord>();
         private readonly List<ScheduledServiceShuttleArrival> pendingShuttleArrivals = new List<ScheduledServiceShuttleArrival>();
+        private readonly List<ScheduledHospitalityIncident> pendingHospitalityIncidents = new List<ScheduledHospitalityIncident>();
         private const int StaleReferenceCleanupVersion = 6;
         private int nextDebugTick;
         private int nextLifecycleTick;
@@ -48,6 +49,7 @@ namespace SpaceServices
         {
             base.MapComponentTick();
             ServiceShuttleUtility.TickPendingArrivals(map, pendingShuttleArrivals);
+            TickPendingHospitalityIncidents();
             if (Find.TickManager.TicksGame >= nextLifecycleTick)
             {
                 nextLifecycleTick = Find.TickManager.TicksGame + ServiceLifecycleUtility.NextTickInterval(serviceGroups);
@@ -96,6 +98,61 @@ namespace SpaceServices
                 showDeparture = showDeparture
             });
         }
+
+        public void ScheduleHospitalityIncident(object worker, IncidentParms parms, Thing pad, string shuttleThingDefName)
+        {
+            if (worker == null || parms == null || pad == null || pad.Destroyed || !pad.Spawned)
+            {
+                return;
+            }
+            pendingHospitalityIncidents.Add(new ScheduledHospitalityIncident
+            {
+                worker = worker,
+                parms = parms,
+                pad = pad,
+                shuttleThingDefName = shuttleThingDefName,
+                touchdownTick = Find.TickManager.TicksGame + ServiceShuttleUtility.ArrivalTouchdownDelayTicks
+            });
+        }
+
+        private void TickPendingHospitalityIncidents()
+        {
+            if (pendingHospitalityIncidents.Count == 0)
+            {
+                return;
+            }
+            for (int i = pendingHospitalityIncidents.Count - 1; i >= 0; i--)
+            {
+                ScheduledHospitalityIncident incident = pendingHospitalityIncidents[i];
+                if (incident == null || Find.TickManager.TicksGame < incident.touchdownTick)
+                {
+                    continue;
+                }
+                pendingHospitalityIncidents.RemoveAt(i);
+                if (incident.pad == null || incident.pad.Destroyed || !incident.pad.Spawned || incident.worker == null || incident.parms == null)
+                {
+                    continue;
+                }
+
+                ServiceShuttleUtility.CleanupTouchdownShuttle(map, incident.pad.Position, incident.shuttleThingDefName);
+                incident.parms.spawnCenter = incident.pad.Position;
+                HospitalityDelayedIncidentContext.Push(map, incident.pad);
+                try
+                {
+                    MethodInfo method = AccessTools.Method(incident.worker.GetType(), "TryExecuteWorker");
+                    method?.Invoke(incident.worker, new object[] { incident.parms });
+                }
+                catch (Exception ex)
+                {
+                    Log.Warning("[Space Services] Delayed Hospitality visitor arrival failed: " + ex);
+                }
+                finally
+                {
+                    HospitalityDelayedIncidentContext.Pop();
+                }
+                ServiceShuttleUtility.SpawnDeparture(map, incident.pad.Position);
+            }
+        }
     }
 
     public sealed class ScheduledServiceShuttleArrival
@@ -105,5 +162,14 @@ namespace SpaceServices
         public string shuttleThingDefName;
         public List<Thing> things = new List<Thing>();
         public bool showDeparture = true;
+    }
+
+    public sealed class ScheduledHospitalityIncident
+    {
+        public object worker;
+        public IncidentParms parms;
+        public Thing pad;
+        public string shuttleThingDefName;
+        public int touchdownTick;
     }
 }
