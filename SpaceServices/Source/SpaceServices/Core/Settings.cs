@@ -39,6 +39,12 @@ namespace SpaceServices
             listing.CheckboxLabeled("MLT_SpaceServices_Settings_HospitalityRequireBeds".Translate(), ref Settings.hospitalityRequireGuestBeds);
             listing.CheckboxLabeled("MLT_SpaceServices_Settings_HospitalityAutoDepartBedless".Translate(), ref Settings.hospitalityAutoDepartBedlessGuests);
             listing.CheckboxLabeled("MLT_SpaceServices_Settings_HospitalityVacuumGuard".Translate(), ref Settings.hospitalityVacuumGuard);
+            listing.CheckboxLabeled("MLT_SpaceServices_Settings_HospitalityFallbackScheduler".Translate(), ref Settings.hospitalityFallbackScheduler);
+            Settings.hospitalityFallbackIntervalDays = listing.SliderLabeled(
+                "MLT_SpaceServices_Settings_HospitalityFallbackInterval".Translate(Settings.hospitalityFallbackIntervalDays.ToString("0.0")),
+                Settings.hospitalityFallbackIntervalDays,
+                0.5f,
+                5f);
             listing.CheckboxLabeled("MLT_SpaceServices_Settings_Spaceports".Translate(), ref Settings.enableSpaceportsBridge);
             listing.CheckboxLabeled("MLT_SpaceServices_Settings_RequirePad".Translate(), ref Settings.requireServicePadForArrivals);
             listing.CheckboxLabeled("MLT_SpaceServices_Settings_SealedNoSuit".Translate(), ref Settings.allowSealedNoSuitArrivals);
@@ -57,6 +63,8 @@ namespace SpaceServices
         public bool hospitalityRequireGuestBeds = true;
         public bool hospitalityAutoDepartBedlessGuests = true;
         public bool hospitalityVacuumGuard = false;
+        public bool hospitalityFallbackScheduler = true;
+        public float hospitalityFallbackIntervalDays = 1.5f;
         public bool enableSpaceportsBridge = true;
         public bool requireServicePadForArrivals = false;
         public bool allowSealedNoSuitArrivals = false;
@@ -71,6 +79,9 @@ namespace SpaceServices
             Scribe_Values.Look(ref hospitalityRequireGuestBeds, "hospitalityRequireGuestBeds", true);
             Scribe_Values.Look(ref hospitalityAutoDepartBedlessGuests, "hospitalityAutoDepartBedlessGuests", true);
             Scribe_Values.Look(ref hospitalityVacuumGuard, "hospitalityVacuumGuard", false);
+            Scribe_Values.Look(ref hospitalityFallbackScheduler, "hospitalityFallbackScheduler", true);
+            Scribe_Values.Look(ref hospitalityFallbackIntervalDays, "hospitalityFallbackIntervalDays", 1.5f);
+            hospitalityFallbackIntervalDays = Mathf.Clamp(hospitalityFallbackIntervalDays, 0.5f, 5f);
             Scribe_Values.Look(ref enableSpaceportsBridge, "enableSpaceportsBridge", true);
             Scribe_Values.Look(ref requireServicePadForArrivals, "requireServicePadForArrivals", false);
             Scribe_Values.Look(ref allowSealedNoSuitArrivals, "allowSealedNoSuitArrivals", false);

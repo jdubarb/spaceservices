@@ -19,8 +19,10 @@ namespace SpaceServices
         private readonly List<ScheduledServiceShuttleArrival> pendingShuttleArrivals = new List<ScheduledServiceShuttleArrival>();
         private readonly List<ScheduledHospitalityIncident> pendingHospitalityIncidents = new List<ScheduledHospitalityIncident>();
         private const int StaleReferenceCleanupVersion = 6;
+        private const int HospitalitySchedulerBlockedRetryTicks = 15000;
         private int nextDebugTick;
         private int nextLifecycleTick;
+        private int nextHospitalityServiceVisitTick;
         private bool staleReferenceCleanupDone;
         private int staleReferenceCleanupVersion;
 
@@ -44,6 +46,7 @@ namespace SpaceServices
             }
             Scribe_Values.Look(ref staleReferenceCleanupDone, "staleReferenceCleanupDone", false);
             Scribe_Values.Look(ref staleReferenceCleanupVersion, "staleReferenceCleanupVersion", 0);
+            Scribe_Values.Look(ref nextHospitalityServiceVisitTick, "nextHospitalityServiceVisitTick", 0);
         }
 
         public override void MapComponentTick()
@@ -51,6 +54,7 @@ namespace SpaceServices
             base.MapComponentTick();
             ServiceShuttleUtility.TickPendingArrivals(map, pendingShuttleArrivals);
             TickPendingHospitalityIncidents();
+            TickNaturalHospitalityScheduler();
             if (Find.TickManager.TicksGame >= nextLifecycleTick)
             {
                 nextLifecycleTick = Find.TickManager.TicksGame + ServiceLifecycleUtility.NextTickInterval(serviceGroups);
@@ -200,6 +204,124 @@ namespace SpaceServices
                 }
                 ServiceShuttleUtility.SpawnDeparture(map, incident.pad.Position);
             }
+        }
+
+        private void TickNaturalHospitalityScheduler()
+        {
+            if (SpaceServicesMod.Settings != null && !SpaceServicesMod.Settings.hospitalityFallbackScheduler)
+            {
+                return;
+            }
+            if (nextHospitalityServiceVisitTick <= 0)
+            {
+                ScheduleNextHospitalityServiceVisit(InitialHospitalityFallbackDelayTicks());
+                return;
+            }
+            if (Find.TickManager.TicksGame < nextHospitalityServiceVisitTick)
+            {
+                return;
+            }
+
+            string reason;
+            if (TryScheduleNaturalHospitalityVisit(out reason))
+            {
+                ScheduleNextHospitalityServiceVisit(NextHospitalityFallbackIntervalTicks());
+                return;
+            }
+
+            ServiceDebugUtility.LogThrottled("hospitality-service-scheduler-" + reason, "Hospitality service visit not scheduled: " + reason, GenDate.TicksPerHour);
+            ScheduleNextHospitalityServiceVisit(HospitalitySchedulerBlockedRetryTicks);
+        }
+
+        private bool TryScheduleNaturalHospitalityVisit(out string reason)
+        {
+            reason = null;
+            if (!HospitalityStillEnabledForMap(map))
+            {
+                reason = "hospitality disabled or map is not eligible";
+                return false;
+            }
+            if (pendingHospitalityIncidents.Count > 0)
+            {
+                reason = "visitor shuttle already inbound";
+                return false;
+            }
+
+            IncidentDef incidentDef = DefDatabase<IncidentDef>.GetNamedSilentFail("VisitorGroup");
+            IncidentWorker worker = incidentDef == null ? null : incidentDef.Worker;
+            if (incidentDef == null || worker == null || AccessTools.TypeByName("Hospitality.IncidentWorker_VisitorGroup") == null)
+            {
+                reason = "Hospitality visitor worker not available";
+                return false;
+            }
+
+            Thing pad = ServicePadUtility.TryFindRandomServicePad(map, ServiceUse.Guest);
+            if (pad == null)
+            {
+                reason = "no usable guest service pad";
+                return false;
+            }
+            if (!HospitalityIncidentGate.CanAcceptHospitalityIncident(incidentDef.defName, map, worker))
+            {
+                reason = HospitalityIncidentGate.ReadinessReport(incidentDef.defName, map, worker);
+                return false;
+            }
+            if (!TryFindHospitalityFaction(out Faction faction))
+            {
+                reason = "no friendly humanlike guest faction";
+                return false;
+            }
+
+            IncidentCategoryDef category = incidentDef.category ?? IncidentCategoryDefOf.Misc;
+            IncidentParms parms = StorytellerUtility.DefaultParmsNow(category, map);
+            parms.target = map;
+            parms.faction = faction;
+            parms.spawnCenter = pad.Position;
+            parms.sendLetter = true;
+
+            ShuttleVisual visual = ShuttleVisual.Resolve();
+            if (!ScheduleHospitalityIncident(worker, parms, pad, visual == null || visual.shipThingDef == null ? null : visual.shipThingDef.defName))
+            {
+                reason = "could not reserve service pad";
+                return false;
+            }
+
+            ServiceShuttleUtility.SpawnArrival(map, pad.Position);
+            Messages.Message("Space Services: visitors inbound", pad, MessageTypeDefOf.NeutralEvent, false);
+            ServiceDebugUtility.Log("Queued service hospitality visitors from " + faction.Name + " at " + pad.Position);
+            return true;
+        }
+
+        private static bool TryFindHospitalityFaction(out Faction faction)
+        {
+            List<Faction> candidates = Find.FactionManager.AllFactionsListForReading
+                .Where(f => f != null && !f.IsPlayer && !f.defeated && !f.temporary && f.def != null && f.def.humanlikeFaction && !f.def.hidden && !f.HostileTo(Faction.OfPlayer))
+                .ToList();
+            if (candidates.Count == 0)
+            {
+                faction = null;
+                return false;
+            }
+            faction = candidates[Rand.Range(0, candidates.Count)];
+            return true;
+        }
+
+        private void ScheduleNextHospitalityServiceVisit(int delayTicks)
+        {
+            nextHospitalityServiceVisitTick = Find.TickManager.TicksGame + Math.Max(delayTicks, GenDate.TicksPerHour);
+        }
+
+        private static int InitialHospitalityFallbackDelayTicks()
+        {
+            return Math.Min(15000, Math.Max(GenDate.TicksPerHour, NextHospitalityFallbackIntervalTicks() / 4));
+        }
+
+        private static int NextHospitalityFallbackIntervalTicks()
+        {
+            float intervalDays = SpaceServicesMod.Settings == null ? 1.5f : SpaceServicesMod.Settings.hospitalityFallbackIntervalDays;
+            intervalDays = Mathf.Clamp(intervalDays, 0.5f, 5f);
+            float variedDays = Rand.Range(intervalDays * 0.85f, intervalDays * 1.15f);
+            return Math.Max(GenDate.TicksPerHour, Mathf.RoundToInt(variedDays * GenDate.TicksPerDay));
         }
 
         private static bool PadStillUsableForGuests(Thing pad)

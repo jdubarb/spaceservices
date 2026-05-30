@@ -21,14 +21,22 @@ namespace SpaceServices
             {
                 return null;
             }
-            Type type = obj.GetType();
-            PropertyInfo property = AccessTools.Property(type, name);
-            if (property != null)
+            try
             {
-                return property.GetValue(obj, null);
+                Type type = obj.GetType();
+                PropertyInfo property = AccessTools.Property(type, name);
+                if (property != null)
+                {
+                    return property.GetValue(obj, null);
+                }
+                FieldInfo field = AccessTools.Field(type, name);
+                return field == null ? null : field.GetValue(obj);
             }
-            FieldInfo field = AccessTools.Field(type, name);
-            return field == null ? null : field.GetValue(obj);
+            catch (Exception ex)
+            {
+                ServiceDebugUtility.LogThrottled("reflect-get-" + obj.GetType().FullName + "." + name, "Reflection get failed for " + obj.GetType().FullName + "." + name + ": " + ex.GetType().Name + " " + ex.Message, GenDate.TicksPerHour);
+                return null;
+            }
         }
 
         public static bool BoolMember(object obj, string name)
@@ -69,17 +77,24 @@ namespace SpaceServices
             {
                 return;
             }
-            Type type = obj.GetType();
-            PropertyInfo property = AccessTools.Property(type, name);
-            if (property != null && property.CanWrite)
+            try
             {
-                property.SetValue(obj, value, null);
-                return;
+                Type type = obj.GetType();
+                PropertyInfo property = AccessTools.Property(type, name);
+                if (property != null && property.CanWrite)
+                {
+                    property.SetValue(obj, value, null);
+                    return;
+                }
+                FieldInfo field = AccessTools.Field(type, name);
+                if (field != null)
+                {
+                    field.SetValue(obj, value);
+                }
             }
-            FieldInfo field = AccessTools.Field(type, name);
-            if (field != null)
+            catch (Exception ex)
             {
-                field.SetValue(obj, value);
+                ServiceDebugUtility.LogThrottled("reflect-set-" + obj.GetType().FullName + "." + name, "Reflection set failed for " + obj.GetType().FullName + "." + name + ": " + ex.GetType().Name + " " + ex.Message, GenDate.TicksPerHour);
             }
         }
     }

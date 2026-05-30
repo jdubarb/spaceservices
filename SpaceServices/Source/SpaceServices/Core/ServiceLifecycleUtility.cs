@@ -211,7 +211,7 @@ namespace SpaceServices
                 }
                 if (record.state == "pickupInbound")
                 {
-                    HospitalityBedUtility.PrepareGuestsForServiceDeparture(record);
+                    EnsureHospitalityDeparturePrepared(record);
                     if (Find.TickManager.TicksGame >= record.pickupShuttleTouchdownTick)
                     {
                         if (!ReservedPadCanServe(record, record.serviceKind == "hospitality" ? ServiceUse.Guest : ServiceUse.Patient, out string blockedReason))
@@ -234,7 +234,7 @@ namespace SpaceServices
                 }
                 if (record.state == "boardingPickup")
                 {
-                    HospitalityBedUtility.PrepareGuestsForServiceDeparture(record);
+                    EnsureHospitalityDeparturePrepared(record);
                     if (!ReservedPadCanServe(record, record.serviceKind == "hospitality" ? ServiceUse.Guest : ServiceUse.Patient, out string blockedReason))
                     {
                         if (ShouldLogBlockedDeparture())
@@ -255,7 +255,7 @@ namespace SpaceServices
                 }
                 if (record.state == "departing")
                 {
-                    HospitalityBedUtility.PrepareGuestsForServiceDeparture(record);
+                    EnsureHospitalityDeparturePrepared(record);
                     if (record.serviceKind == "hospital")
                     {
                         BeginHospitalDeparture(map, record, "waiting for free departure pad");
@@ -419,7 +419,7 @@ namespace SpaceServices
                     return;
                 }
             }
-            HospitalityBedUtility.PrepareGuestsForServiceDeparture(record);
+            EnsureHospitalityDeparturePrepared(record);
             if (ReadyForExtraction(record))
             {
                 BeginPickupShuttle(record, reason);
@@ -432,6 +432,16 @@ namespace SpaceServices
                 Log.Message("[Space Services] Routing " + record.serviceKind + " service group " + record.id + " to departure pad: " + reason);
             }
             GuideDepartingPawnsToPad(record);
+        }
+
+        private static void EnsureHospitalityDeparturePrepared(ServiceGroupRecord record)
+        {
+            if (record == null || record.serviceKind != "hospitality" || record.hospitalityDeparturePrepared)
+            {
+                return;
+            }
+            HospitalityBedUtility.PrepareGuestsForServiceDeparture(record);
+            record.hospitalityDeparturePrepared = true;
         }
 
         private static void BeginHospitalDeparture(Map map, ServiceGroupRecord record, string reason)

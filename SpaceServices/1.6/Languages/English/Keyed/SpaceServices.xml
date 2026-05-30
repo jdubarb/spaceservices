@@ -8,6 +8,8 @@
   <MLT_SpaceServices_Settings_HospitalityRequireBeds>Require free guest beds for Hospitality arrivals</MLT_SpaceServices_Settings_HospitalityRequireBeds>
   <MLT_SpaceServices_Settings_HospitalityAutoDepartBedless>Auto-depart Hospitality guests without beds</MLT_SpaceServices_Settings_HospitalityAutoDepartBedless>
   <MLT_SpaceServices_Settings_HospitalityVacuumGuard>Hospitality vacuum guard (periodic tick interrupt)</MLT_SpaceServices_Settings_HospitalityVacuumGuard>
+  <MLT_SpaceServices_Settings_HospitalityFallbackScheduler>Space Hospitality fallback visits (use if Hospitality is not spawning guests)</MLT_SpaceServices_Settings_HospitalityFallbackScheduler>
+  <MLT_SpaceServices_Settings_HospitalityFallbackInterval>Fallback visit interval: {0} days</MLT_SpaceServices_Settings_HospitalityFallbackInterval>
   <MLT_SpaceServices_Settings_Spaceports>Spaceports bridge</MLT_SpaceServices_Settings_Spaceports>
   <MLT_SpaceServices_Settings_RequirePad>Require service pad for arrivals</MLT_SpaceServices_Settings_RequirePad>
   <MLT_SpaceServices_Settings_SealedNoSuit>Allow sealed non-vacsuit arrivals</MLT_SpaceServices_Settings_SealedNoSuit>
