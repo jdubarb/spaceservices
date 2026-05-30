@@ -60,7 +60,10 @@ namespace SpaceServices
 
         public static void LogAudit(string message)
         {
-            LogVerbose("[audit] " + message);
+            if (DebugLogging || VerboseLogging)
+            {
+                Verse.Log.Message("[Space Services] [audit] " + message);
+            }
         }
 
         public static void LogThrottled(string key, string message)

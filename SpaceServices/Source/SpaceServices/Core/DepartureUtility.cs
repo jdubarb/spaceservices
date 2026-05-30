@@ -222,13 +222,15 @@ namespace SpaceServices
             {
                 return;
             }
-            CleanupSocialMemoriesReferencing(map, departingPawn);
-            CleanupDirectRelationsReferencing(departingPawn);
-            CleanupLordReferences(map, departingPawn);
+            int memories = CleanupSocialMemoriesReferencing(map, departingPawn);
+            int relations = CleanupDirectRelationsReferencing(departingPawn);
+            int lords = CleanupLordReferences(map, departingPawn);
+            ServiceDebugUtility.LogAudit("CleanupDepartingPawnReferences pawn=" + ServiceDebugUtility.PawnAuditSummary(departingPawn) + " memories=" + memories + " relations=" + relations + " lordRefs=" + lords);
         }
 
-        private static void CleanupSocialMemoriesReferencing(Map map, Pawn departingPawn)
+        private static int CleanupSocialMemoriesReferencing(Map map, Pawn departingPawn)
         {
+            int removed = 0;
             foreach (Pawn pawn in PawnsToClean(map))
             {
                 if (pawn == null || pawn.needs == null || pawn.needs.mood == null || pawn.needs.mood.thoughts == null || pawn.needs.mood.thoughts.memories == null)
@@ -240,39 +242,44 @@ namespace SpaceServices
                 {
                     continue;
                 }
-                memories.RemoveAll(memory =>
+                removed += memories.RemoveAll(memory =>
                 {
                     Thought_MemorySocial social = memory as Thought_MemorySocial;
                     return social != null && Reflect.GetMember(social, "otherPawn") == departingPawn;
                 });
             }
+            return removed;
         }
 
-        private static void CleanupDirectRelationsReferencing(Pawn departingPawn)
+        private static int CleanupDirectRelationsReferencing(Pawn departingPawn)
         {
+            int removed = 0;
             foreach (Pawn pawn in PawnsToClean(departingPawn.MapHeld))
             {
                 if (pawn == null || pawn.relations == null || pawn.relations.DirectRelations == null)
                 {
                     continue;
                 }
-                pawn.relations.DirectRelations.RemoveAll(relation => relation == null || relation.otherPawn == departingPawn || relation.otherPawn == null || relation.otherPawn.Destroyed);
+                removed += pawn.relations.DirectRelations.RemoveAll(relation => relation == null || relation.otherPawn == departingPawn || relation.otherPawn == null || relation.otherPawn.Destroyed);
             }
+            return removed;
         }
 
-        private static void CleanupLordReferences(Map map, Pawn departingPawn)
+        private static int CleanupLordReferences(Map map, Pawn departingPawn)
         {
             if (map == null || map.lordManager == null || map.lordManager.lords == null)
             {
-                return;
+                return 0;
             }
+            int removed = 0;
             foreach (Lord lord in map.lordManager.lords)
             {
                 if (lord != null && lord.ownedPawns != null)
                 {
-                    lord.ownedPawns.RemoveAll(pawn => pawn == null || pawn == departingPawn || pawn.Destroyed);
+                    removed += lord.ownedPawns.RemoveAll(pawn => pawn == null || pawn == departingPawn || pawn.Destroyed);
                 }
             }
+            return removed;
         }
 
         private static IEnumerable<Pawn> PawnsToClean(Map map)

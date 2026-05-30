@@ -220,6 +220,10 @@ namespace SpaceServices
                 }
                 List<Pawn> previouslyTrackedPawns = record.pawns == null ? new List<Pawn>() : record.pawns.Where(pawn => pawn != null).Distinct().ToList();
                 record.pawns = ActiveTrackedPawns(map, record);
+                if (!SamePawnSet(previouslyTrackedPawns, record.pawns))
+                {
+                    ServiceDebugUtility.LogAudit("ActiveTrackedPawns updated " + RecordAudit(record) + " previous=" + PawnSummary(previouslyTrackedPawns) + " active=" + PawnSummary(record.pawns));
+                }
                 if (record.pawns.Count == 0)
                 {
                     Log.Message("[Space Services] Service group " + record.id + " has no active pawns; releasing reservation. Previously tracked: " + PawnSummary(previouslyTrackedPawns));
@@ -1189,6 +1193,27 @@ namespace SpaceServices
                 labels.Add(pawn.LabelShortCap + "(spawned=" + pawn.Spawned + ", destroyed=" + pawn.Destroyed + ")");
             }
             return labels.Count == 0 ? "none" : string.Join(", ", labels.ToArray());
+        }
+
+        private static bool SamePawnSet(List<Pawn> left, List<Pawn> right)
+        {
+            if (left == null || right == null)
+            {
+                return left == right;
+            }
+            if (left.Count != right.Count)
+            {
+                return false;
+            }
+            HashSet<Pawn> set = new HashSet<Pawn>(left);
+            foreach (Pawn pawn in right)
+            {
+                if (!set.Contains(pawn))
+                {
+                    return false;
+                }
+            }
+            return true;
         }
 
         private static string RecordAudit(ServiceGroupRecord record)
