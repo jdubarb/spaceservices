@@ -32,6 +32,7 @@ namespace SpaceServices
         {
             base.FinalizeInit();
             RunStaleReferenceCleanup();
+            ReleaseTransientArrivalReservations();
         }
 
         public override void ExposeData()
@@ -79,6 +80,18 @@ namespace SpaceServices
             StaleReferenceCleanupUtility.CleanupAfterLoad(map);
         }
 
+        private void ReleaseTransientArrivalReservations()
+        {
+            foreach (Thing pad in ServicePadUtility.AllServicePadBuildings(map))
+            {
+                CompSpaceServicePad comp = pad.TryGetComp<CompSpaceServicePad>();
+                if (comp != null && comp.reservedForGroup != null && comp.reservedForGroup.StartsWith("hospitality-arrival-", StringComparison.Ordinal))
+                {
+                    comp.ForceRelease();
+                }
+            }
+        }
+
         public void ScheduleShuttleArrival(IntVec3 cell, string shuttleThingDefName, List<Thing> things, bool showDeparture)
         {
             if (!cell.IsValid)
@@ -99,20 +112,28 @@ namespace SpaceServices
             });
         }
 
-        public void ScheduleHospitalityIncident(object worker, IncidentParms parms, Thing pad, string shuttleThingDefName)
+        public bool ScheduleHospitalityIncident(object worker, IncidentParms parms, Thing pad, string shuttleThingDefName)
         {
             if (worker == null || parms == null || pad == null || pad.Destroyed || !pad.Spawned)
             {
-                return;
+                return false;
+            }
+            string reservationId = "hospitality-arrival-" + Find.UniqueIDsManager.GetNextThingID();
+            CompSpaceServicePad comp = pad.TryGetComp<CompSpaceServicePad>();
+            if (comp == null || !comp.TryReserve(reservationId))
+            {
+                return false;
             }
             pendingHospitalityIncidents.Add(new ScheduledHospitalityIncident
             {
                 worker = worker,
                 parms = parms,
                 pad = pad,
+                reservationId = reservationId,
                 shuttleThingDefName = shuttleThingDefName,
                 touchdownTick = Find.TickManager.TicksGame + ServiceShuttleUtility.ArrivalTouchdownDelayTicks
             });
+            return true;
         }
 
         private void TickPendingHospitalityIncidents()
@@ -133,16 +154,18 @@ namespace SpaceServices
                 {
                     continue;
                 }
-                if (!HospitalityIncidentGate.CanAcceptHospitalityIncident("VisitorGroup", map) || !PadStillUsableForGuests(incident.pad))
+                if (!HospitalityStillEnabledForMap(map) || !PadStillUsableForGuests(incident.pad))
                 {
                     Messages.Message("Space Services: visitor arrival canceled, landing pad is no longer usable", incident.pad, MessageTypeDefOf.RejectInput, false);
                     ServiceShuttleUtility.CleanupTouchdownShuttle(map, incident.pad.Position, incident.shuttleThingDefName);
                     ServiceShuttleUtility.SpawnDeparture(map, incident.pad.Position);
+                    ReleaseArrivalReservation(incident);
                     continue;
                 }
 
                 ServiceShuttleUtility.CleanupTouchdownShuttle(map, incident.pad.Position, incident.shuttleThingDefName);
                 incident.parms.spawnCenter = incident.pad.Position;
+                ReleaseArrivalReservation(incident);
                 HospitalityDelayedIncidentContext.Push(map, incident.pad);
                 try
                 {
@@ -164,7 +187,25 @@ namespace SpaceServices
         private static bool PadStillUsableForGuests(Thing pad)
         {
             CompSpaceServicePad comp = pad == null ? null : pad.TryGetComp<CompSpaceServicePad>();
-            return comp != null && comp.IsUsableFor(ServiceUse.Guest);
+            return comp != null && comp.MeetsUseRequirements(ServiceUse.Guest);
+        }
+
+        private static bool HospitalityStillEnabledForMap(Map map)
+        {
+            if (SpaceServicesMod.Settings != null && !SpaceServicesMod.Settings.enableHospitality)
+            {
+                return false;
+            }
+            return map != null && SpaceServiceMapDetector.IsServiceEligible(map);
+        }
+
+        private static void ReleaseArrivalReservation(ScheduledHospitalityIncident incident)
+        {
+            CompSpaceServicePad comp = incident == null || incident.pad == null ? null : incident.pad.TryGetComp<CompSpaceServicePad>();
+            if (comp != null)
+            {
+                comp.Release(incident.reservationId);
+            }
         }
     }
 
@@ -182,6 +223,7 @@ namespace SpaceServices
         public object worker;
         public IncidentParms parms;
         public Thing pad;
+        public string reservationId;
         public string shuttleThingDefName;
         public int touchdownTick;
     }

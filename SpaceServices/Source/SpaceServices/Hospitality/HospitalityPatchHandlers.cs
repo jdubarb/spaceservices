@@ -44,12 +44,11 @@ namespace SpaceServices
             if (visual != null && pad != null)
             {
                 parms.spawnCenter = pad.Position;
-                ServiceShuttleUtility.SpawnArrival(map, pad.Position);
-                Messages.Message("Space Services: visitors inbound", pad, MessageTypeDefOf.NeutralEvent, false);
                 SpaceServicesMapComponent comp = map.GetComponent<SpaceServicesMapComponent>();
-                if (comp != null)
+                if (comp != null && comp.ScheduleHospitalityIncident(__instance, parms, pad, visual.shipThingDef == null ? null : visual.shipThingDef.defName))
                 {
-                    comp.ScheduleHospitalityIncident(__instance, parms, pad, visual.shipThingDef == null ? null : visual.shipThingDef.defName);
+                    ServiceShuttleUtility.SpawnArrival(map, pad.Position);
+                    Messages.Message("Space Services: visitors inbound", pad, MessageTypeDefOf.NeutralEvent, false);
                     __result = true;
                     return false;
                 }

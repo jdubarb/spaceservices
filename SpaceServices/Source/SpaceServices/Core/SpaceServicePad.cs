@@ -421,13 +421,28 @@ namespace SpaceServices
 
     public static class ServicePadUtility
     {
-        public static IEnumerable<Thing> AllServicePads(Map map, ServiceUse use)
+        public static IEnumerable<Thing> AllServicePadBuildings(Map map)
         {
             if (map == null)
             {
                 yield break;
             }
             foreach (Building building in map.listerBuildings.allBuildingsColonist)
+            {
+                if (building.TryGetComp<CompSpaceServicePad>() != null)
+                {
+                    yield return building;
+                }
+            }
+        }
+
+        public static IEnumerable<Thing> AllServicePads(Map map, ServiceUse use)
+        {
+            if (map == null)
+            {
+                yield break;
+            }
+            foreach (Thing building in AllServicePadBuildings(map))
             {
                 CompSpaceServicePad comp = building.TryGetComp<CompSpaceServicePad>();
                 if (comp != null && comp.IsUsableFor(use))
