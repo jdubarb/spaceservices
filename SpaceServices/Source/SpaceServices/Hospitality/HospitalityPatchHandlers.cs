@@ -49,6 +49,23 @@ namespace SpaceServices
             }
         }
 
+        public static bool AskForSafetyPrefix(IncidentParms parms, Action allow)
+        {
+            Map map = parms == null ? null : parms.target as Map;
+            if (map == null || !SpaceServiceMapDetector.IsServiceEligible(map))
+            {
+                return true;
+            }
+            if (!HospitalityIncidentGate.CanAcceptHospitalityIncident("VisitorGroup", map))
+            {
+                return true;
+            }
+
+            // Hospitality's normal safety check does not understand sealed space-service pads.
+            allow?.Invoke();
+            return false;
+        }
+
         public static void SpawnGroupPrefix(IncidentParms parms, Map map)
         {
             if (map != null && SpaceServiceMapDetector.IsServiceEligible(map) && ServicePadUtility.TryFindServicePadCell(map, ServiceUse.Guest, out IntVec3 cell))

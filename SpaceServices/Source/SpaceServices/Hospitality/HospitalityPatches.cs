@@ -44,6 +44,7 @@ namespace SpaceServices
 
             OptionalModPatches.PatchIfExists(harmony, AccessTools.Method(visitorGroup, "TryExecuteWorker"), typeof(HospitalityPatchHandlers), prefix: nameof(HospitalityPatchHandlers.VisitorGroupTryExecutePrefix), postfix: nameof(HospitalityPatchHandlers.VisitorGroupTryExecutePostfix));
             OptionalModPatches.PatchIfExists(harmony, AccessTools.Method(selectFaction, "TryExecuteWorker"), typeof(HospitalityPatchHandlers), prefix: nameof(HospitalityPatchHandlers.VisitorGroupTryExecutePrefix), postfix: nameof(HospitalityPatchHandlers.VisitorGroupTryExecutePostfix));
+            OptionalModPatches.PatchIfExists(harmony, AccessTools.Method(visitorGroup, "AskForSafety"), typeof(HospitalityPatchHandlers), prefix: nameof(HospitalityPatchHandlers.AskForSafetyPrefix));
             OptionalModPatches.PatchIfExists(harmony, AccessTools.Method(visitorGroup, "GetSpot"), typeof(HospitalityPatchHandlers), postfix: nameof(HospitalityPatchHandlers.GetSpotPostfix));
             OptionalModPatches.PatchIfExists(harmony, AccessTools.Method(visitorGroup, "SpawnGroup"), typeof(HospitalityPatchHandlers), prefix: nameof(HospitalityPatchHandlers.SpawnGroupPrefix), postfix: nameof(HospitalityPatchHandlers.SpawnGroupPostfix));
             OptionalModPatches.PatchIfExists(harmony, AccessTools.Method(spawnUtility, "SpawnVisitor"), typeof(HospitalityPatchHandlers), prefix: nameof(HospitalityPatchHandlers.SpawnVisitorPrefix), postfix: nameof(HospitalityPatchHandlers.SpawnVisitorPostfix));
