@@ -28,10 +28,11 @@ namespace SpaceServices
             int removedLegacyShuttles = CleanupLegacyPassengerShuttleSkyfallers(map);
             int removedSocialMemories = CleanupBrokenSocialMemories(map);
             int removedDirectRelations = CleanupBrokenDirectRelations(map);
+            int removedRuntimeLords = CleanupUnspawnedPawnRuntimeLords(map);
 
-            if (removedHospitalPatients > 0 || removedLordPawns > 0 || removedServicePawns > 0 || removedLegacyShuttles > 0 || removedSocialMemories > 0 || removedDirectRelations > 0)
+            if (removedHospitalPatients > 0 || removedLordPawns > 0 || removedServicePawns > 0 || removedLegacyShuttles > 0 || removedSocialMemories > 0 || removedDirectRelations > 0 || removedRuntimeLords > 0)
             {
-                Log.Message("[Space Services] cleaned stale service references: hospitalPatients=" + removedHospitalPatients + ", lordPawns=" + removedLordPawns + ", servicePawns=" + removedServicePawns + ", legacyPassengerShuttles=" + removedLegacyShuttles + ", socialMemories=" + removedSocialMemories + ", directRelations=" + removedDirectRelations);
+                Log.Message("[Space Services] cleaned stale service references: hospitalPatients=" + removedHospitalPatients + ", lordPawns=" + removedLordPawns + ", servicePawns=" + removedServicePawns + ", legacyPassengerShuttles=" + removedLegacyShuttles + ", socialMemories=" + removedSocialMemories + ", directRelations=" + removedDirectRelations + ", runtimeLordRefs=" + removedRuntimeLords);
             }
         }
 
@@ -261,6 +262,20 @@ namespace SpaceServices
                         record.state = "completed";
                     }
                 }
+            }
+            return removed;
+        }
+
+        private static int CleanupUnspawnedPawnRuntimeLords(Map map)
+        {
+            int removed = 0;
+            foreach (Pawn pawn in PawnsToClean(map))
+            {
+                if (pawn == null || pawn.Destroyed || pawn.Spawned || pawn.MapHeld != null)
+                {
+                    continue;
+                }
+                removed += ServicePawnUtility.ClearRuntimeLordReferences(pawn);
             }
             return removed;
         }

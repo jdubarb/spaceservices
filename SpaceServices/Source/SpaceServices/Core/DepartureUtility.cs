@@ -120,6 +120,8 @@ namespace SpaceServices
                 ServiceDebugUtility.LogAudit("TryExitSpawnedPawn after prep " + ServiceDebugUtility.PawnAuditSummary(pawn));
                 LogServicePawnRemoval(pawn, "ExitMap", reason);
                 pawn.ExitMap(false, Rot4.Invalid);
+                int runtimeLords = ServicePawnUtility.ClearRuntimeLordReferences(pawn);
+                ServiceDebugUtility.LogAudit("TryExitSpawnedPawn after ExitMap runtimeLordRefsCleared=" + runtimeLords + " " + ServiceDebugUtility.PawnAuditSummary(pawn));
                 ServiceDebugUtility.LogAudit("TryExitSpawnedPawn after ExitMap " + ServiceDebugUtility.PawnAuditSummary(pawn));
                 return true;
             }
@@ -180,10 +182,10 @@ namespace SpaceServices
             try
             {
                 ServiceDebugUtility.LogAudit("PreparePawnJobsForExit before " + ServiceDebugUtility.PawnAuditSummary(pawn) + " queue=" + JobQueueAudit(pawn));
-                bool clearedCurrentBefore = ClearJobLord(pawn.CurJob);
+                bool clearedCurrentBefore = ServicePawnUtility.ClearJobLord(pawn.CurJob);
                 int clearedQueued = ClearQueuedJobLords(pawn);
                 pawn.jobs.StopAll(false);
-                bool clearedCurrentAfter = ClearJobLord(pawn.CurJob);
+                bool clearedCurrentAfter = ServicePawnUtility.ClearJobLord(pawn.CurJob);
                 ServiceDebugUtility.LogAudit("PreparePawnJobsForExit after " + ServiceDebugUtility.PawnAuditSummary(pawn) + " clearedCurrentBefore=" + clearedCurrentBefore + " clearedQueued=" + clearedQueued + " clearedCurrentAfter=" + clearedCurrentAfter + " queue=" + JobQueueAudit(pawn));
             }
             catch (Exception ex)
@@ -201,7 +203,7 @@ namespace SpaceServices
             {
                 foreach (object queued in enumerable)
                 {
-                    if (ClearJobLord(Reflect.GetMember(queued, "job") as Job))
+                    if (ServicePawnUtility.ClearJobLord(Reflect.GetMember(queued, "job") as Job))
                     {
                         cleared++;
                     }
@@ -215,26 +217,17 @@ namespace SpaceServices
             return cleared;
         }
 
-        private static bool ClearJobLord(Job job)
-        {
-            if (job != null && job.lord != null)
-            {
-                job.lord = null;
-                return true;
-            }
-            return false;
-        }
-
         private static void CleanupDepartingPawnReferences(Map map, Pawn departingPawn)
         {
             if (departingPawn == null)
             {
                 return;
             }
+            int runtimeLords = ServicePawnUtility.ClearRuntimeLordReferences(departingPawn);
             int memories = CleanupSocialMemoriesReferencing(map, departingPawn);
             int relations = CleanupDirectRelationsReferencing(departingPawn);
             int lords = CleanupLordReferences(map, departingPawn);
-            ServiceDebugUtility.LogAudit("CleanupDepartingPawnReferences pawn=" + ServiceDebugUtility.PawnAuditSummary(departingPawn) + " memories=" + memories + " relations=" + relations + " lordRefs=" + lords);
+            ServiceDebugUtility.LogAudit("CleanupDepartingPawnReferences pawn=" + ServiceDebugUtility.PawnAuditSummary(departingPawn) + " memories=" + memories + " relations=" + relations + " lordRefs=" + lords + " runtimeLordRefs=" + runtimeLords);
         }
 
         private static int CleanupSocialMemoriesReferencing(Map map, Pawn departingPawn)
