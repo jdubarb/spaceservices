@@ -22,22 +22,30 @@ namespace SpaceServices
             {
                 return;
             }
+            string methodName = __originalMethod == null || __originalMethod.DeclaringType == null ? "" : __originalMethod.DeclaringType.FullName ?? "";
+            bool isHospitality = methodName.IndexOf("Hospitality.", StringComparison.OrdinalIgnoreCase) >= 0;
+            Thing hospitalityArrivalPad = null;
+            if (isHospitality && (map == null || !HospitalityArrivalContext.TryGetArrivalPad(map, out hospitalityArrivalPad)))
+            {
+                ServiceDebugUtility.LogVerbose("Ignored Hospitality pawn spawn outside Space Services arrival context from " + methodName);
+                return;
+            }
+
             List<Pawn> pawns = PawnsFromArgs(__args).Distinct().ToList();
             foreach (Pawn pawn in pawns)
             {
-                IntVec3 cell = pawn != null && pawn.Spawned ? pawn.Position : IntVec3.Invalid;
+                IntVec3 cell = hospitalityArrivalPad != null && hospitalityArrivalPad.Spawned ? hospitalityArrivalPad.Position : pawn != null && pawn.Spawned ? pawn.Position : IntVec3.Invalid;
                 VacSuitUtility.SuitPawnForEnvironment(pawn, map, cell);
             }
-            string methodName = __originalMethod == null || __originalMethod.DeclaringType == null ? "" : __originalMethod.DeclaringType.FullName ?? "";
             if (map != null && pawns.Count > 0)
             {
                 if (methodName.IndexOf("Hospital.", StringComparison.OrdinalIgnoreCase) >= 0)
                 {
                     ServiceLifecycleUtility.RegisterPawns(map, "hospital", pawns);
                 }
-                else if (methodName.IndexOf("Hospitality.", StringComparison.OrdinalIgnoreCase) >= 0)
+                else if (isHospitality)
                 {
-                    ServiceLifecycleUtility.RegisterPawns(map, "hospitality", pawns);
+                    ServiceLifecycleUtility.RegisterPawns(map, "hospitality", pawns, hospitalityArrivalPad);
                 }
             }
         }

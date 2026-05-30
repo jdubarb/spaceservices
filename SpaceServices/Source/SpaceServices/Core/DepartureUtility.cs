@@ -63,9 +63,12 @@ namespace SpaceServices
                 any = true;
                 if (pawn.Spawned)
                 {
-                    CleanupDepartingPawnReferences(map ?? pawn.MapHeld, pawn);
-                    NotifyLordPawnExited(pawn);
-                    pawn.DeSpawn(DestroyMode.Vanish);
+                    if (!TryExitSpawnedPawn(pawn))
+                    {
+                        CleanupDepartingPawnReferences(map ?? pawn.MapHeld, pawn);
+                        NotifyLordPawnExited(pawn);
+                        pawn.DeSpawn(DestroyMode.Vanish);
+                    }
                 }
                 else if (pawn.MapHeld != null)
                 {
@@ -78,6 +81,25 @@ namespace SpaceServices
                 Log.Message("[Space Services] Auto-extracted service pawns: " + reason);
             }
             return any;
+        }
+
+        private static bool TryExitSpawnedPawn(Pawn pawn)
+        {
+            if (pawn == null || !pawn.Spawned)
+            {
+                return false;
+            }
+            try
+            {
+                // A real map exit keeps RimWorld's play logs, tales, relations, and lords consistent.
+                pawn.ExitMap(false, Rot4.Invalid);
+                return true;
+            }
+            catch (Exception ex)
+            {
+                Log.Warning("[Space Services] Could not exit service pawn cleanly, falling back to vanish: " + ex.Message);
+                return false;
+            }
         }
 
         private static void NotifyHospitalPatientsLeft(Map map, IEnumerable<Pawn> pawns)

@@ -93,7 +93,7 @@ namespace SpaceServices
             }
 
             comp.serviceGroups.Add(record);
-            Log.Message("[Space Services] Registered " + kind + " service group " + record.id + " pawns=" + list.Count + " padReserved=" + (record.reservedPad != null));
+            ServiceDebugUtility.Log("Registered " + kind + " service group " + record.id + " pawns=" + list.Count + " padReserved=" + (record.reservedPad != null) + " arrivalPad=" + (arrivalPad != null));
         }
 
         public static bool ReleaseGroup(Map map, string groupId, string reason)

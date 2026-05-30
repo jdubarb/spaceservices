@@ -27,7 +27,8 @@ namespace SpaceServices
             string incidentDefName = incident == null ? "VisitorGroup" : incident.defName;
             if (!HospitalityIncidentGate.CanAcceptHospitalityIncident(incidentDefName, map))
             {
-                Log.Message("[Space Services] Hospitality visitor incident blocked: " + HospitalityIncidentGate.ReadinessReport(incidentDefName, map));
+                string report = HospitalityIncidentGate.ReadinessReport(incidentDefName, map);
+                ServiceDebugUtility.LogThrottled("hospitality-block-" + incidentDefName + "-" + report, "Hospitality visitor incident blocked: " + report, GenDate.TicksPerHour);
                 __result = false;
                 return false;
             }
@@ -127,6 +128,7 @@ namespace SpaceServices
             }
             if (!HospitalityArrivalContext.TryGetArrivalPad(map, out Thing arrivalPad))
             {
+                ServiceDebugUtility.LogVerbose("Ignored Hospitality SpawnVisitorPostfix outside Space Services arrival context.");
                 return;
             }
             List<Pawn> pawns = new List<Pawn>();
@@ -153,6 +155,7 @@ namespace SpaceServices
             }
             if (!HospitalityArrivalContext.TryGetArrivalPad(map, out Thing arrivalPad))
             {
+                ServiceDebugUtility.LogVerbose("Ignored Hospitality CreateLordPostfix outside Space Services arrival context.");
                 return;
             }
             ServiceLifecycleUtility.RegisterPawns(map, "hospitality", pawns, arrivalPad);

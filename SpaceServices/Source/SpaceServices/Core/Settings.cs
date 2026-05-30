@@ -32,6 +32,7 @@ namespace SpaceServices
             Listing_Standard listing = new Listing_Standard();
             listing.Begin(inRect);
             listing.CheckboxLabeled("MLT_SpaceServices_Settings_DebugLogging".Translate(), ref Settings.debugLogging);
+            listing.CheckboxLabeled("MLT_SpaceServices_Settings_VerboseDevLogging".Translate(), ref Settings.verboseDevLogging);
             listing.CheckboxLabeled("MLT_SpaceServices_Settings_AutoExtract".Translate(), ref Settings.autoExtractFallback);
             listing.CheckboxLabeled("MLT_SpaceServices_Settings_Hospital".Translate(), ref Settings.enableHospital);
             listing.CheckboxLabeled("MLT_SpaceServices_Settings_Hospitality".Translate(), ref Settings.enableHospitality);
@@ -47,6 +48,7 @@ namespace SpaceServices
     public class SpaceServicesSettings : ModSettings
     {
         public bool debugLogging = true;
+        public bool verboseDevLogging = false;
         public bool autoExtractFallback = true;
         public bool enableHospital = true;
         public bool enableHospitality = true;
@@ -58,6 +60,7 @@ namespace SpaceServices
         public override void ExposeData()
         {
             Scribe_Values.Look(ref debugLogging, "debugLogging", true);
+            Scribe_Values.Look(ref verboseDevLogging, "verboseDevLogging", false);
             Scribe_Values.Look(ref autoExtractFallback, "autoExtractFallback", true);
             Scribe_Values.Look(ref enableHospital, "enableHospital", true);
             Scribe_Values.Look(ref enableHospitality, "enableHospitality", true);

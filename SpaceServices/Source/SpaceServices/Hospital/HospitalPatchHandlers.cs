@@ -47,7 +47,8 @@ namespace SpaceServices
                 HospitalArrivalIncidentContext.Push(map, IsMassCasualtyIncident(__instance, incidentDefName));
                 return true;
             }
-            Log.Message("[Space Services] Hospital patient incident blocked: " + HospitalIncidentGate.ReadinessReport(incidentDefName, map));
+            string report = HospitalIncidentGate.ReadinessReport(incidentDefName, map);
+            ServiceDebugUtility.LogThrottled("hospital-block-" + incidentDefName + "-" + report, "Hospital patient incident blocked: " + report, GenDate.TicksPerHour);
             __result = false;
             return false;
         }
@@ -169,7 +170,8 @@ namespace SpaceServices
                 }
                 if (!HospitalIncidentGate.CanAcceptHospitalIncident("PatientArrives", map))
                 {
-                    Log.Message("[Space Services] Hospital PatientArrives returned false; fallback blocked: " + HospitalIncidentGate.ReadinessReport("PatientArrives", map));
+                    string report = HospitalIncidentGate.ReadinessReport("PatientArrives", map);
+                    ServiceDebugUtility.LogThrottled("hospital-fallback-block-" + report, "Hospital PatientArrives returned false; fallback blocked: " + report, GenDate.TicksPerHour);
                     return;
                 }
                 try

@@ -1,6 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <LanguageData>
   <MLT_SpaceServices_Settings_DebugLogging>Debug logging</MLT_SpaceServices_Settings_DebugLogging>
+  <MLT_SpaceServices_Settings_VerboseDevLogging>Verbose dev logging</MLT_SpaceServices_Settings_VerboseDevLogging>
   <MLT_SpaceServices_Settings_AutoExtract>Auto-extract fallback</MLT_SpaceServices_Settings_AutoExtract>
   <MLT_SpaceServices_Settings_Hospital>Hospital support</MLT_SpaceServices_Settings_Hospital>
   <MLT_SpaceServices_Settings_Hospitality>Hospitality support</MLT_SpaceServices_Settings_Hospitality>
