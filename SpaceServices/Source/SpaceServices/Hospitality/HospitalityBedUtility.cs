@@ -88,6 +88,11 @@ namespace SpaceServices
                 {
                     continue;
                 }
+                if (HospitalityPatchHandlers.TryRunNativeGuestLeave(pawn))
+                {
+                    ServiceDebugUtility.LogVerbose("Ran Hospitality GuestUtility.Leave for service departure: " + pawn.LabelShortCap);
+                    continue;
+                }
                 MethodInfo leave = AccessTools.Method(comp.GetType(), "Leave", new[] { typeof(bool) });
                 if (leave != null)
                 {

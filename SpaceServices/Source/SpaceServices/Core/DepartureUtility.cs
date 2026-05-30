@@ -29,10 +29,6 @@ namespace SpaceServices
             IntVec3 padCell = record.reservedPad == null ? IntVec3.Invalid : record.reservedPad.Position;
             ServiceShuttleUtility.CleanupTouchdownShuttle(padMap, padCell, record.pickupShuttleThingDefName);
 
-            if (record.serviceKind == "hospital")
-            {
-                NotifyHospitalPatientsLeft(map, record.pawns);
-            }
             bool completed = TryAutoExtract(map, record.pawns, reason);
             if (completed)
             {
@@ -41,6 +37,10 @@ namespace SpaceServices
                     ServiceShuttleUtility.SpawnDeparture(record.reservedPad.Map, record.reservedPad.Position);
                 }
                 record.state = "completed";
+                if (record.serviceKind == "hospital")
+                {
+                    NotifyHospitalPatientsLeft(map, record.pawns);
+                }
                 ReleaseReservation(record);
                 Messages.Message("Space Services: service group departed", MessageTypeDefOf.NeutralEvent, false);
             }
@@ -66,14 +66,15 @@ namespace SpaceServices
                     if (!TryExitSpawnedPawn(pawn, reason))
                     {
                         LogServicePawnRemoval(pawn, "despawn fallback", reason);
-                        CleanupDepartingPawnReferences(map ?? pawn.MapHeld, pawn);
                         NotifyLordPawnExited(pawn);
+                        CleanupDepartingPawnReferences(map ?? pawn.MapHeld, pawn);
                         pawn.DeSpawn(DestroyMode.Vanish);
                     }
                 }
                 else if (pawn.MapHeld != null)
                 {
                     LogServicePawnRemoval(pawn, "destroy unspawned", reason);
+                    NotifyLordPawnExited(pawn);
                     CleanupDepartingPawnReferences(map ?? pawn.MapHeld, pawn);
                     pawn.Destroy(DestroyMode.Vanish);
                 }
@@ -94,6 +95,7 @@ namespace SpaceServices
             try
             {
                 // A real map exit keeps RimWorld's play logs, tales, relations, and lords consistent.
+                PreparePawnJobsForExit(pawn);
                 LogServicePawnRemoval(pawn, "ExitMap", reason);
                 pawn.ExitMap(false, Rot4.Invalid);
                 return true;
@@ -115,17 +117,79 @@ namespace SpaceServices
         private static void NotifyHospitalPatientsLeft(Map map, IEnumerable<Pawn> pawns)
         {
             object hospital = HospitalIncidentGate.FindHospitalComponent(map);
+            MethodInfo patientLeftTheMap = hospital == null ? null : AccessTools.Method(hospital.GetType(), "PatientLeftTheMap", new[] { typeof(Pawn) });
             IDictionary patients = hospital == null ? null : Reflect.GetMember(hospital, "Patients") as IDictionary;
-            if (patients == null)
+            if (patients == null && patientLeftTheMap == null)
             {
                 return;
             }
             foreach (Pawn pawn in pawns ?? Enumerable.Empty<Pawn>())
             {
-                if (pawn != null && patients.Contains(pawn))
+                if (pawn == null)
+                {
+                    continue;
+                }
+                if (patientLeftTheMap != null)
+                {
+                    try
+                    {
+                        patientLeftTheMap.Invoke(hospital, new object[] { pawn });
+                        continue;
+                    }
+                    catch (Exception ex)
+                    {
+                        ServiceDebugUtility.LogVerbose("Hospital PatientLeftTheMap failed during service departure: " + ex.Message);
+                    }
+                }
+                if (patients != null && patients.Contains(pawn))
                 {
                     patients.Remove(pawn);
                 }
+            }
+        }
+
+        private static void PreparePawnJobsForExit(Pawn pawn)
+        {
+            if (pawn == null || pawn.jobs == null)
+            {
+                return;
+            }
+            try
+            {
+                ClearJobLord(pawn.CurJob);
+                ClearQueuedJobLords(pawn);
+                pawn.jobs.StopAll(false);
+                ClearJobLord(pawn.CurJob);
+            }
+            catch (Exception ex)
+            {
+                ServiceDebugUtility.LogVerbose("Could not clear service pawn jobs before exit: " + ex.Message);
+            }
+        }
+
+        private static void ClearQueuedJobLords(Pawn pawn)
+        {
+            object queue = pawn == null || pawn.jobs == null ? null : Reflect.GetMember(pawn.jobs, "jobQueue");
+            IEnumerable enumerable = queue as IEnumerable;
+            if (enumerable != null)
+            {
+                foreach (object queued in enumerable)
+                {
+                    ClearJobLord(Reflect.GetMember(queued, "job") as Job);
+                }
+            }
+            MethodInfo clear = queue == null ? null : AccessTools.Method(queue.GetType(), "Clear");
+            if (clear != null)
+            {
+                clear.Invoke(queue, null);
+            }
+        }
+
+        private static void ClearJobLord(Job job)
+        {
+            if (job != null)
+            {
+                job.lord = null;
             }
         }
 

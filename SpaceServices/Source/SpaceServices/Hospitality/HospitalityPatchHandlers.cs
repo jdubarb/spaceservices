@@ -15,6 +15,8 @@ namespace SpaceServices
 {
     public static class HospitalityPatchHandlers
     {
+        private static readonly HashSet<Pawn> NativeGuestLeaveAllowed = new HashSet<Pawn>();
+
         public static bool VisitorGroupTryExecutePrefix(object __instance, IncidentParms parms, ref bool __result)
         {
             Map map = parms == null ? null : parms.target as Map;
@@ -163,11 +165,44 @@ namespace SpaceServices
 
         public static bool GuestLeavePrefix(Pawn pawn)
         {
+            if (pawn != null && NativeGuestLeaveAllowed.Remove(pawn))
+            {
+                return true;
+            }
             if (ServiceLifecycleUtility.RequestDepartureForPawn(pawn, "Hospitality marked guest leaving"))
             {
                 return false;
             }
             return true;
+        }
+
+        public static bool TryRunNativeGuestLeave(Pawn pawn)
+        {
+            if (pawn == null)
+            {
+                return false;
+            }
+            Type guestUtility = AccessTools.TypeByName("Hospitality.Utilities.GuestUtility");
+            MethodInfo leave = guestUtility == null ? null : AccessTools.Method(guestUtility, "Leave", new[] { typeof(Pawn) });
+            if (leave == null)
+            {
+                return false;
+            }
+            try
+            {
+                NativeGuestLeaveAllowed.Add(pawn);
+                leave.Invoke(null, new object[] { pawn });
+                return true;
+            }
+            catch (Exception ex)
+            {
+                ServiceDebugUtility.LogVerbose("Hospitality GuestUtility.Leave failed during service departure: " + ex.Message);
+                return false;
+            }
+            finally
+            {
+                NativeGuestLeaveAllowed.Remove(pawn);
+            }
         }
 
         public static void VisitPointLeavePostfix(object __instance)
