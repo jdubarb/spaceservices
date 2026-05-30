@@ -74,7 +74,7 @@ namespace SpaceServices
                 return "hospitality traffic blocked by " + dangerReason;
             }
             string priorityReport = ServicePadUtility.PriorityReadinessReport(map, ServiceUse.Guest);
-            if (priorityReport != "priority pad available")
+            if (priorityReport != "priority or shared pad available")
             {
                 return priorityReport;
             }
