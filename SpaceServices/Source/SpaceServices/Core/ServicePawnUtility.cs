@@ -1,5 +1,8 @@
 using RimWorld;
+using System;
+using System.Collections;
 using System.Collections.Generic;
+using System.Linq;
 using Verse;
 using Verse.AI;
 using Verse.AI.Group;
@@ -67,6 +70,95 @@ namespace SpaceServices
                 return true;
             }
             return false;
+        }
+
+        public static int CleanupRelationshipRecordsReferencing(Pawn departingPawn)
+        {
+            if (departingPawn == null)
+            {
+                return 0;
+            }
+            return CleanupRelationshipRecordReferences(pawn => pawn == null || pawn == departingPawn || pawn.Destroyed);
+        }
+
+        public static int CleanupBrokenRelationshipRecords()
+        {
+            HashSet<Pawn> knownPawns = KnownPersistentPawns();
+            return CleanupRelationshipRecordReferences(pawn => pawn == null || pawn.Destroyed || !knownPawns.Contains(pawn));
+        }
+
+        private static int CleanupRelationshipRecordReferences(Func<Pawn, bool> shouldRemove)
+        {
+            if (shouldRemove == null)
+            {
+                return 0;
+            }
+            object relationshipRecords = RelationshipRecords();
+            IDictionary records = relationshipRecords == null ? null : Reflect.GetMember(relationshipRecords, "records") as IDictionary;
+            if (records == null)
+            {
+                return 0;
+            }
+
+            int removed = 0;
+            foreach (object record in records.Values)
+            {
+                IList references = Reflect.GetMember(record, "references") as IList;
+                if (references == null)
+                {
+                    continue;
+                }
+                for (int i = references.Count - 1; i >= 0; i--)
+                {
+                    Pawn pawn = references[i] as Pawn;
+                    if (shouldRemove(pawn))
+                    {
+                        references.RemoveAt(i);
+                        removed++;
+                    }
+                }
+            }
+            return removed;
+        }
+
+        private static object RelationshipRecords()
+        {
+            object world = Find.World;
+            return Reflect.GetMember(world, "relationshipRecords") ?? Reflect.GetMember(world, "RelationshipRecords");
+        }
+
+        private static HashSet<Pawn> KnownPersistentPawns()
+        {
+            HashSet<Pawn> pawns = new HashSet<Pawn>();
+            foreach (Pawn pawn in PawnsFinder.AllMapsWorldAndTemporary_AliveOrDead ?? Enumerable.Empty<Pawn>())
+            {
+                if (pawn != null)
+                {
+                    pawns.Add(pawn);
+                }
+            }
+            foreach (Map map in Find.Maps ?? Enumerable.Empty<Map>())
+            {
+                if (map == null || map.mapPawns == null)
+                {
+                    continue;
+                }
+                foreach (Pawn pawn in map.mapPawns.AllPawnsSpawned)
+                {
+                    if (pawn != null)
+                    {
+                        pawns.Add(pawn);
+                    }
+                }
+                foreach (Pawn pawn in map.mapPawns.AllPawnsUnspawned)
+                {
+                    if (pawn != null)
+                    {
+                        pawns.Add(pawn);
+                    }
+                }
+            }
+            return pawns;
         }
     }
 }

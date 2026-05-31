@@ -226,8 +226,9 @@ namespace SpaceServices
             int runtimeLords = ServicePawnUtility.ClearRuntimeLordReferences(departingPawn);
             int memories = CleanupSocialMemoriesReferencing(map, departingPawn);
             int relations = CleanupDirectRelationsReferencing(departingPawn);
+            int relationshipRecords = ServicePawnUtility.CleanupRelationshipRecordsReferencing(departingPawn);
             int lords = CleanupLordReferences(map, departingPawn);
-            ServiceDebugUtility.LogAudit("CleanupDepartingPawnReferences pawn=" + ServiceDebugUtility.PawnAuditSummary(departingPawn) + " memories=" + memories + " relations=" + relations + " lordRefs=" + lords + " runtimeLordRefs=" + runtimeLords);
+            ServiceDebugUtility.LogAudit("CleanupDepartingPawnReferences pawn=" + ServiceDebugUtility.PawnAuditSummary(departingPawn) + " memories=" + memories + " relations=" + relations + " relationshipRecords=" + relationshipRecords + " lordRefs=" + lords + " runtimeLordRefs=" + runtimeLords);
         }
 
         private static int CleanupSocialMemoriesReferencing(Map map, Pawn departingPawn)
