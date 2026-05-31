@@ -34,7 +34,7 @@ namespace SpaceServices
 
             if (removedHospitalPatients > 0 || removedLordPawns > 0 || removedServicePawns > 0 || removedLegacyShuttles > 0 || removedServiceShuttles > 0 || removedSocialMemories > 0 || removedDirectRelations > 0 || removedRelationshipRecords > 0 || removedRuntimeLords > 0)
             {
-                Log.Message("[Space Services] cleaned stale service references: hospitalPatients=" + removedHospitalPatients + ", lordPawns=" + removedLordPawns + ", servicePawns=" + removedServicePawns + ", legacyPassengerShuttles=" + removedLegacyShuttles + ", serviceShuttlePayloads=" + removedServiceShuttles + ", socialMemories=" + removedSocialMemories + ", directRelations=" + removedDirectRelations + ", relationshipRecords=" + removedRelationshipRecords + ", runtimeLordRefs=" + removedRuntimeLords);
+                ServiceDebugUtility.Log(ServiceLogIntegration.Core, "cleaned stale service references: hospitalPatients=" + removedHospitalPatients + ", lordPawns=" + removedLordPawns + ", servicePawns=" + removedServicePawns + ", legacyPassengerShuttles=" + removedLegacyShuttles + ", serviceShuttlePayloads=" + removedServiceShuttles + ", socialMemories=" + removedSocialMemories + ", directRelations=" + removedDirectRelations + ", relationshipRecords=" + removedRelationshipRecords + ", runtimeLordRefs=" + removedRuntimeLords);
             }
         }
 

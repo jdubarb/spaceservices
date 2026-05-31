@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Defs>
+  <SpaceServices.SpaceServiceShuttleVisualDef>
+    <defName>JDB_ServicePassengerShuttleVisual</defName>
+    <label>service passenger shuttle</label>
+    <weight>1</weight>
+    <shipThingDefName>JDB_ServiceShuttlePayload</shipThingDefName>
+    <incomingSkyfallerDefName>JDB_ServiceShuttleIncoming</incomingSkyfallerDefName>
+    <leavingSkyfallerDefName>JDB_ServiceShuttleLeaving</leavingSkyfallerDefName>
+    <serviceKinds>
+      <li>hospital</li>
+      <li>hospitality</li>
+    </serviceKinds>
+  </SpaceServices.SpaceServiceShuttleVisualDef>
+</Defs>

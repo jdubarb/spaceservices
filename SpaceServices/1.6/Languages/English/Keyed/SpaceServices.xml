@@ -7,15 +7,13 @@
   <JDB_SpaceServices_Settings_SectionCompatibility>Compatibility</JDB_SpaceServices_Settings_SectionCompatibility>
 
   <JDB_SpaceServices_Settings_DebugLogging>Debug logging</JDB_SpaceServices_Settings_DebugLogging>
-  <JDB_SpaceServices_Settings_DebugLoggingDesc>Write normal core Space Services diagnostics to the RimWorld log. Integration details use their own verbose toggles below.</JDB_SpaceServices_Settings_DebugLoggingDesc>
+  <JDB_SpaceServices_Settings_DebugLoggingDesc>Write normal Space Services diagnostics to the RimWorld log. Warnings and errors are always logged.</JDB_SpaceServices_Settings_DebugLoggingDesc>
   <JDB_SpaceServices_Settings_VerboseCoreLogging>Core lifecycle verbose logging</JDB_SpaceServices_Settings_VerboseCoreLogging>
-  <JDB_SpaceServices_Settings_VerboseCoreLoggingDesc>Write extra shared lifecycle, shuttle, cleanup, and service pawn diagnostics. Does not enable Hospital, Hospitality, or Trader Ships logs.</JDB_SpaceServices_Settings_VerboseCoreLoggingDesc>
+  <JDB_SpaceServices_Settings_VerboseCoreLoggingDesc>Write extra shared lifecycle, shuttle, cleanup, and service pawn diagnostics. Does not enable Hospital or Hospitality logs.</JDB_SpaceServices_Settings_VerboseCoreLoggingDesc>
   <JDB_SpaceServices_Settings_VerboseHospitalLogging>Hospital verbose logging</JDB_SpaceServices_Settings_VerboseHospitalLogging>
   <JDB_SpaceServices_Settings_VerboseHospitalLoggingDesc>Write extra Hospital patient arrival, departure, and cleanup diagnostics.</JDB_SpaceServices_Settings_VerboseHospitalLoggingDesc>
   <JDB_SpaceServices_Settings_VerboseHospitalityLogging>Hospitality verbose logging</JDB_SpaceServices_Settings_VerboseHospitalityLogging>
   <JDB_SpaceServices_Settings_VerboseHospitalityLoggingDesc>Write extra Hospitality guest arrival, bed, lord, and departure diagnostics.</JDB_SpaceServices_Settings_VerboseHospitalityLoggingDesc>
-  <JDB_SpaceServices_Settings_VerboseTraderShipsLogging>Trader Ships verbose logging</JDB_SpaceServices_Settings_VerboseTraderShipsLogging>
-  <JDB_SpaceServices_Settings_VerboseTraderShipsLoggingDesc>Write extra Trader Ships bridge diagnostics when that integration is active.</JDB_SpaceServices_Settings_VerboseTraderShipsLoggingDesc>
   <JDB_SpaceServices_Settings_AutoExtract>Auto-extract fallback</JDB_SpaceServices_Settings_AutoExtract>
   <JDB_SpaceServices_Settings_AutoExtractDesc>Let Space Services recover service visitors that are ready to leave but get stuck outside the normal departure path.</JDB_SpaceServices_Settings_AutoExtractDesc>
   <JDB_SpaceServices_Settings_Hospital>Hospital support</JDB_SpaceServices_Settings_Hospital>
@@ -54,8 +52,6 @@
   <JDB_SpaceServices_Gizmo_ModeHospitalPriorityDesc>Use this pad for Hospital and Hospitality traffic, preferring Hospital patients.</JDB_SpaceServices_Gizmo_ModeHospitalPriorityDesc>
   <JDB_SpaceServices_Gizmo_ModeHospitalityPriority>Hospitality priority</JDB_SpaceServices_Gizmo_ModeHospitalityPriority>
   <JDB_SpaceServices_Gizmo_ModeHospitalityPriorityDesc>Use this pad for Hospital and Hospitality traffic, preferring Hospitality guests.</JDB_SpaceServices_Gizmo_ModeHospitalityPriorityDesc>
-  <JDB_SpaceServices_Gizmo_RequireVacRoof>Require vac-safe roof</JDB_SpaceServices_Gizmo_RequireVacRoof>
-  <JDB_SpaceServices_Gizmo_RequirePower>Require power</JDB_SpaceServices_Gizmo_RequirePower>
   <JDB_SpaceServices_Gizmo_ReportMap>Report service map status</JDB_SpaceServices_Gizmo_ReportMap>
   <JDB_SpaceServices_Gizmo_ReportMapDesc>Write the current map's Space Services eligibility reasons to the log.</JDB_SpaceServices_Gizmo_ReportMapDesc>
 </LanguageData>

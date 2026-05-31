@@ -15,7 +15,7 @@ namespace SpaceServices
 {
     public class SpaceServicesMod : Mod
     {
-        private const float SettingsViewHeight = 980f;
+        private const float SettingsViewHeight = 900f;
         private static Vector2 settingsScrollPosition;
 
         public static SpaceServicesSettings Settings;
@@ -49,7 +49,6 @@ namespace SpaceServices
             Checkbox(listing, "JDB_SpaceServices_Settings_VerboseCoreLogging", ref Settings.verboseCoreLogging);
             Checkbox(listing, "JDB_SpaceServices_Settings_VerboseHospitalLogging", ref Settings.verboseHospitalLogging);
             Checkbox(listing, "JDB_SpaceServices_Settings_VerboseHospitalityLogging", ref Settings.verboseHospitalityLogging);
-            Checkbox(listing, "JDB_SpaceServices_Settings_VerboseTraderShipsLogging", ref Settings.verboseTraderShipsLogging);
 
             Section(listing, "JDB_SpaceServices_Settings_SectionHospitality");
             Checkbox(listing, "JDB_SpaceServices_Settings_HospitalityRequireBeds", ref Settings.hospitalityRequireGuestBeds);
@@ -107,11 +106,10 @@ namespace SpaceServices
 
     public class SpaceServicesSettings : ModSettings
     {
-        public bool debugLogging = true;
+        public bool debugLogging = false;
         public bool verboseCoreLogging = false;
         public bool verboseHospitalLogging = false;
         public bool verboseHospitalityLogging = false;
-        public bool verboseTraderShipsLogging = false;
         public bool verboseDevLogging = false;
         public bool autoExtractFallback = true;
         public bool enableHospital = true;
@@ -130,19 +128,17 @@ namespace SpaceServices
 
         public override void ExposeData()
         {
-            Scribe_Values.Look(ref debugLogging, "debugLogging", true);
+            Scribe_Values.Look(ref debugLogging, "debugLogging", false);
             // Keep the old all-verbose debug save field as a one-load migration path for test saves.
             Scribe_Values.Look(ref verboseDevLogging, "verboseDevLogging", false);
             Scribe_Values.Look(ref verboseCoreLogging, "verboseCoreLogging", false);
             Scribe_Values.Look(ref verboseHospitalLogging, "verboseHospitalLogging", false);
             Scribe_Values.Look(ref verboseHospitalityLogging, "verboseHospitalityLogging", false);
-            Scribe_Values.Look(ref verboseTraderShipsLogging, "verboseTraderShipsLogging", false);
             if (Scribe.mode == LoadSaveMode.PostLoadInit && verboseDevLogging)
             {
                 verboseCoreLogging = true;
                 verboseHospitalLogging = true;
                 verboseHospitalityLogging = true;
-                verboseTraderShipsLogging = true;
                 verboseDevLogging = false;
             }
             Scribe_Values.Look(ref autoExtractFallback, "autoExtractFallback", true);

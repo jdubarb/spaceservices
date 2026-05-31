@@ -119,7 +119,7 @@ namespace SpaceServices
                 return false;
             }
             BeginDeparture(map, record, reason);
-            Log.Message("[Space Services] Released service group " + groupId + ": " + reason);
+            ServiceDebugUtility.Log("Released service group " + groupId + ": " + reason);
             return true;
         }
 
@@ -142,7 +142,7 @@ namespace SpaceServices
             ReleaseRecord(record);
             record.reservedPad = null;
             record.state = "completed";
-            Log.Message("[Space Services] Cleared service group " + groupId + " reservation: " + reason);
+            ServiceDebugUtility.Log("Cleared service group " + groupId + " reservation: " + reason);
             return true;
         }
 
@@ -192,7 +192,7 @@ namespace SpaceServices
             {
                 ReleaseRecord(record);
                 record.state = "completed";
-                Log.Message("[Space Services] Released service group " + record.id + ": " + reason);
+                ServiceDebugUtility.Log("Released service group " + record.id + ": " + reason);
             }
             else
             {
@@ -260,7 +260,7 @@ namespace SpaceServices
                 }
                 if (record.pawns.Count == 0)
                 {
-                    Log.Message("[Space Services] Service group " + record.id + " has no active pawns; releasing reservation. Previously tracked: " + PawnSummary(previouslyTrackedPawns));
+                    ServiceDebugUtility.Log("Service group " + record.id + " has no active pawns; releasing reservation. Previously tracked: " + PawnSummary(previouslyTrackedPawns));
                     ReleaseRecord(record);
                     records.RemoveAt(i);
                     continue;
@@ -306,7 +306,7 @@ namespace SpaceServices
                         {
                             if (ShouldLogBlockedDeparture())
                             {
-                                Log.Message("[Space Services] Pickup shuttle waiting for usable pad: " + blockedReason);
+                                ServiceDebugUtility.Log("Pickup shuttle waiting for usable pad: " + blockedReason);
                             }
                             GuideDepartingPawnsToPad(record);
                             continue;
@@ -331,7 +331,7 @@ namespace SpaceServices
                     {
                         if (ShouldLogBlockedDeparture())
                         {
-                            Log.Message("[Space Services] Service pickup boarding waiting: " + blockedReason);
+                            ServiceDebugUtility.Log("Service pickup boarding waiting: " + blockedReason);
                         }
                         continue;
                     }
@@ -548,7 +548,7 @@ namespace SpaceServices
                     {
                         record.state = "departing";
                         record.departureRequestedTick = Find.TickManager.TicksGame;
-                        Log.Message("[Space Services] Hospitality visitors waiting for free departure pad: " + reason);
+                        ServiceDebugUtility.Log("Hospitality visitors waiting for free departure pad: " + reason);
                     }
                     return;
                 }
@@ -564,7 +564,7 @@ namespace SpaceServices
             {
                 record.state = "departing";
                 record.departureRequestedTick = Find.TickManager.TicksGame;
-                Log.Message("[Space Services] Routing " + record.serviceKind + " service group " + record.id + " to departure pad: " + reason);
+                ServiceDebugUtility.Log("Routing " + record.serviceKind + " service group " + record.id + " to departure pad: " + reason);
             }
             GuideDepartingPawnsToPad(record);
         }
@@ -606,7 +606,7 @@ namespace SpaceServices
                 {
                     record.state = "departing";
                     record.departureRequestedTick = Find.TickManager.TicksGame;
-                    Log.Message("[Space Services] Hospital patient waiting for free departure pad: " + reason);
+                    ServiceDebugUtility.Log("Hospital patient waiting for free departure pad: " + reason);
                 }
                 return;
             }
@@ -614,13 +614,13 @@ namespace SpaceServices
             {
                 record.state = "departing";
                 record.departureRequestedTick = Find.TickManager.TicksGame;
-                Log.Message("[Space Services] Routing hospital patient to departure pad: " + reason);
+                ServiceDebugUtility.Log("Routing hospital patient to departure pad: " + reason);
             }
             if (!ReservedPadCanServe(record, ServiceUse.Patient, out string blockedReason))
             {
                 if (SpaceServicesMod.Settings != null && SpaceServicesMod.Settings.debugLogging)
                 {
-                    Log.Message("[Space Services] Hospital patient departure waiting: " + blockedReason);
+                    ServiceDebugUtility.Log("Hospital patient departure waiting: " + blockedReason);
                 }
                 GuideDepartingPawnsToPad(record);
                 return;
@@ -648,7 +648,7 @@ namespace SpaceServices
             {
                 if (SpaceServicesMod.Settings != null && SpaceServicesMod.Settings.debugLogging && ShouldLogBlockedDeparture())
                 {
-                    Log.Message("[Space Services] Service group " + record.id + " waiting for a usable departure pad.");
+                    ServiceDebugUtility.Log("Service group " + record.id + " waiting for a usable departure pad.");
                 }
                 return false;
             }
@@ -665,7 +665,18 @@ namespace SpaceServices
             {
                 return;
             }
-            ShuttleVisual visual = ShuttleVisual.Resolve();
+            if (ServiceDangerUtility.DepartureShuttleBlocked(record.reservedPad.Map, record.serviceKind, out string hazardReason))
+            {
+                ServiceDebugUtility.LogThrottled(ServiceDebugUtility.IntegrationForServiceKind(record.serviceKind), "departure-hazard-" + record.id + "-" + hazardReason, "Pickup shuttle delayed for service group " + record.id + ": " + hazardReason, GenDate.TicksPerHour);
+                if (record.state != "departing")
+                {
+                    record.state = "departing";
+                    record.departureRequestedTick = Find.TickManager.TicksGame;
+                }
+                return;
+            }
+
+            ShuttleVisual visual = ShuttleVisual.Resolve(record.serviceKind, record.pickupShuttleVisualDefName);
             if (visual == null)
             {
                 ServiceDebugUtility.LogAudit("BeginPickupShuttle no shuttle visual, completing directly " + RecordAudit(record));
@@ -676,9 +687,10 @@ namespace SpaceServices
             record.state = "pickupInbound";
             record.pickupShuttleTouchdownTick = Find.TickManager.TicksGame + ServiceShuttleUtility.ArrivalTouchdownDelayTicks;
             record.pickupShuttleThingDefName = visual.shipThingDef.defName;
-            ServiceShuttleUtility.SpawnArrival(record.reservedPad.Map, record.reservedPad.Position);
-            Log.Message("[Space Services] Pickup shuttle inbound for " + record.serviceKind + " service group " + record.id + ": " + reason);
-            ServiceDebugUtility.LogAudit("BeginPickupShuttle " + RecordAudit(record) + " touchdownTick=" + record.pickupShuttleTouchdownTick + " ship=" + record.pickupShuttleThingDefName + " reason=" + (reason ?? "none"));
+            record.pickupShuttleVisualDefName = visual.id;
+            ServiceShuttleUtility.SpawnArrival(record.reservedPad.Map, record.reservedPad.Position, record.serviceKind, visual.id);
+            ServiceDebugUtility.Log("Pickup shuttle inbound for " + record.serviceKind + " service group " + record.id + ": " + reason);
+            ServiceDebugUtility.LogAudit("BeginPickupShuttle " + RecordAudit(record) + " touchdownTick=" + record.pickupShuttleTouchdownTick + " ship=" + record.pickupShuttleThingDefName + " visual=" + record.pickupShuttleVisualDefName + " reason=" + (reason ?? "none"));
         }
 
         private static Thing TryReserveBestDeparturePad(Map map, ServiceUse use, ServiceGroupRecord record)
@@ -1249,6 +1261,16 @@ namespace SpaceServices
                         continue;
                     }
                     ServiceUse use = record.serviceKind == "hospitality" ? ServiceUse.Guest : ServiceUse.Patient;
+                    if (ServiceDangerUtility.DepartureShuttleBlocked(map, record.serviceKind, out string hazardReason))
+                    {
+                        blocks.Add(new ServiceDepartureBlock
+                        {
+                            map = map,
+                            record = record,
+                            reason = hazardReason
+                        });
+                        continue;
+                    }
                     if (record.serviceKind == "hospital" && record.state == "arrived")
                     {
                         string futureDepartureReason = NoReservedPadBlockReason(map, use, record);

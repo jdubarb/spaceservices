@@ -35,7 +35,7 @@ namespace SpaceServices
                 request.cells = BuildArrivalCells(map);
                 if (SpaceServicesMod.Settings != null && SpaceServicesMod.Settings.debugLogging)
                 {
-                    Log.Message("[Space Services] Mass casualty arrival cells prepared=" + request.cells.Count);
+                    ServiceDebugUtility.LogVerbose(ServiceLogIntegration.Hospital, "Mass casualty arrival cells prepared=" + request.cells.Count);
                 }
             }
             Requests.Push(request);

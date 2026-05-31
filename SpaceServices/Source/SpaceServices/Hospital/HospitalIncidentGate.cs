@@ -30,6 +30,10 @@ namespace SpaceServices
             {
                 return false;
             }
+            if (ServiceDangerUtility.ArrivalTrafficBlocked(map, "hospital", out _))
+            {
+                return false;
+            }
             int freeBeds = CallInt(hospital, "FreeMedicalBeds", -1);
             if (freeBeds == 0 || CallBool(hospital, "IsFull", false))
             {
@@ -61,6 +65,10 @@ namespace SpaceServices
             if (hospital == null)
             {
                 return "no HospitalMapComponent";
+            }
+            if (ServiceDangerUtility.ArrivalTrafficBlocked(map, "hospital", out string trafficReason))
+            {
+                return trafficReason;
             }
             return "open=" + CallBool(hospital, "IsOpen", true) +
                 ", freeBeds=" + CallInt(hospital, "FreeMedicalBeds", -1) +

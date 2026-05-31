@@ -25,14 +25,14 @@ namespace SpaceServices
                 method.GetParameters()[1].ParameterType == typeof(Pawn));
             if (worker == null || spawnPatient == null)
             {
-                Log.Message("[Space Services] Hospital fallback could not find Hospital.IncidentWorker_PatientArrives.SpawnPatient.");
+                ServiceDebugUtility.LogWarning(ServiceLogIntegration.Hospital, "Hospital fallback could not find Hospital.IncidentWorker_PatientArrives.SpawnPatient.");
                 return false;
             }
 
             List<Pawn> pawns = ResolvePatientPawns(worker, parms, map);
             if (pawns.Count == 0)
             {
-                Log.Message("[Space Services] Hospital fallback could not generate a patient pawn.");
+                ServiceDebugUtility.LogWarning(ServiceLogIntegration.Hospital, "Hospital fallback could not generate a patient pawn.");
                 return false;
             }
 
@@ -59,7 +59,7 @@ namespace SpaceServices
             TryCreateHospitalLord(worker, parms, map, pawns);
             ServiceLifecycleUtility.RegisterPawns(map, "hospital", pawns);
             SendPatientArrivalNotice(pawns[0]);
-            Log.Message("[Space Services] Hospital fallback ran real patient arrival pawns=" + pawns.Count);
+            ServiceDebugUtility.Log(ServiceLogIntegration.Hospital, "Hospital fallback ran real patient arrival pawns=" + pawns.Count);
             return true;
         }
 

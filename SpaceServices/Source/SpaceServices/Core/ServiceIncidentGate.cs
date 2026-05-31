@@ -67,11 +67,19 @@ namespace SpaceServices
             }
             if (HospitalIncidents.Contains(incidentDefName))
             {
+                if (ServiceDangerUtility.ArrivalTrafficBlocked(map, "hospital", out _))
+                {
+                    return false;
+                }
                 return (SpaceServicesMod.Settings == null || SpaceServicesMod.Settings.enableHospital) &&
                     HospitalIncidentGate.CanAcceptHospitalIncident(incidentDefName, map);
             }
             if (HospitalityIncidents.Contains(incidentDefName))
             {
+                if (ServiceDangerUtility.ArrivalTrafficBlocked(map, "hospitality", out _))
+                {
+                    return false;
+                }
                 return (SpaceServicesMod.Settings == null || SpaceServicesMod.Settings.enableHospitality) &&
                     HospitalityIncidentGate.CanAcceptHospitalityIncident(incidentDefName, map);
             }

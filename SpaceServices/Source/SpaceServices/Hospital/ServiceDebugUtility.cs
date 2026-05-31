@@ -17,8 +17,7 @@ namespace SpaceServices
     {
         Core,
         Hospital,
-        Hospitality,
-        TraderShips
+        Hospitality
     }
 
     public static class ServiceDebugUtility
@@ -48,8 +47,7 @@ namespace SpaceServices
             {
                 return VerboseLogging(ServiceLogIntegration.Core) ||
                     VerboseLogging(ServiceLogIntegration.Hospital) ||
-                    VerboseLogging(ServiceLogIntegration.Hospitality) ||
-                    VerboseLogging(ServiceLogIntegration.TraderShips);
+                    VerboseLogging(ServiceLogIntegration.Hospitality);
             }
         }
 
@@ -65,8 +63,6 @@ namespace SpaceServices
                     return SpaceServicesMod.Settings.verboseHospitalLogging;
                 case ServiceLogIntegration.Hospitality:
                     return SpaceServicesMod.Settings.verboseHospitalityLogging;
-                case ServiceLogIntegration.TraderShips:
-                    return SpaceServicesMod.Settings.verboseTraderShipsLogging;
                 default:
                     return SpaceServicesMod.Settings.verboseCoreLogging;
             }
@@ -87,10 +83,12 @@ namespace SpaceServices
 
         public static void LogWarning(ServiceLogIntegration integration, string message)
         {
-            if (NormalLogging(integration))
-            {
-                Verse.Log.Warning("[Space Services] " + message);
-            }
+            Verse.Log.Warning("[Space Services] " + message);
+        }
+
+        public static void LogError(ServiceLogIntegration integration, string message)
+        {
+            Verse.Log.Error("[Space Services] " + message);
         }
 
         public static void LogVerbose(string message)
@@ -172,11 +170,6 @@ namespace SpaceServices
             {
                 return ServiceLogIntegration.Hospitality;
             }
-            if (string.Equals(serviceKind, "traderShips", StringComparison.OrdinalIgnoreCase) ||
-                string.Equals(serviceKind, "trader-ships", StringComparison.OrdinalIgnoreCase))
-            {
-                return ServiceLogIntegration.TraderShips;
-            }
             return ServiceLogIntegration.Core;
         }
 
@@ -185,11 +178,6 @@ namespace SpaceServices
             if (message == null)
             {
                 return ServiceLogIntegration.Core;
-            }
-            if (message.IndexOf("Trader Ships", StringComparison.OrdinalIgnoreCase) >= 0 ||
-                message.IndexOf("TraderShips", StringComparison.OrdinalIgnoreCase) >= 0)
-            {
-                return ServiceLogIntegration.TraderShips;
             }
             if (message.IndexOf("Hospitality", StringComparison.OrdinalIgnoreCase) >= 0 ||
                 message.IndexOf("Guest", StringComparison.OrdinalIgnoreCase) >= 0 ||
@@ -214,8 +202,6 @@ namespace SpaceServices
                     return "hospital";
                 case ServiceLogIntegration.Hospitality:
                     return "hospitality";
-                case ServiceLogIntegration.TraderShips:
-                    return "trader-ships";
                 default:
                     return "core";
             }

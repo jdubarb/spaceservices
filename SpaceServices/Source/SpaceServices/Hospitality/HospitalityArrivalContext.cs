@@ -81,19 +81,20 @@ namespace SpaceServices
             {
                 return;
             }
-            ShuttleVisual visual = ShuttleVisual.Resolve();
+            ShuttleVisual visual = ShuttleVisual.Resolve("hospitality", null);
             if (visual == null)
             {
                 return;
             }
 
-            ServiceShuttleUtility.SpawnArrival(map, request.pad.Position);
+            ServiceShuttleUtility.SpawnArrival(map, request.pad.Position, "hospitality", visual.id);
             SpaceServicesMapComponent comp = map.GetComponent<SpaceServicesMapComponent>();
             if (comp != null)
             {
                 comp.ScheduleShuttleArrival(
                     request.pad.Position,
                     visual.shipThingDef == null ? null : visual.shipThingDef.defName,
+                    visual.id,
                     new List<Thing>(),
                     true);
             }

@@ -24,6 +24,7 @@ namespace SpaceServices
         public int pickupShuttleTouchdownTick;
         public int hospitalityBedlessSinceTick;
         public string pickupShuttleThingDefName;
+        public string pickupShuttleVisualDefName;
         public bool hospitalityDeparturePrepared;
         public Thing arrivalPad;
         public Thing reservedPad;
@@ -40,6 +41,7 @@ namespace SpaceServices
             Scribe_Values.Look(ref pickupShuttleTouchdownTick, "pickupShuttleTouchdownTick", 0);
             Scribe_Values.Look(ref hospitalityBedlessSinceTick, "hospitalityBedlessSinceTick", 0);
             Scribe_Values.Look(ref pickupShuttleThingDefName, "pickupShuttleThingDefName");
+            Scribe_Values.Look(ref pickupShuttleVisualDefName, "pickupShuttleVisualDefName");
             Scribe_Values.Look(ref hospitalityDeparturePrepared, "hospitalityDeparturePrepared", false);
             Scribe_References.Look(ref arrivalPad, "arrivalPad");
             Scribe_References.Look(ref reservedPad, "reservedPad");

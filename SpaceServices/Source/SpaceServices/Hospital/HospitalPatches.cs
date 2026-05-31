@@ -64,7 +64,7 @@ namespace SpaceServices
             OptionalModPatches.PatchIfExists(harmony, AccessTools.Method(typeof(DropPodUtility), "MakeDropPodAt", new[] { typeof(IntVec3), typeof(Map), typeof(ActiveTransporterInfo), typeof(Faction) }), typeof(HospitalPatchHandlers), prefix: nameof(HospitalPatchHandlers.HospitalDropPodAtPrefix));
             if (incidentHelper != null || patientArrival != null || massCasualty != null)
             {
-                Log.Message("[Space Services] Hospital bridge patches installed.");
+                ServiceDebugUtility.Log(ServiceLogIntegration.Hospital, "Hospital bridge patches installed.");
             }
         }
     }

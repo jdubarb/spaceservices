@@ -464,7 +464,7 @@ namespace SpaceServices
                     action = delegate
                     {
                         SpaceServiceEligibility eligibility = SpaceServiceMapDetector.Evaluate(parent.MapHeld);
-                        Log.Message("[Space Services] " + eligibility.ToLogString(parent.MapHeld));
+                        ServiceDebugUtility.Log(ServiceLogIntegration.Core, eligibility.ToLogString(parent.MapHeld));
                         Messages.Message(eligibility.allowed ? "Space Services: map eligible" : "Space Services: map blocked", parent, MessageTypeDefOf.NeutralEvent, false);
                     }
                 };
@@ -644,7 +644,7 @@ namespace SpaceServices
 
         private static bool ShouldShowDevGizmos()
         {
-            return Prefs.DevMode || DebugSettings.godMode;
+            return DebugSettings.godMode;
         }
 
         private Command_Toggle DebugDangerToggle()

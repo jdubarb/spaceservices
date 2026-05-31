@@ -19,14 +19,24 @@ namespace SpaceServices
 
         public static void SpawnArrival(Map map, IntVec3 cell)
         {
+            SpawnArrival(map, cell, null, null);
+        }
+
+        public static void SpawnArrival(Map map, IntVec3 cell, string serviceKind, string visualDefName)
+        {
             ServiceDebugUtility.LogAudit("SpawnArrivalShuttle cell=" + cell + " map=" + (map == null ? "null" : map.Index.ToString()));
-            SpawnSkyfaller(map, cell, ShuttleVisual.Resolve(), true);
+            SpawnSkyfaller(map, cell, ShuttleVisual.Resolve(serviceKind, visualDefName), true);
         }
 
         public static void SpawnDeparture(Map map, IntVec3 cell)
         {
+            SpawnDeparture(map, cell, null, null);
+        }
+
+        public static void SpawnDeparture(Map map, IntVec3 cell, string serviceKind, string visualDefName)
+        {
             ServiceDebugUtility.LogAudit("SpawnDepartureShuttle cell=" + cell + " map=" + (map == null ? "null" : map.Index.ToString()));
-            SpawnSkyfaller(map, cell, ShuttleVisual.Resolve(), false);
+            SpawnSkyfaller(map, cell, ShuttleVisual.Resolve(serviceKind, visualDefName), false);
         }
 
         public static bool TryReplaceDropPodWithArrivalShuttle(IntVec3 cell, Map map, ActiveTransporterInfo info, Faction faction, bool showArrival, bool showDeparture)
@@ -47,7 +57,7 @@ namespace SpaceServices
             {
                 return false;
             }
-            ShuttleVisual visual = ShuttleVisual.Resolve();
+            ShuttleVisual visual = ShuttleVisual.Resolve("hospital", null);
             if (showArrival && visual == null)
             {
                 return false;
@@ -64,7 +74,7 @@ namespace SpaceServices
             {
                 SpawnSkyfaller(map, cell, visual, true);
             }
-            comp.ScheduleShuttleArrival(cell, visual == null || visual.shipThingDef == null ? null : visual.shipThingDef.defName, things, showDeparture);
+            comp.ScheduleShuttleArrival(cell, visual == null || visual.shipThingDef == null ? null : visual.shipThingDef.defName, visual == null ? null : visual.id, things, showDeparture);
             return true;
         }
 
@@ -88,7 +98,7 @@ namespace SpaceServices
                 SpawnContents(map, arrival.cell, arrival.things);
                 if (arrival.showDeparture)
                 {
-                    SpawnDeparture(map, arrival.cell);
+                    SpawnDeparture(map, arrival.cell, null, arrival.shuttleVisualDefName);
                 }
                 arrivals.RemoveAt(i);
             }
@@ -124,7 +134,7 @@ namespace SpaceServices
             }
             Thing innerThing = ThingMaker.MakeThing(shipThingDef);
             // Graphic_Multi payloads are made off-map, so set the service pad facing explicitly.
-            innerThing.Rotation = Rot4.East;
+            innerThing.Rotation = visual.rotation;
             SkyfallerMaker.SpawnSkyfaller(skyfallerDef, innerThing, cell, map);
         }
 
@@ -185,30 +195,122 @@ namespace SpaceServices
 
     public sealed class ShuttleVisual
     {
+        public string id;
+        public float weight = 1f;
+        public Rot4 rotation = Rot4.East;
         public ThingDef shipThingDef;
         public ThingDef incomingSkyfallerDef;
         public ThingDef leavingSkyfallerDef;
 
         public static ShuttleVisual Resolve()
         {
-            ThingDef payload = DefDatabase<ThingDef>.GetNamedSilentFail("JDB_ServiceShuttlePayload");
+            return Resolve(null, null);
+        }
+
+        public static ShuttleVisual Resolve(string serviceKind, string visualDefName)
+        {
+            List<ShuttleVisual> visuals = AvailableVisuals(serviceKind).ToList();
+            if (!string.IsNullOrEmpty(visualDefName))
+            {
+                ShuttleVisual exact = visuals.FirstOrDefault(visual => string.Equals(visual.id, visualDefName, StringComparison.OrdinalIgnoreCase));
+                if (exact != null)
+                {
+                    return exact;
+                }
+            }
+            if (visuals.Count == 0)
+            {
+                return FallbackVisual();
+            }
+            float totalWeight = visuals.Sum(visual => Math.Max(0.001f, visual.weight));
+            float roll = Rand.Value * totalWeight;
+            foreach (ShuttleVisual visual in visuals)
+            {
+                roll -= Math.Max(0.001f, visual.weight);
+                if (roll <= 0f)
+                {
+                    return visual;
+                }
+            }
+            return visuals[visuals.Count - 1];
+        }
+
+        private static IEnumerable<ShuttleVisual> AvailableVisuals(string serviceKind)
+        {
+            foreach (SpaceServiceShuttleVisualDef def in DefDatabase<SpaceServiceShuttleVisualDef>.AllDefsListForReading)
+            {
+                if (def != null && def.AppliesTo(serviceKind))
+                {
+                    ShuttleVisual visual = FromNames(def.defName, def.weight, def.shipThingDefName, def.incomingSkyfallerDefName, def.leavingSkyfallerDefName, def.rotation);
+                    if (visual != null)
+                    {
+                        yield return visual;
+                    }
+                }
+            }
+
+            foreach (ThingDef thingDef in DefDatabase<ThingDef>.AllDefsListForReading)
+            {
+                SpaceServiceShuttleVisualExtension extension = thingDef.GetModExtension<SpaceServiceShuttleVisualExtension>();
+                if (extension == null || !extension.AppliesTo(serviceKind))
+                {
+                    continue;
+                }
+                string shipDefName = string.IsNullOrEmpty(extension.shipThingDefName) ? thingDef.defName : extension.shipThingDefName;
+                ShuttleVisual visual = FromNames(thingDef.defName, extension.weight, shipDefName, extension.incomingSkyfallerDefName, extension.leavingSkyfallerDefName, extension.rotation);
+                if (visual != null)
+                {
+                    yield return visual;
+                }
+            }
+        }
+
+        private static ShuttleVisual FromNames(string id, float weight, string shipThingDefName, string incomingSkyfallerDefName, string leavingSkyfallerDefName, Rot4 rotation)
+        {
+            if (string.IsNullOrEmpty(shipThingDefName))
+            {
+                shipThingDefName = "JDB_ServiceShuttlePayload";
+            }
+            if (string.IsNullOrEmpty(incomingSkyfallerDefName))
+            {
+                incomingSkyfallerDefName = "JDB_ServiceShuttleIncoming";
+            }
+            if (string.IsNullOrEmpty(leavingSkyfallerDefName))
+            {
+                leavingSkyfallerDefName = "JDB_ServiceShuttleLeaving";
+            }
+            ThingDef payload = DefDatabase<ThingDef>.GetNamedSilentFail(shipThingDefName);
             if (payload == null)
             {
                 return null;
             }
 
-            ThingDef incoming = DefDatabase<ThingDef>.GetNamedSilentFail("JDB_ServiceShuttleIncoming");
-            ThingDef leaving = DefDatabase<ThingDef>.GetNamedSilentFail("JDB_ServiceShuttleLeaving");
+            ThingDef incoming = DefDatabase<ThingDef>.GetNamedSilentFail(incomingSkyfallerDefName);
+            ThingDef leaving = DefDatabase<ThingDef>.GetNamedSilentFail(leavingSkyfallerDefName);
             if (incoming == null || leaving == null)
             {
                 return null;
             }
             return new ShuttleVisual
             {
+                id = id,
+                weight = Math.Max(0.001f, weight),
+                rotation = rotation,
                 shipThingDef = payload,
                 incomingSkyfallerDef = incoming,
                 leavingSkyfallerDef = leaving
             };
+        }
+
+        private static ShuttleVisual FallbackVisual()
+        {
+            return FromNames(
+                "JDB_ServicePassengerShuttleVisual",
+                1f,
+                "JDB_ServiceShuttlePayload",
+                "JDB_ServiceShuttleIncoming",
+                "JDB_ServiceShuttleLeaving",
+                Rot4.East);
         }
     }
 }

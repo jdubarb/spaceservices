@@ -19,7 +19,6 @@ namespace SpaceServices
         {
             HospitalPatches.Install(harmony);
             HospitalityPatches.Install(harmony);
-            TraderShipsPatches.Install(harmony);
         }
 
         public static void PatchIfExists(Harmony harmony, MethodInfo method, Type handlerType, string prefix = null, string postfix = null)

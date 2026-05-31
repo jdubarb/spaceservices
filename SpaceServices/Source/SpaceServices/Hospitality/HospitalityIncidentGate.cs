@@ -38,6 +38,10 @@ namespace SpaceServices
             {
                 return false;
             }
+            if (ServiceDangerUtility.ArrivalTrafficBlocked(map, "hospitality", out _))
+            {
+                return false;
+            }
             if (applyPriorityThrottle && !ServicePadUtility.PriorityThrottleAllows(map, ServiceUse.Guest, out _))
             {
                 return false;
@@ -72,6 +76,10 @@ namespace SpaceServices
             if (ServiceDangerUtility.HospitalityTrafficBlocked(map, out string dangerReason))
             {
                 return "hospitality traffic blocked by " + dangerReason;
+            }
+            if (ServiceDangerUtility.ArrivalTrafficBlocked(map, "hospitality", out string trafficReason))
+            {
+                return "hospitality traffic blocked by " + trafficReason;
             }
             string priorityReport = ServicePadUtility.PriorityReadinessReport(map, ServiceUse.Guest);
             if (priorityReport != "priority or shared pad available")

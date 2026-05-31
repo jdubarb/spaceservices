@@ -78,7 +78,7 @@ namespace SpaceServices
             if (SpaceServicesMod.Settings != null && SpaceServicesMod.Settings.debugLogging)
             {
                 SpaceServiceEligibility eligibility = SpaceServiceMapDetector.Evaluate(map);
-                Log.Message("[Space Services] " + eligibility.ToLogString(map));
+                ServiceDebugUtility.LogVerbose(ServiceLogIntegration.Core, eligibility.ToLogString(map));
             }
         }
 
@@ -114,7 +114,7 @@ namespace SpaceServices
             }
         }
 
-        public void ScheduleShuttleArrival(IntVec3 cell, string shuttleThingDefName, List<Thing> things, bool showDeparture)
+        public void ScheduleShuttleArrival(IntVec3 cell, string shuttleThingDefName, string shuttleVisualDefName, List<Thing> things, bool showDeparture)
         {
             if (!cell.IsValid)
             {
@@ -129,6 +129,7 @@ namespace SpaceServices
                 cell = cell,
                 touchdownTick = Find.TickManager.TicksGame + ServiceShuttleUtility.ArrivalTouchdownDelayTicks,
                 shuttleThingDefName = shuttleThingDefName,
+                shuttleVisualDefName = shuttleVisualDefName,
                 showDeparture = showDeparture
             };
             foreach (Thing thing in things ?? Enumerable.Empty<Thing>())
@@ -146,7 +147,7 @@ namespace SpaceServices
             pendingShuttleArrivals.Add(arrival);
         }
 
-        public bool ScheduleHospitalityIncident(object worker, IncidentParms parms, Thing pad, string shuttleThingDefName)
+        public bool ScheduleHospitalityIncident(object worker, IncidentParms parms, Thing pad, string shuttleThingDefName, string shuttleVisualDefName)
         {
             if (worker == null || parms == null || pad == null || pad.Destroyed || !pad.Spawned)
             {
@@ -180,6 +181,7 @@ namespace SpaceServices
                 incidentDefName = IncidentDefName(worker),
                 expectedBedDemand = expectedBedDemand,
                 shuttleThingDefName = shuttleThingDefName,
+                shuttleVisualDefName = shuttleVisualDefName,
                 touchdownTick = Find.TickManager.TicksGame + ServiceShuttleUtility.ArrivalTouchdownDelayTicks
             });
             ServiceDebugUtility.LogAudit("ScheduleHospitalityIncident queued id=" + reservationId + " incident=" + IncidentDefName(worker) + " beds=" + expectedBedDemand + " pad=" + ServiceDebugUtility.ThingAuditSummary(pad) + " touchdownTick=" + (Find.TickManager.TicksGame + ServiceShuttleUtility.ArrivalTouchdownDelayTicks));
@@ -210,7 +212,7 @@ namespace SpaceServices
                     ServiceDebugUtility.LogAudit("TickPendingHospitalityIncidents canceled unusable pad reservation=" + incident.reservationId + " pad=" + ServiceDebugUtility.ThingAuditSummary(incident.pad));
                     Messages.Message("Space Services: visitor arrival canceled, landing pad is no longer usable", incident.pad, MessageTypeDefOf.RejectInput, false);
                     ServiceShuttleUtility.CleanupTouchdownShuttle(map, incident.pad.Position, incident.shuttleThingDefName);
-                    ServiceShuttleUtility.SpawnDeparture(map, incident.pad.Position);
+                    ServiceShuttleUtility.SpawnDeparture(map, incident.pad.Position, "hospitality", incident.shuttleVisualDefName);
                     ReleaseArrivalReservation(incident);
                     continue;
                 }
@@ -219,7 +221,16 @@ namespace SpaceServices
                     ServiceDebugUtility.LogAudit("TickPendingHospitalityIncidents waved off danger reservation=" + incident.reservationId + " reason=" + dangerReason + " pad=" + ServiceDebugUtility.ThingAuditSummary(incident.pad));
                     Messages.Message("Space Services: visitor arrival waved off, " + dangerReason, incident.pad, MessageTypeDefOf.NegativeEvent, false);
                     ServiceShuttleUtility.CleanupTouchdownShuttle(map, incident.pad.Position, incident.shuttleThingDefName);
-                    ServiceShuttleUtility.SpawnDeparture(map, incident.pad.Position);
+                    ServiceShuttleUtility.SpawnDeparture(map, incident.pad.Position, "hospitality", incident.shuttleVisualDefName);
+                    ReleaseArrivalReservation(incident);
+                    continue;
+                }
+                if (ServiceDangerUtility.ArrivalTrafficBlocked(map, "hospitality", out string trafficReason))
+                {
+                    ServiceDebugUtility.LogAudit("TickPendingHospitalityIncidents waved off traffic hazard reservation=" + incident.reservationId + " reason=" + trafficReason + " pad=" + ServiceDebugUtility.ThingAuditSummary(incident.pad));
+                    Messages.Message("Space Services: visitor arrival waved off, " + trafficReason, incident.pad, MessageTypeDefOf.NegativeEvent, false);
+                    ServiceShuttleUtility.CleanupTouchdownShuttle(map, incident.pad.Position, incident.shuttleThingDefName);
+                    ServiceShuttleUtility.SpawnDeparture(map, incident.pad.Position, "hospitality", incident.shuttleVisualDefName);
                     ReleaseArrivalReservation(incident);
                     continue;
                 }
@@ -231,7 +242,7 @@ namespace SpaceServices
                     ServiceDebugUtility.LogAudit("TickPendingHospitalityIncidents canceled beds reservation=" + incident.reservationId + " need=" + expectedBedDemand + " " + beds.ToSummary());
                     ServiceDebugUtility.LogThrottled("hospitality-touchdown-beds-" + (incident.incidentDefName ?? ""), "Hospitality visitor arrival canceled at touchdown: need " + expectedBedDemand + ", " + beds.ToSummary(), GenDate.TicksPerHour);
                     ServiceShuttleUtility.CleanupTouchdownShuttle(map, incident.pad.Position, incident.shuttleThingDefName);
-                    ServiceShuttleUtility.SpawnDeparture(map, incident.pad.Position);
+                    ServiceShuttleUtility.SpawnDeparture(map, incident.pad.Position, "hospitality", incident.shuttleVisualDefName);
                     ReleaseArrivalReservation(incident);
                     continue;
                 }
@@ -254,7 +265,7 @@ namespace SpaceServices
                 {
                     HospitalityDelayedIncidentContext.Pop();
                 }
-                ServiceShuttleUtility.SpawnDeparture(map, incident.pad.Position);
+                ServiceShuttleUtility.SpawnDeparture(map, incident.pad.Position, "hospitality", incident.shuttleVisualDefName);
             }
         }
 
@@ -336,14 +347,14 @@ namespace SpaceServices
             parms.spawnCenter = pad.Position;
             parms.sendLetter = true;
 
-            ShuttleVisual visual = ShuttleVisual.Resolve();
-            if (!ScheduleHospitalityIncident(worker, parms, pad, visual == null || visual.shipThingDef == null ? null : visual.shipThingDef.defName))
+            ShuttleVisual visual = ShuttleVisual.Resolve("hospitality", null);
+            if (!ScheduleHospitalityIncident(worker, parms, pad, visual == null || visual.shipThingDef == null ? null : visual.shipThingDef.defName, visual == null ? null : visual.id))
             {
                 reason = "could not reserve service pad";
                 return false;
             }
 
-            ServiceShuttleUtility.SpawnArrival(map, pad.Position);
+            ServiceShuttleUtility.SpawnArrival(map, pad.Position, "hospitality", visual == null ? null : visual.id);
             Messages.Message("Space Services: visitors inbound", pad, MessageTypeDefOf.NeutralEvent, false);
             ServiceDebugUtility.Log("Queued service hospitality visitors from " + faction.Name + " at " + pad.Position);
             return true;
@@ -429,6 +440,7 @@ namespace SpaceServices
         public IntVec3 cell;
         public int touchdownTick;
         public string shuttleThingDefName;
+        public string shuttleVisualDefName;
         public ThingOwner<Thing> things;
         public bool showDeparture = true;
         public IThingHolder ParentHolder => null;
@@ -458,6 +470,7 @@ namespace SpaceServices
         public string incidentDefName;
         public int expectedBedDemand;
         public string shuttleThingDefName;
+        public string shuttleVisualDefName;
         public int touchdownTick;
     }
 }

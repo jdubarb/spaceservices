@@ -24,7 +24,7 @@ namespace SpaceServices
 
             record.state = "extracting";
             record.departureRequestedTick = Find.TickManager.TicksGame;
-            Log.Message("[Space Services] Departing " + record.serviceKind + " service group " + record.id + ": " + reason);
+            ServiceDebugUtility.Log("Departing " + record.serviceKind + " service group " + record.id + ": " + reason);
             ServiceDebugUtility.LogAudit("CompleteDeparture begin id=" + record.id + " kind=" + record.serviceKind + " state=" + record.state + " reason=" + (reason ?? "none") + " pawns=" + PawnListAudit(record.pawns) + " pad=" + ServiceDebugUtility.ThingAuditSummary(record.reservedPad));
             Map padMap = record.reservedPad == null ? null : record.reservedPad.Map;
             IntVec3 padCell = record.reservedPad == null ? IntVec3.Invalid : record.reservedPad.Position;
@@ -44,7 +44,7 @@ namespace SpaceServices
             {
                 if (record.reservedPad != null && record.reservedPad.Spawned)
                 {
-                    ServiceShuttleUtility.SpawnDeparture(record.reservedPad.Map, record.reservedPad.Position);
+                    ServiceShuttleUtility.SpawnDeparture(record.reservedPad.Map, record.reservedPad.Position, record.serviceKind, record.pickupShuttleVisualDefName);
                 }
                 record.state = "completed";
                 if (record.serviceKind == "hospital")
@@ -101,7 +101,7 @@ namespace SpaceServices
             }
             if (any)
             {
-                Log.Message("[Space Services] Auto-extracted service pawns: " + reason);
+                ServiceDebugUtility.Log("Auto-extracted service pawns: " + reason);
             }
             return any;
         }
@@ -139,7 +139,7 @@ namespace SpaceServices
         {
             string label = pawn == null ? "null pawn" : pawn.LabelShortCap + " [" + pawn.ThingID + "]";
             IntVec3 cell = pawn != null && pawn.Spawned ? pawn.Position : IntVec3.Invalid;
-            Log.Message("[Space Services] Removing service pawn via " + method + ": " + label + ", cell=" + cell + ", reason=" + (reason ?? "none"));
+            ServiceDebugUtility.Log("Removing service pawn via " + method + ": " + label + ", cell=" + cell + ", reason=" + (reason ?? "none"));
         }
 
         private static void NotifyHospitalPatientsLeft(Map map, IEnumerable<Pawn> pawns)

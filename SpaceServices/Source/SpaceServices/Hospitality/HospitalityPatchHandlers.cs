@@ -52,16 +52,16 @@ namespace SpaceServices
                 return false;
             }
 
-            ShuttleVisual visual = ShuttleVisual.Resolve();
+            ShuttleVisual visual = ShuttleVisual.Resolve("hospitality", null);
             Thing pad = ServicePadUtility.TryFindNearestServicePad(map, ServiceUse.Guest, parms == null ? IntVec3.Invalid : parms.spawnCenter);
             if (visual != null && pad != null)
             {
                 parms.spawnCenter = pad.Position;
                 SpaceServicesMapComponent comp = map.GetComponent<SpaceServicesMapComponent>();
-                if (comp != null && comp.ScheduleHospitalityIncident(__instance, parms, pad, visual.shipThingDef == null ? null : visual.shipThingDef.defName))
+                if (comp != null && comp.ScheduleHospitalityIncident(__instance, parms, pad, visual.shipThingDef == null ? null : visual.shipThingDef.defName, visual.id))
                 {
                     ServiceDebugUtility.LogAudit("Hospitality VisitorGroup scheduled shuttle arrival pad=" + ServiceDebugUtility.ThingAuditSummary(pad) + " visual=" + (visual.shipThingDef == null ? "none" : visual.shipThingDef.defName));
-                    ServiceShuttleUtility.SpawnArrival(map, pad.Position);
+                    ServiceShuttleUtility.SpawnArrival(map, pad.Position, "hospitality", visual.id);
                     Messages.Message("Space Services: visitors inbound", pad, MessageTypeDefOf.NeutralEvent, false);
                     __result = true;
                     return false;

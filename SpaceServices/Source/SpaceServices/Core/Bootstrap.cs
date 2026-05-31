@@ -26,7 +26,7 @@ namespace SpaceServices
             Harmony.PatchAll(Assembly.GetExecutingAssembly());
             OptionalModPatches.Install(Harmony);
             LongEventHandler.ExecuteWhenFinished(ArchitectMenuPatch.InjectArchitectDesignators);
-            Log.Message("[Space Services] Loaded.");
+            ServiceDebugUtility.Log(ServiceLogIntegration.Core, "Loaded.");
         }
     }
 }
