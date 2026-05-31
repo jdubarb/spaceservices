@@ -97,7 +97,7 @@ namespace SpaceServices
             }
             HashSet<Pawn> knownPawns = KnownPersistentPawns();
             int removed = 0;
-            foreach (Pawn pawn in PawnsForRelationCleanup(map, knownPawns))
+            foreach (Pawn pawn in PawnsForRelationCleanup(map, knownPawns, targetPawn))
             {
                 if (pawn == null || pawn.relations == null || pawn.relations.DirectRelations == null)
                 {
@@ -142,7 +142,25 @@ namespace SpaceServices
                 otherPawn.Destroyed ||
                 otherPawn.relations == null ||
                 otherPawn.relations.DirectRelations == null ||
-                (knownPawns != null && !knownPawns.Contains(otherPawn));
+                (knownPawns != null && !knownPawns.Contains(otherPawn)) ||
+                IsMissingReflexiveReciprocal(owner, relation);
+        }
+
+        private static bool IsMissingReflexiveReciprocal(Pawn owner, DirectPawnRelation relation)
+        {
+            if (owner == null || relation == null || relation.def == null || !relation.def.reflexive)
+            {
+                return false;
+            }
+            Pawn otherPawn = relation.otherPawn;
+            if (otherPawn == null || otherPawn.relations == null || otherPawn.relations.DirectRelations == null)
+            {
+                return true;
+            }
+            return !otherPawn.relations.DirectRelations.Any(otherRelation =>
+                otherRelation != null &&
+                otherRelation.def == relation.def &&
+                otherRelation.otherPawn == owner);
         }
 
         public static bool NotifyLordPawnLost(Lord lord, Pawn pawn, PawnLostCondition condition)
@@ -246,7 +264,7 @@ namespace SpaceServices
             return KnownPersistentPawns();
         }
 
-        private static IEnumerable<Pawn> PawnsForRelationCleanup(Map map, HashSet<Pawn> knownPawns)
+        private static IEnumerable<Pawn> PawnsForRelationCleanup(Map map, HashSet<Pawn> knownPawns, Pawn inboundTarget = null)
         {
             HashSet<Pawn> pawns = new HashSet<Pawn>();
             if (knownPawns != null)
@@ -273,6 +291,23 @@ namespace SpaceServices
                     if (pawn != null)
                     {
                         pawns.Add(pawn);
+                    }
+                }
+            }
+            if (inboundTarget != null && inboundTarget.relations != null)
+            {
+                // Vanilla stores incoming direct-relation owners separately and may touch them
+                // during Pawn.Discard even when they are not in the usual pawn finder lists.
+                IEnumerable inboundPawns = Reflect.GetMember(inboundTarget.relations, "pawnsWithDirectRelationsWithMe") as IEnumerable;
+                if (inboundPawns != null)
+                {
+                    foreach (object inbound in inboundPawns)
+                    {
+                        Pawn pawn = inbound as Pawn;
+                        if (pawn != null)
+                        {
+                            pawns.Add(pawn);
+                        }
                     }
                 }
             }
