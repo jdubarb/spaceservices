@@ -13,6 +13,15 @@ using Verse.AI.Group;
 
 namespace SpaceServices
 {
+    public class Building_ServiceLandingPad : Building
+    {
+        protected override void DrawAt(Vector3 drawLoc, bool flip = false)
+        {
+            base.DrawAt(drawLoc, flip);
+            GetComp<CompSpaceServicePad>()?.DrawModeOverlay(drawLoc);
+        }
+    }
+
     public class CompProperties_SpaceServicePad : CompProperties
     {
         public CompProperties_SpaceServicePad()
@@ -467,16 +476,15 @@ namespace SpaceServices
             }
         }
 
-        public override void PostDraw()
+        public void DrawModeOverlay(Vector3 baseDrawPos)
         {
-            base.PostDraw();
             Material overlay = CurrentOverlayMaterial();
-            if (overlay == null || parent == null)
+            if (overlay == null)
             {
                 return;
             }
-            // Match the base building graphic center so mode icons sit inside the landing circle.
-            Vector3 drawPos = parent.DrawPos;
+            // Draw from the building draw pass so the icon shares the pad texture's exact center.
+            Vector3 drawPos = baseDrawPos;
             drawPos.y = AltitudeLayer.MetaOverlays.AltitudeFor() + 0.15f;
             Graphics.DrawMesh(MeshPool.GridPlane(OverlaySize), drawPos, Quaternion.identity, overlay, 0);
         }

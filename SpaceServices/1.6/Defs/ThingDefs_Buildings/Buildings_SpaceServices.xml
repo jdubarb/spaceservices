@@ -4,7 +4,7 @@
     <defName>JDB_ServiceLandingPad</defName>
     <label>service landing pad</label>
     <description>Marks a controlled arrival and departure point for patients, guests, and other service traffic on stationary space facilities.</description>
-    <thingClass>Building</thingClass>
+    <thingClass>SpaceServices.Building_ServiceLandingPad</thingClass>
     <graphicData>
       <texPath>Things/Building/SpaceServices/ServiceLandingPad</texPath>
       <graphicClass>Graphic_Single</graphicClass>
