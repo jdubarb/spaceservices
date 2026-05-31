@@ -45,6 +45,8 @@ namespace SpaceServices
             }
             int cleared = 0;
             cleared += ClearJobLord(pawn.CurJob) ? 1 : 0;
+            cleared += ClearQueuedJobLordReferences(pawn);
+            cleared += ClearDutyLord(pawn.mindState == null ? null : pawn.mindState.duty) ? 1 : 0;
             Lord pawnLord = Reflect.GetMember(pawn, "lord") as Lord;
             if (pawnLord != null)
             {
@@ -68,6 +70,18 @@ namespace SpaceServices
             return cleared;
         }
 
+        public static int CleanupTerminalPawnReferences(Map map, Pawn pawn)
+        {
+            if (pawn == null)
+            {
+                return 0;
+            }
+            int cleaned = ClearRuntimeLordReferences(pawn);
+            cleaned += CleanupLordOwnedPawnReferences(map, pawn);
+            cleaned += CleanupRelationshipRecordsReferencing(pawn);
+            return cleaned;
+        }
+
         public static bool ClearJobLord(Job job)
         {
             if (job != null && job.lord != null)
@@ -76,6 +90,59 @@ namespace SpaceServices
                 return true;
             }
             return false;
+        }
+
+        private static int ClearQueuedJobLordReferences(Pawn pawn)
+        {
+            object queue = pawn == null || pawn.jobs == null ? null : Reflect.GetMember(pawn.jobs, "jobQueue");
+            IEnumerable enumerable = queue as IEnumerable;
+            if (enumerable == null)
+            {
+                return 0;
+            }
+
+            int cleared = 0;
+            foreach (object queued in enumerable)
+            {
+                if (ClearJobLord(Reflect.GetMember(queued, "job") as Job))
+                {
+                    cleared++;
+                }
+            }
+            return cleared;
+        }
+
+        private static bool ClearDutyLord(PawnDuty duty)
+        {
+            if (duty == null)
+            {
+                return false;
+            }
+            Lord lord = Reflect.GetMember(duty, "lord") as Lord;
+            if (lord == null)
+            {
+                return false;
+            }
+            Reflect.SetMember(duty, "lord", null);
+            return true;
+        }
+
+        private static int CleanupLordOwnedPawnReferences(Map map, Pawn pawn)
+        {
+            if (map == null || pawn == null || map.lordManager == null || map.lordManager.lords == null)
+            {
+                return 0;
+            }
+            int removed = 0;
+            foreach (Lord lord in map.lordManager.lords)
+            {
+                if (lord == null || lord.ownedPawns == null)
+                {
+                    continue;
+                }
+                removed += lord.ownedPawns.RemoveAll(owned => owned == null || owned == pawn || owned.Destroyed || owned.Dead);
+            }
+            return removed;
         }
 
         public static int CleanupRelationshipRecordsReferencing(Pawn departingPawn)

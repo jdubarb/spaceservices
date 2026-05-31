@@ -243,6 +243,11 @@ namespace SpaceServices
                     continue;
                 }
                 List<Pawn> previouslyTrackedPawns = record.pawns == null ? new List<Pawn>() : record.pawns.Where(pawn => pawn != null).Distinct().ToList();
+                foreach (Pawn terminalPawn in previouslyTrackedPawns.Where(pawn => ServicePawnUtility.IsTerminalPawn(pawn)).Distinct())
+                {
+                    // Death/destruction skips the normal shuttle extraction path, so clear lord refs here.
+                    ServicePawnUtility.CleanupTerminalPawnReferences(map, terminalPawn);
+                }
                 record.pawns = ActiveTrackedPawns(map, record);
                 if (!SamePawnSet(previouslyTrackedPawns, record.pawns))
                 {

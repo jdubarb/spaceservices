@@ -164,7 +164,16 @@ namespace SpaceServices
                 {
                     continue;
                 }
-                removed += lord.ownedPawns.RemoveAll(pawn => pawn == null);
+                for (int i = lord.ownedPawns.Count - 1; i >= 0; i--)
+                {
+                    Pawn pawn = lord.ownedPawns[i];
+                    if (pawn == null || ServicePawnUtility.IsTerminalPawn(pawn))
+                    {
+                        ServicePawnUtility.CleanupTerminalPawnReferences(map, pawn);
+                        lord.ownedPawns.RemoveAt(i);
+                        removed++;
+                    }
+                }
             }
             return removed;
         }
@@ -268,6 +277,12 @@ namespace SpaceServices
                 {
                     ReleaseServiceRecord(record);
                     record.reservedPad = null;
+                }
+                List<Pawn> terminalPawns = record.pawns.Where(pawn => ServicePawnUtility.IsTerminalPawn(pawn)).Distinct().ToList();
+                foreach (Pawn terminalPawn in terminalPawns)
+                {
+                    // Dead service pawns can leave their Hospital lord in jobs/duties after the patient record is gone.
+                    ServicePawnUtility.CleanupTerminalPawnReferences(map, terminalPawn);
                 }
                 int before = record.pawns.Count;
                 record.pawns = record.pawns.Where(pawn => !ServicePawnUtility.IsTerminalPawn(pawn)).Distinct().ToList();
