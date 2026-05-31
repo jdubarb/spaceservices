@@ -7,12 +7,12 @@
     <useHitPoints>false</useHitPoints>
     <drawerType>RealtimeOnly</drawerType>
     <altitudeLayer>Building</altitudeLayer>
-    <size>(5,3)</size>
+    <size>(3,5)</size>
     <graphicData>
-      <texPath>Things/Building/Misc/Shuttle</texPath>
-      <graphicClass>Graphic_Single</graphicClass>
-      <drawSize>(6,3)</drawSize>
-      <color>(162,164,149)</color>
+      <graphicClass>Graphic_Multi</graphicClass>
+      <texPath>Things/Building/PassengerShuttle/PassengerShuttle</texPath>
+      <shaderType>CutoutComplex</shaderType>
+      <drawSize>(3,5)</drawSize>
     </graphicData>
   </ThingDef>
 
@@ -20,10 +20,19 @@
     <defName>JDB_ServiceShuttleIncoming</defName>
     <label>service shuttle (incoming)</label>
     <thingClass>Skyfaller</thingClass>
+    <graphicData>
+      <graphicClass>Graphic_Multi</graphicClass>
+      <texPath>Things/Building/PassengerShuttle/PassengerShuttle</texPath>
+      <shaderType>CutoutComplex</shaderType>
+      <drawSize>(3,5)</drawSize>
+    </graphicData>
+    <size>(3,5)</size>
     <skyfaller>
       <anticipationSound>Shuttle_Landing</anticipationSound>
       <anticipationSoundTicks>250</anticipationSoundTicks>
       <ticksToImpactRange>200~250</ticksToImpactRange>
+      <minimalRoofDestruction>true</minimalRoofDestruction>
+      <shadowSize>(3.5,5.5)</shadowSize>
       <angleCurve>
         <points>
           <li>(0,-60)</li>
@@ -57,6 +66,14 @@
     <defName>JDB_ServiceShuttleLeaving</defName>
     <label>service shuttle (leaving)</label>
     <thingClass>Skyfaller</thingClass>
+    <rotatable>true</rotatable>
+    <graphicData>
+      <graphicClass>Graphic_Multi</graphicClass>
+      <texPath>Things/Building/PassengerShuttle/PassengerShuttle</texPath>
+      <shaderType>CutoutComplex</shaderType>
+      <drawSize>(3,5)</drawSize>
+    </graphicData>
+    <size>(3,5)</size>
     <skyfaller>
       <reversed>true</reversed>
       <anticipationSound>Shuttle_Leaving</anticipationSound>
@@ -64,7 +81,7 @@
       <ticksToImpactRange>-40~-15</ticksToImpactRange>
       <moteSpawnTime>0.05</moteSpawnTime>
       <shadow>Things/Skyfaller/SkyfallerShadowRectangle</shadow>
-      <shadowSize>(5.5,3.5)</shadowSize>
+      <shadowSize>(3.5,5.5)</shadowSize>
       <motesPerCell>1</motesPerCell>
       <angleCurve>
         <points>
