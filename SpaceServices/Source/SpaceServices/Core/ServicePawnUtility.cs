@@ -87,6 +87,11 @@ namespace SpaceServices
             return CleanupRelationshipRecordReferences(pawn => pawn == null || pawn.Destroyed || !knownPawns.Contains(pawn));
         }
 
+        public static HashSet<Pawn> KnownPersistentPawnsForCleanup()
+        {
+            return KnownPersistentPawns();
+        }
+
         private static int CleanupRelationshipRecordReferences(Func<Pawn, bool> shouldRemove)
         {
             if (shouldRemove == null)

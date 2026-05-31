@@ -115,12 +115,14 @@ namespace SpaceServices
             try
             {
                 // A real map exit keeps RimWorld's play logs, tales, relations, and lords consistent.
+                Map map = pawn.MapHeld ?? pawn.Map;
                 ServiceDebugUtility.LogAudit("TryExitSpawnedPawn before prep " + ServiceDebugUtility.PawnAuditSummary(pawn));
                 PreparePawnJobsForExit(pawn);
                 ServiceDebugUtility.LogAudit("TryExitSpawnedPawn after prep " + ServiceDebugUtility.PawnAuditSummary(pawn));
                 LogServicePawnRemoval(pawn, "ExitMap", reason);
                 pawn.ExitMap(false, Rot4.Invalid);
                 int runtimeLords = ServicePawnUtility.ClearRuntimeLordReferences(pawn);
+                CleanupDepartingPawnReferences(map, pawn);
                 ServiceDebugUtility.LogAudit("TryExitSpawnedPawn after ExitMap runtimeLordRefsCleared=" + runtimeLords + " " + ServiceDebugUtility.PawnAuditSummary(pawn));
                 ServiceDebugUtility.LogAudit("TryExitSpawnedPawn after ExitMap " + ServiceDebugUtility.PawnAuditSummary(pawn));
                 return true;
