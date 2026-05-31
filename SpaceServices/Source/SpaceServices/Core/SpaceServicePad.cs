@@ -475,7 +475,8 @@ namespace SpaceServices
             {
                 return;
             }
-            Vector3 drawPos = parent.OccupiedRect().CenterCell.ToVector3Shifted();
+            // Match the base building graphic center so mode icons sit inside the landing circle.
+            Vector3 drawPos = parent.DrawPos;
             drawPos.y = AltitudeLayer.MetaOverlays.AltitudeFor() + 0.15f;
             overlay.Draw(drawPos, Rot4.North, parent);
         }
