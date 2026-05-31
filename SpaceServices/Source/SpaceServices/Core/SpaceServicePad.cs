@@ -26,8 +26,8 @@ namespace SpaceServices
     {
         private const float OverlayDrawSize = 1.55f;
         private static readonly Vector2 OverlaySize = new Vector2(OverlayDrawSize, OverlayDrawSize);
-        private static readonly Graphic HospitalOverlay = GraphicDatabase.Get<Graphic_Single>("Things/Building/SpaceServices/ServiceLandingPad_Hospital", ShaderDatabase.Cutout, OverlaySize, Color.white);
-        private static readonly Graphic HospitalityOverlay = GraphicDatabase.Get<Graphic_Single>("Things/Building/SpaceServices/ServiceLandingPad_Hospitality", ShaderDatabase.Cutout, OverlaySize, Color.white);
+        private static readonly Material HospitalOverlayMat = MaterialPool.MatFrom("Things/Building/SpaceServices/ServiceLandingPad_Hospital", ShaderDatabase.Cutout);
+        private static readonly Material HospitalityOverlayMat = MaterialPool.MatFrom("Things/Building/SpaceServices/ServiceLandingPad_Hospitality", ShaderDatabase.Cutout);
         private static readonly Texture2D SharedIcon = ContentFinder<Texture2D>.Get("Things/Building/SpaceServices/ServiceLandingPad");
         private static readonly Texture2D HospitalIcon = ContentFinder<Texture2D>.Get("Things/Building/SpaceServices/ServiceLandingPad_Hospital");
         private static readonly Texture2D HospitalityIcon = ContentFinder<Texture2D>.Get("Things/Building/SpaceServices/ServiceLandingPad_Hospitality");
@@ -470,7 +470,7 @@ namespace SpaceServices
         public override void PostDraw()
         {
             base.PostDraw();
-            Graphic overlay = CurrentOverlay();
+            Material overlay = CurrentOverlayMaterial();
             if (overlay == null || parent == null)
             {
                 return;
@@ -478,18 +478,18 @@ namespace SpaceServices
             // Match the base building graphic center so mode icons sit inside the landing circle.
             Vector3 drawPos = parent.DrawPos;
             drawPos.y = AltitudeLayer.MetaOverlays.AltitudeFor() + 0.15f;
-            overlay.Draw(drawPos, Rot4.North, parent);
+            Graphics.DrawMesh(MeshPool.GridPlane(OverlaySize), drawPos, Quaternion.identity, overlay, 0);
         }
 
-        private Graphic CurrentOverlay()
+        private Material CurrentOverlayMaterial()
         {
             if (Prioritizes(ServiceUse.Patient))
             {
-                return HospitalOverlay;
+                return HospitalOverlayMat;
             }
             if (Prioritizes(ServiceUse.Guest))
             {
-                return HospitalityOverlay;
+                return HospitalityOverlayMat;
             }
             return null;
         }
