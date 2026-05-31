@@ -67,7 +67,6 @@ namespace SpaceServices
             if (HospitalIncidents.Contains(incidentDefName))
             {
                 return (SpaceServicesMod.Settings == null || SpaceServicesMod.Settings.enableHospital) &&
-                    HasRequiredPad(map, ServiceUse.Patient) &&
                     HospitalIncidentGate.CanAcceptHospitalIncident(incidentDefName, map);
             }
             if (HospitalityIncidents.Contains(incidentDefName))
@@ -135,13 +134,5 @@ namespace SpaceServices
             return (map == null ? -1 : map.uniqueID) + ":" + (incidentDefName ?? "");
         }
 
-        private static bool HasRequiredPad(Map map, ServiceUse use)
-        {
-            if (SpaceServicesMod.Settings == null || !SpaceServicesMod.Settings.requireServicePadForArrivals)
-            {
-                return true;
-            }
-            return ServicePadUtility.TryFindServicePad(map, use) != null;
-        }
     }
 }

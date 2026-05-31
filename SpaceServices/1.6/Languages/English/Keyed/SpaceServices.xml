@@ -1,23 +1,43 @@
 <?xml version="1.0" encoding="utf-8"?>
 <LanguageData>
+  <JDB_SpaceServices_Settings_SectionGeneral>General</JDB_SpaceServices_Settings_SectionGeneral>
+  <JDB_SpaceServices_Settings_SectionHospitality>Hospitality</JDB_SpaceServices_Settings_SectionHospitality>
+  <JDB_SpaceServices_Settings_SectionTraffic>Traffic rates</JDB_SpaceServices_Settings_SectionTraffic>
+  <JDB_SpaceServices_Settings_SectionCompatibility>Compatibility</JDB_SpaceServices_Settings_SectionCompatibility>
+
   <JDB_SpaceServices_Settings_DebugLogging>Debug logging</JDB_SpaceServices_Settings_DebugLogging>
+  <JDB_SpaceServices_Settings_DebugLoggingDesc>Write normal Space Services diagnostics to the RimWorld log.</JDB_SpaceServices_Settings_DebugLoggingDesc>
   <JDB_SpaceServices_Settings_VerboseDevLogging>Verbose dev logging</JDB_SpaceServices_Settings_VerboseDevLogging>
+  <JDB_SpaceServices_Settings_VerboseDevLoggingDesc>Write extra lifecycle and service pawn diagnostics. This is mostly for active debugging.</JDB_SpaceServices_Settings_VerboseDevLoggingDesc>
   <JDB_SpaceServices_Settings_AutoExtract>Auto-extract fallback</JDB_SpaceServices_Settings_AutoExtract>
+  <JDB_SpaceServices_Settings_AutoExtractDesc>Let Space Services recover service visitors that are ready to leave but get stuck outside the normal departure path.</JDB_SpaceServices_Settings_AutoExtractDesc>
   <JDB_SpaceServices_Settings_Hospital>Hospital support</JDB_SpaceServices_Settings_Hospital>
+  <JDB_SpaceServices_Settings_HospitalDesc>Enable space-map handling for Hospital patient arrivals and departures.</JDB_SpaceServices_Settings_HospitalDesc>
   <JDB_SpaceServices_Settings_Hospitality>Hospitality support</JDB_SpaceServices_Settings_Hospitality>
+  <JDB_SpaceServices_Settings_HospitalityDesc>Enable space-map handling for Hospitality guest arrivals and departures.</JDB_SpaceServices_Settings_HospitalityDesc>
   <JDB_SpaceServices_Settings_HospitalityRequireBeds>Require free guest beds for Hospitality arrivals</JDB_SpaceServices_Settings_HospitalityRequireBeds>
+  <JDB_SpaceServices_Settings_HospitalityRequireBedsDesc>Block new Hospitality guest groups unless enough free guest beds are available.</JDB_SpaceServices_Settings_HospitalityRequireBedsDesc>
   <JDB_SpaceServices_Settings_HospitalityAutoDepartBedless>Auto-depart Hospitality guests without beds</JDB_SpaceServices_Settings_HospitalityAutoDepartBedless>
+  <JDB_SpaceServices_Settings_HospitalityAutoDepartBedlessDesc>After a grace period, send away Hospitality guests who cannot find usable guest beds.</JDB_SpaceServices_Settings_HospitalityAutoDepartBedlessDesc>
   <JDB_SpaceServices_Settings_HospitalityVacuumGuard>Hospitality vacuum guard (periodic tick interrupt)</JDB_SpaceServices_Settings_HospitalityVacuumGuard>
+  <JDB_SpaceServices_Settings_HospitalityVacuumGuardDesc>Periodically interrupts Hospitality guests who try to walk through unsafe vacuum. Off by default because it runs during map ticks.</JDB_SpaceServices_Settings_HospitalityVacuumGuardDesc>
   <JDB_SpaceServices_Settings_HospitalityFallbackScheduler>Space Hospitality fallback visits (use if Hospitality is not spawning guests)</JDB_SpaceServices_Settings_HospitalityFallbackScheduler>
+  <JDB_SpaceServices_Settings_HospitalityFallbackSchedulerDesc>Schedule Space Services visitor groups directly when Hospitality's normal space-map incident flow is not producing guests.</JDB_SpaceServices_Settings_HospitalityFallbackSchedulerDesc>
   <JDB_SpaceServices_Settings_HospitalityFallbackInterval>Fallback visit interval: {0} days</JDB_SpaceServices_Settings_HospitalityFallbackInterval>
+  <JDB_SpaceServices_Settings_HospitalityFallbackIntervalDesc>Base interval for fallback Hospitality visits when traffic-rate override is disabled. Snaps to 0.25 day steps.</JDB_SpaceServices_Settings_HospitalityFallbackIntervalDesc>
   <JDB_SpaceServices_Settings_TrafficRateOverride>Override service traffic rates</JDB_SpaceServices_Settings_TrafficRateOverride>
+  <JDB_SpaceServices_Settings_TrafficRateOverrideDesc>Use deterministic service-rate limits instead of the raw incident cadence. At 0.25x, every fourth eligible attempt is allowed.</JDB_SpaceServices_Settings_TrafficRateOverrideDesc>
   <JDB_SpaceServices_Settings_HospitalPatientTrafficRate>Hospital patient traffic: {0}x</JDB_SpaceServices_Settings_HospitalPatientTrafficRate>
+  <JDB_SpaceServices_Settings_HospitalPatientTrafficRateDesc>Deterministic rate for normal Hospital patient arrivals. 0.00 blocks new arrivals; existing patients can still leave.</JDB_SpaceServices_Settings_HospitalPatientTrafficRateDesc>
   <JDB_SpaceServices_Settings_HospitalMassCasualtyTrafficRate>Hospital mass casualty traffic: {0}x</JDB_SpaceServices_Settings_HospitalMassCasualtyTrafficRate>
+  <JDB_SpaceServices_Settings_HospitalMassCasualtyTrafficRateDesc>Deterministic rate for Hospital mass casualty arrivals. 0.00 blocks new mass casualties.</JDB_SpaceServices_Settings_HospitalMassCasualtyTrafficRateDesc>
   <JDB_SpaceServices_Settings_HospitalityVisitorTrafficRate>Hospitality visitor traffic: {0}x</JDB_SpaceServices_Settings_HospitalityVisitorTrafficRate>
+  <JDB_SpaceServices_Settings_HospitalityVisitorTrafficRateDesc>Deterministic rate for native Hospitality visitor incidents, and interval scaler for fallback visits.</JDB_SpaceServices_Settings_HospitalityVisitorTrafficRateDesc>
   <JDB_SpaceServices_Settings_HospitalityFallbackRateNote>Hospitality fallback interval is scaled by visitor traffic rate while override is enabled.</JDB_SpaceServices_Settings_HospitalityFallbackRateNote>
   <JDB_SpaceServices_Settings_Spaceports>Spaceports bridge</JDB_SpaceServices_Settings_Spaceports>
-  <JDB_SpaceServices_Settings_RequirePad>Require service pad for arrivals</JDB_SpaceServices_Settings_RequirePad>
+  <JDB_SpaceServices_Settings_SpaceportsDesc>Enable compatibility patches for Rimsential Spaceports when it is active.</JDB_SpaceServices_Settings_SpaceportsDesc>
   <JDB_SpaceServices_Settings_SealedNoSuit>Allow sealed non-vacsuit arrivals</JDB_SpaceServices_Settings_SealedNoSuit>
+  <JDB_SpaceServices_Settings_SealedNoSuitDesc>Allow arrivals without forced vacsuits when the selected service pad is in a safe sealed environment.</JDB_SpaceServices_Settings_SealedNoSuitDesc>
 
   <JDB_SpaceServices_Gizmo_ModeHospitalOnly>Hospital only</JDB_SpaceServices_Gizmo_ModeHospitalOnly>
   <JDB_SpaceServices_Gizmo_ModeHospitalOnlyDesc>Use this pad only for Hospital patient arrivals and departures.</JDB_SpaceServices_Gizmo_ModeHospitalOnlyDesc>
