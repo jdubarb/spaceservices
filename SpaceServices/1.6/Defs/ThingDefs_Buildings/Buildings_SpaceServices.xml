@@ -5,6 +5,7 @@
     <label>service landing pad</label>
     <description>Marks a controlled arrival and departure point for patients, guests, and other service traffic on stationary space facilities.</description>
     <thingClass>SpaceServices.Building_ServiceLandingPad</thingClass>
+    <drawerType>MapMeshAndRealTime</drawerType>
     <graphicData>
       <texPath>Things/Building/SpaceServices/ServiceLandingPad</texPath>
       <graphicClass>Graphic_Single</graphicClass>

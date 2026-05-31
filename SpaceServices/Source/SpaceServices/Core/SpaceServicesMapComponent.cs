@@ -16,6 +16,7 @@ namespace SpaceServices
     public sealed class SpaceServicesMapComponent : MapComponent
     {
         public List<ServiceGroupRecord> serviceGroups = new List<ServiceGroupRecord>();
+        public List<PrebuildPadModeRecord> prebuildPadModes = new List<PrebuildPadModeRecord>();
         private readonly List<ScheduledServiceShuttleArrival> pendingShuttleArrivals = new List<ScheduledServiceShuttleArrival>();
         private readonly List<ScheduledHospitalityIncident> pendingHospitalityIncidents = new List<ScheduledHospitalityIncident>();
         private const int StaleReferenceCleanupVersion = 9;
@@ -44,6 +45,11 @@ namespace SpaceServices
             if (serviceGroups == null)
             {
                 serviceGroups = new List<ServiceGroupRecord>();
+            }
+            Scribe_Collections.Look(ref prebuildPadModes, "prebuildPadModes", LookMode.Deep);
+            if (prebuildPadModes == null)
+            {
+                prebuildPadModes = new List<PrebuildPadModeRecord>();
             }
             Scribe_Values.Look(ref staleReferenceCleanupDone, "staleReferenceCleanupDone", false);
             Scribe_Values.Look(ref staleReferenceCleanupVersion, "staleReferenceCleanupVersion", 0);

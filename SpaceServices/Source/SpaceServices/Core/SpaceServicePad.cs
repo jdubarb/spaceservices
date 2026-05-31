@@ -15,6 +15,12 @@ namespace SpaceServices
 {
     public class Building_ServiceLandingPad : Building
     {
+        public override void SpawnSetup(Map map, bool respawningAfterLoad)
+        {
+            base.SpawnSetup(map, respawningAfterLoad);
+            ServicePadPrebuildModeUtility.ApplyPendingMode(this);
+        }
+
         protected override void DrawAt(Vector3 drawLoc, bool flip = false)
         {
             base.DrawAt(drawLoc, flip);
@@ -443,11 +449,10 @@ namespace SpaceServices
             {
                 yield return gizmo;
             }
-            yield return ModeCommand(ServicePadMode.HospitalOnly, "JDB_SpaceServices_Gizmo_ModeHospitalOnly", "JDB_SpaceServices_Gizmo_ModeHospitalOnlyDesc", HospitalIcon);
-            yield return ModeCommand(ServicePadMode.HospitalityOnly, "JDB_SpaceServices_Gizmo_ModeHospitalityOnly", "JDB_SpaceServices_Gizmo_ModeHospitalityOnlyDesc", HospitalityIcon);
-            yield return ModeCommand(ServicePadMode.Shared, "JDB_SpaceServices_Gizmo_ModeShared", "JDB_SpaceServices_Gizmo_ModeSharedDesc", SharedIcon);
-            yield return ModeCommand(ServicePadMode.HospitalPriority, "JDB_SpaceServices_Gizmo_ModeHospitalPriority", "JDB_SpaceServices_Gizmo_ModeHospitalPriorityDesc", HospitalIcon);
-            yield return ModeCommand(ServicePadMode.HospitalityPriority, "JDB_SpaceServices_Gizmo_ModeHospitalityPriority", "JDB_SpaceServices_Gizmo_ModeHospitalityPriorityDesc", HospitalityIcon);
+            foreach (Gizmo gizmo in ModeCommands(() => activeMode, mode => activeMode = mode))
+            {
+                yield return gizmo;
+            }
             if (ShouldShowDevGizmos())
             {
                 yield return DebugDangerToggle();
@@ -615,15 +620,24 @@ namespace SpaceServices
             };
         }
 
-        private Command_Toggle ModeCommand(ServicePadMode mode, string labelKey, string descKey, Texture2D icon)
+        public static IEnumerable<Gizmo> ModeCommands(Func<ServicePadMode> getter, Action<ServicePadMode> setter)
+        {
+            yield return ModeCommand(ServicePadMode.HospitalOnly, "JDB_SpaceServices_Gizmo_ModeHospitalOnly", "JDB_SpaceServices_Gizmo_ModeHospitalOnlyDesc", HospitalIcon, getter, setter);
+            yield return ModeCommand(ServicePadMode.HospitalityOnly, "JDB_SpaceServices_Gizmo_ModeHospitalityOnly", "JDB_SpaceServices_Gizmo_ModeHospitalityOnlyDesc", HospitalityIcon, getter, setter);
+            yield return ModeCommand(ServicePadMode.Shared, "JDB_SpaceServices_Gizmo_ModeShared", "JDB_SpaceServices_Gizmo_ModeSharedDesc", SharedIcon, getter, setter);
+            yield return ModeCommand(ServicePadMode.HospitalPriority, "JDB_SpaceServices_Gizmo_ModeHospitalPriority", "JDB_SpaceServices_Gizmo_ModeHospitalPriorityDesc", HospitalIcon, getter, setter);
+            yield return ModeCommand(ServicePadMode.HospitalityPriority, "JDB_SpaceServices_Gizmo_ModeHospitalityPriority", "JDB_SpaceServices_Gizmo_ModeHospitalityPriorityDesc", HospitalityIcon, getter, setter);
+        }
+
+        private static Command_Toggle ModeCommand(ServicePadMode mode, string labelKey, string descKey, Texture2D icon, Func<ServicePadMode> getter, Action<ServicePadMode> setter)
         {
             return new Command_Toggle
             {
                 defaultLabel = labelKey.Translate(),
                 defaultDesc = descKey.Translate(),
                 icon = icon,
-                isActive = () => activeMode == mode,
-                toggleAction = delegate { activeMode = mode; }
+                isActive = () => getter() == mode,
+                toggleAction = delegate { setter(mode); }
             };
         }
 
