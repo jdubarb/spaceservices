@@ -40,16 +40,34 @@ namespace SpaceServices
             listing.CheckboxLabeled("JDB_SpaceServices_Settings_HospitalityAutoDepartBedless".Translate(), ref Settings.hospitalityAutoDepartBedlessGuests);
             listing.CheckboxLabeled("JDB_SpaceServices_Settings_HospitalityVacuumGuard".Translate(), ref Settings.hospitalityVacuumGuard);
             listing.CheckboxLabeled("JDB_SpaceServices_Settings_HospitalityFallbackScheduler".Translate(), ref Settings.hospitalityFallbackScheduler);
-            Settings.hospitalityFallbackIntervalDays = listing.SliderLabeled(
-                "JDB_SpaceServices_Settings_HospitalityFallbackInterval".Translate(Settings.hospitalityFallbackIntervalDays.ToString("0.0")),
-                Settings.hospitalityFallbackIntervalDays,
-                0.5f,
-                5f);
+            listing.CheckboxLabeled("JDB_SpaceServices_Settings_TrafficRateOverride".Translate(), ref Settings.trafficRateOverride);
+            if (Settings.trafficRateOverride)
+            {
+                Settings.hospitalPatientTrafficRate = RateSlider(listing, "JDB_SpaceServices_Settings_HospitalPatientTrafficRate", Settings.hospitalPatientTrafficRate);
+                Settings.hospitalMassCasualtyTrafficRate = RateSlider(listing, "JDB_SpaceServices_Settings_HospitalMassCasualtyTrafficRate", Settings.hospitalMassCasualtyTrafficRate);
+                Settings.hospitalityVisitorTrafficRate = RateSlider(listing, "JDB_SpaceServices_Settings_HospitalityVisitorTrafficRate", Settings.hospitalityVisitorTrafficRate);
+                listing.Label("JDB_SpaceServices_Settings_HospitalityFallbackRateNote".Translate());
+            }
+            else
+            {
+                Settings.hospitalityFallbackIntervalDays = listing.SliderLabeled(
+                    "JDB_SpaceServices_Settings_HospitalityFallbackInterval".Translate(Settings.hospitalityFallbackIntervalDays.ToString("0.0")),
+                    Settings.hospitalityFallbackIntervalDays,
+                    0.5f,
+                    5f);
+            }
             listing.CheckboxLabeled("JDB_SpaceServices_Settings_Spaceports".Translate(), ref Settings.enableSpaceportsBridge);
             listing.CheckboxLabeled("JDB_SpaceServices_Settings_RequirePad".Translate(), ref Settings.requireServicePadForArrivals);
             listing.CheckboxLabeled("JDB_SpaceServices_Settings_SealedNoSuit".Translate(), ref Settings.allowSealedNoSuitArrivals);
             listing.End();
             Settings.Write();
+        }
+
+        private static float RateSlider(Listing_Standard listing, string translationKey, float value)
+        {
+            float rounded = SpaceServicesSettings.QuantizeRate(value);
+            float next = listing.SliderLabeled(translationKey.Translate(rounded.ToString("0.00")), rounded, 0f, 1f);
+            return SpaceServicesSettings.QuantizeRate(next);
         }
     }
 
@@ -65,6 +83,10 @@ namespace SpaceServices
         public bool hospitalityVacuumGuard = false;
         public bool hospitalityFallbackScheduler = true;
         public float hospitalityFallbackIntervalDays = 1.5f;
+        public bool trafficRateOverride = true;
+        public float hospitalPatientTrafficRate = 0.25f;
+        public float hospitalMassCasualtyTrafficRate = 0.25f;
+        public float hospitalityVisitorTrafficRate = 0.25f;
         public bool enableSpaceportsBridge = true;
         public bool requireServicePadForArrivals = false;
         public bool allowSealedNoSuitArrivals = false;
@@ -82,9 +104,21 @@ namespace SpaceServices
             Scribe_Values.Look(ref hospitalityFallbackScheduler, "hospitalityFallbackScheduler", true);
             Scribe_Values.Look(ref hospitalityFallbackIntervalDays, "hospitalityFallbackIntervalDays", 1.5f);
             hospitalityFallbackIntervalDays = Mathf.Clamp(hospitalityFallbackIntervalDays, 0.5f, 5f);
+            Scribe_Values.Look(ref trafficRateOverride, "trafficRateOverride", true);
+            Scribe_Values.Look(ref hospitalPatientTrafficRate, "hospitalPatientTrafficRate", 0.25f);
+            Scribe_Values.Look(ref hospitalMassCasualtyTrafficRate, "hospitalMassCasualtyTrafficRate", 0.25f);
+            Scribe_Values.Look(ref hospitalityVisitorTrafficRate, "hospitalityVisitorTrafficRate", 0.25f);
+            hospitalPatientTrafficRate = QuantizeRate(hospitalPatientTrafficRate);
+            hospitalMassCasualtyTrafficRate = QuantizeRate(hospitalMassCasualtyTrafficRate);
+            hospitalityVisitorTrafficRate = QuantizeRate(hospitalityVisitorTrafficRate);
             Scribe_Values.Look(ref enableSpaceportsBridge, "enableSpaceportsBridge", true);
             Scribe_Values.Look(ref requireServicePadForArrivals, "requireServicePadForArrivals", false);
             Scribe_Values.Look(ref allowSealedNoSuitArrivals, "allowSealedNoSuitArrivals", false);
+        }
+
+        public static float QuantizeRate(float value)
+        {
+            return Mathf.Clamp01(Mathf.Round(value / 0.05f) * 0.05f);
         }
     }
 }

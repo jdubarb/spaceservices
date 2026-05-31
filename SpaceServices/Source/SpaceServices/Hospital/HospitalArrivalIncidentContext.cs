@@ -25,6 +25,7 @@ namespace SpaceServices
         }
 
         private static readonly Stack<Request> Requests = new Stack<Request>();
+        private static readonly HashSet<int> RateDeniedPatientFallbacks = new HashSet<int>();
 
         public static void Push(Map map, bool massCasualty)
         {
@@ -46,6 +47,19 @@ namespace SpaceServices
             {
                 Requests.Pop();
             }
+        }
+
+        public static void MarkPatientFallbackSuppressed(Map map)
+        {
+            if (map != null)
+            {
+                RateDeniedPatientFallbacks.Add(map.uniqueID);
+            }
+        }
+
+        public static bool ConsumePatientFallbackSuppressed(Map map)
+        {
+            return map != null && RateDeniedPatientFallbacks.Remove(map.uniqueID);
         }
 
         public static bool TryGetNextArrivalCell(Map map, out IntVec3 cell)

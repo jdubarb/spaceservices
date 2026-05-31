@@ -41,6 +41,8 @@ namespace SpaceServices
 
     public static class ServiceIncidentUtility
     {
+        private static readonly Dictionary<string, float> TrafficRateProgress = new Dictionary<string, float>();
+
         private static readonly HashSet<string> HospitalIncidents = new HashSet<string>
         {
             "PatientArrives",
@@ -74,6 +76,63 @@ namespace SpaceServices
                     HospitalityIncidentGate.CanAcceptHospitalityIncident(incidentDefName, map);
             }
             return false;
+        }
+
+        public static bool TrafficRateAllows(string incidentDefName, Map map)
+        {
+            float rate = TrafficRateFor(incidentDefName);
+            if (rate <= 0f)
+            {
+                return false;
+            }
+            if (rate >= 1f)
+            {
+                return true;
+            }
+
+            string key = TrafficRateKey(incidentDefName, map);
+            float progress;
+            TrafficRateProgress.TryGetValue(key, out progress);
+            progress += rate;
+            if (progress >= 1f)
+            {
+                TrafficRateProgress[key] = progress - 1f;
+                return true;
+            }
+            TrafficRateProgress[key] = progress;
+            return false;
+        }
+
+        public static float TrafficRateFor(string incidentDefName)
+        {
+            SpaceServicesSettings settings = SpaceServicesMod.Settings;
+            if (settings == null || !settings.trafficRateOverride || string.IsNullOrEmpty(incidentDefName))
+            {
+                return 1f;
+            }
+            if (incidentDefName == "PatientArrives")
+            {
+                return SpaceServicesSettings.QuantizeRate(settings.hospitalPatientTrafficRate);
+            }
+            if (incidentDefName == "MassCasualtyEvent")
+            {
+                return SpaceServicesSettings.QuantizeRate(settings.hospitalMassCasualtyTrafficRate);
+            }
+            if (HospitalityIncidents.Contains(incidentDefName))
+            {
+                return SpaceServicesSettings.QuantizeRate(settings.hospitalityVisitorTrafficRate);
+            }
+            return 1f;
+        }
+
+        public static string TrafficRateReport(string incidentDefName)
+        {
+            return TrafficRateFor(incidentDefName).ToString("0.00") + "x";
+        }
+
+        private static string TrafficRateKey(string incidentDefName, Map map)
+        {
+            return (map == null ? -1 : map.uniqueID) + ":" + (incidentDefName ?? "");
         }
 
         private static bool HasRequiredPad(Map map, ServiceUse use)

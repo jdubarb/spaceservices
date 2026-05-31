@@ -44,6 +44,16 @@ namespace SpaceServices
             string incidentDefName = incident == null ? (IsMassCasualtyIncident(__instance, null) ? "MassCasualtyEvent" : "PatientArrives") : incident.defName;
             if (HospitalIncidentGate.CanAcceptHospitalIncident(incidentDefName, map, false))
             {
+                if (!ServiceIncidentUtility.TrafficRateAllows(incidentDefName, map))
+                {
+                    if (incidentDefName == "PatientArrives")
+                    {
+                        HospitalArrivalIncidentContext.MarkPatientFallbackSuppressed(map);
+                    }
+                    ServiceDebugUtility.LogThrottled("hospital-rate-block-" + incidentDefName, "Hospital patient incident blocked by traffic rate " + ServiceIncidentUtility.TrafficRateReport(incidentDefName), GenDate.TicksPerHour);
+                    __result = false;
+                    return false;
+                }
                 HospitalArrivalIncidentContext.Push(map, IsMassCasualtyIncident(__instance, incidentDefName));
                 return true;
             }
@@ -171,6 +181,11 @@ namespace SpaceServices
                 Map map = parms.target as Map;
                 if (map == null || !SpaceServiceMapDetector.IsServiceEligible(map))
                 {
+                    return;
+                }
+                if (HospitalArrivalIncidentContext.ConsumePatientFallbackSuppressed(map))
+                {
+                    ServiceDebugUtility.LogThrottled("hospital-fallback-rate-suppressed", "Hospital PatientArrives fallback suppressed by traffic rate.", GenDate.TicksPerHour);
                     return;
                 }
                 if (!HospitalIncidentGate.CanAcceptHospitalIncident("PatientArrives", map, false))

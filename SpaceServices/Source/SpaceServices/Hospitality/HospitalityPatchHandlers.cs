@@ -45,6 +45,13 @@ namespace SpaceServices
                 return true;
             }
 
+            if (!ServiceIncidentUtility.TrafficRateAllows(incidentDefName, map))
+            {
+                ServiceDebugUtility.LogThrottled("hospitality-rate-block-" + incidentDefName, "Hospitality visitor incident blocked by traffic rate " + ServiceIncidentUtility.TrafficRateReport(incidentDefName), GenDate.TicksPerHour);
+                __result = false;
+                return false;
+            }
+
             ShuttleVisual visual = ShuttleVisual.Resolve();
             Thing pad = ServicePadUtility.TryFindNearestServicePad(map, ServiceUse.Guest, parms == null ? IntVec3.Invalid : parms.spawnCenter);
             if (visual != null && pad != null)

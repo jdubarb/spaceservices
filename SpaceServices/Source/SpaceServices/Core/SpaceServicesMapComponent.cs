@@ -258,6 +258,11 @@ namespace SpaceServices
             {
                 return;
             }
+            if (SpaceServicesMod.Settings != null && SpaceServicesMod.Settings.trafficRateOverride && ServiceIncidentUtility.TrafficRateFor("VisitorGroup") <= 0f)
+            {
+                nextHospitalityServiceVisitTick = 0;
+                return;
+            }
             if (nextHospitalityServiceVisitTick <= 0)
             {
                 ScheduleNextHospitalityServiceVisit(InitialHospitalityFallbackDelayTicks());
@@ -365,7 +370,19 @@ namespace SpaceServices
         private static int NextHospitalityFallbackIntervalTicks()
         {
             float intervalDays = SpaceServicesMod.Settings == null ? 1.5f : SpaceServicesMod.Settings.hospitalityFallbackIntervalDays;
-            intervalDays = Mathf.Clamp(intervalDays, 0.5f, 5f);
+            if (SpaceServicesMod.Settings != null && SpaceServicesMod.Settings.trafficRateOverride)
+            {
+                float rate = ServiceIncidentUtility.TrafficRateFor("VisitorGroup");
+                if (rate <= 0f)
+                {
+                    return GenDate.TicksPerDay;
+                }
+                intervalDays = Mathf.Max(0.5f, 1.5f / rate);
+            }
+            else
+            {
+                intervalDays = Mathf.Clamp(intervalDays, 0.5f, 5f);
+            }
             float variedDays = Rand.Range(intervalDays * 0.85f, intervalDays * 1.15f);
             return Math.Max(GenDate.TicksPerHour, Mathf.RoundToInt(variedDays * GenDate.TicksPerDay));
         }

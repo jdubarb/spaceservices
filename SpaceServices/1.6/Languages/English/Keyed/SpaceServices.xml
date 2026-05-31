@@ -10,6 +10,11 @@
   <JDB_SpaceServices_Settings_HospitalityVacuumGuard>Hospitality vacuum guard (periodic tick interrupt)</JDB_SpaceServices_Settings_HospitalityVacuumGuard>
   <JDB_SpaceServices_Settings_HospitalityFallbackScheduler>Space Hospitality fallback visits (use if Hospitality is not spawning guests)</JDB_SpaceServices_Settings_HospitalityFallbackScheduler>
   <JDB_SpaceServices_Settings_HospitalityFallbackInterval>Fallback visit interval: {0} days</JDB_SpaceServices_Settings_HospitalityFallbackInterval>
+  <JDB_SpaceServices_Settings_TrafficRateOverride>Override service traffic rates</JDB_SpaceServices_Settings_TrafficRateOverride>
+  <JDB_SpaceServices_Settings_HospitalPatientTrafficRate>Hospital patient traffic: {0}x</JDB_SpaceServices_Settings_HospitalPatientTrafficRate>
+  <JDB_SpaceServices_Settings_HospitalMassCasualtyTrafficRate>Hospital mass casualty traffic: {0}x</JDB_SpaceServices_Settings_HospitalMassCasualtyTrafficRate>
+  <JDB_SpaceServices_Settings_HospitalityVisitorTrafficRate>Hospitality visitor traffic: {0}x</JDB_SpaceServices_Settings_HospitalityVisitorTrafficRate>
+  <JDB_SpaceServices_Settings_HospitalityFallbackRateNote>Hospitality fallback interval is scaled by visitor traffic rate while override is enabled.</JDB_SpaceServices_Settings_HospitalityFallbackRateNote>
   <JDB_SpaceServices_Settings_Spaceports>Spaceports bridge</JDB_SpaceServices_Settings_Spaceports>
   <JDB_SpaceServices_Settings_RequirePad>Require service pad for arrivals</JDB_SpaceServices_Settings_RequirePad>
   <JDB_SpaceServices_Settings_SealedNoSuit>Allow sealed non-vacsuit arrivals</JDB_SpaceServices_Settings_SealedNoSuit>
