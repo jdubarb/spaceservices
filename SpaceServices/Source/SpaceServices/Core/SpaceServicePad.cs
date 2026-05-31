@@ -41,8 +41,9 @@ namespace SpaceServices
     {
         private const float OverlayDrawSize = 1.55f;
         private static readonly Vector2 OverlaySize = new Vector2(OverlayDrawSize, OverlayDrawSize);
-        private static readonly Material HospitalOverlayMat = MaterialPool.MatFrom("Things/Building/SpaceServices/ServiceLandingPad_Hospital", ShaderDatabase.Cutout);
-        private static readonly Material HospitalityOverlayMat = MaterialPool.MatFrom("Things/Building/SpaceServices/ServiceLandingPad_Hospitality", ShaderDatabase.Cutout);
+        private static readonly Color OverlayTint = new Color(0.72f, 0.78f, 0.8f, 0.62f);
+        private static readonly Material HospitalOverlayMat = MaterialPool.MatFrom("Things/Building/SpaceServices/ServiceLandingPad_Hospital", ShaderDatabase.Transparent, OverlayTint);
+        private static readonly Material HospitalityOverlayMat = MaterialPool.MatFrom("Things/Building/SpaceServices/ServiceLandingPad_Hospitality", ShaderDatabase.Transparent, OverlayTint);
         private static readonly Texture2D SharedIcon = ContentFinder<Texture2D>.Get("Things/Building/SpaceServices/ServiceLandingPad");
         private static readonly Texture2D HospitalIcon = ContentFinder<Texture2D>.Get("Things/Building/SpaceServices/ServiceLandingPad_Hospital");
         private static readonly Texture2D HospitalityIcon = ContentFinder<Texture2D>.Get("Things/Building/SpaceServices/ServiceLandingPad_Hospitality");
