@@ -893,11 +893,9 @@ namespace SpaceServices
             {
                 return false;
             }
-            if (record.reservedPad == pad || record.arrivalPad == pad)
-            {
-                return true;
-            }
-            return pad.Map != null && ServicePadUtility.AllServicePadBuildings(pad.Map).Count() == 1;
+            // Departures are a cleanup path, not a new service. If the right-mode pads are
+            // missing, reserved, or unsafe, let existing groups escape through any safe pad.
+            return true;
         }
 
         private static bool ReadyForExtraction(ServiceGroupRecord record)
