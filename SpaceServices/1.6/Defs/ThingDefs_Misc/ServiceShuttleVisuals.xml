@@ -8,6 +8,8 @@
     <drawerType>RealtimeOnly</drawerType>
     <altitudeLayer>Building</altitudeLayer>
     <size>(3,5)</size>
+    <rotatable>true</rotatable>
+    <defaultPlacingRot>East</defaultPlacingRot>
     <graphicData>
       <graphicClass>Graphic_Multi</graphicClass>
       <texPath>Things/Building/PassengerShuttle/PassengerShuttle</texPath>
@@ -20,6 +22,8 @@
     <defName>JDB_ServiceShuttleIncoming</defName>
     <label>service shuttle (incoming)</label>
     <thingClass>Skyfaller</thingClass>
+    <rotatable>true</rotatable>
+    <defaultPlacingRot>East</defaultPlacingRot>
     <graphicData>
       <graphicClass>Graphic_Multi</graphicClass>
       <texPath>Things/Building/PassengerShuttle/PassengerShuttle</texPath>
@@ -67,6 +71,7 @@
     <label>service shuttle (leaving)</label>
     <thingClass>Skyfaller</thingClass>
     <rotatable>true</rotatable>
+    <defaultPlacingRot>East</defaultPlacingRot>
     <graphicData>
       <graphicClass>Graphic_Multi</graphicClass>
       <texPath>Things/Building/PassengerShuttle/PassengerShuttle</texPath>

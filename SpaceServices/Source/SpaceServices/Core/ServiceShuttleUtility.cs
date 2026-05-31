@@ -123,6 +123,8 @@ namespace SpaceServices
                 return;
             }
             Thing innerThing = ThingMaker.MakeThing(shipThingDef);
+            // Graphic_Multi payloads are made off-map, so set the service pad facing explicitly.
+            innerThing.Rotation = Rot4.East;
             SkyfallerMaker.SpawnSkyfaller(skyfallerDef, innerThing, cell, map);
         }
 
