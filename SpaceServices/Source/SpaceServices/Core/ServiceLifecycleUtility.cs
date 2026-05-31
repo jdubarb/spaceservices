@@ -181,6 +181,11 @@ namespace SpaceServices
             }
             if (record.pawns != null)
             {
+                foreach (Pawn terminalPawn in record.pawns.Where(ServicePawnUtility.IsTerminalPawn).Where(tracked => tracked != null).Distinct().ToList())
+                {
+                    // External mod callbacks can release dead pawns before our lifecycle tick sees them.
+                    ServicePawnUtility.CleanupTerminalPawnReferences(map, terminalPawn);
+                }
                 record.pawns.RemoveAll(tracked => tracked == null || tracked == pawn || ServicePawnUtility.IsTerminalPawn(tracked));
             }
             if (record.pawns == null || record.pawns.Count == 0)

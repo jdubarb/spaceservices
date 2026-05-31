@@ -59,7 +59,7 @@ namespace SpaceServices
                 OptionalModPatches.PatchIfExists(harmony, AccessTools.Method(hospitalComponent, "PatientLeaves"), typeof(HospitalPatchHandlers), postfix: nameof(HospitalPatchHandlers.HospitalPatientDeparturePostfix));
                 OptionalModPatches.PatchIfExists(harmony, AccessTools.Method(hospitalComponent, "DismissPatient"), typeof(HospitalPatchHandlers), postfix: nameof(HospitalPatchHandlers.HospitalPatientDeparturePostfix));
                 OptionalModPatches.PatchIfExists(harmony, AccessTools.Method(hospitalComponent, "PatientLeftTheMap"), typeof(HospitalPatchHandlers), postfix: nameof(HospitalPatchHandlers.HospitalPatientGonePostfix));
-                OptionalModPatches.PatchIfExists(harmony, AccessTools.Method(hospitalComponent, "PatientDied"), typeof(HospitalPatchHandlers), postfix: nameof(HospitalPatchHandlers.HospitalPatientGonePostfix));
+                OptionalModPatches.PatchIfExists(harmony, AccessTools.Method(hospitalComponent, "PatientDied"), typeof(HospitalPatchHandlers), prefix: nameof(HospitalPatchHandlers.HospitalPatientDiedPrefix), postfix: nameof(HospitalPatchHandlers.HospitalPatientDiedPostfix));
             }
             OptionalModPatches.PatchIfExists(harmony, AccessTools.Method(typeof(DropPodUtility), "MakeDropPodAt", new[] { typeof(IntVec3), typeof(Map), typeof(ActiveTransporterInfo), typeof(Faction) }), typeof(HospitalPatchHandlers), prefix: nameof(HospitalPatchHandlers.HospitalDropPodAtPrefix));
             if (incidentHelper != null || patientArrival != null || massCasualty != null)

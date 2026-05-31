@@ -170,6 +170,21 @@ namespace SpaceServices
             ServiceLifecycleUtility.ReleasePawn(pawn, "Hospital removed patient from map");
         }
 
+        public static void HospitalPatientDiedPrefix(Pawn pawn, ref HospitalPatientDeathState __state)
+        {
+            __state = HospitalPatientDeathState.Capture(pawn);
+        }
+
+        public static void HospitalPatientDiedPostfix(Pawn pawn, HospitalPatientDeathState __state)
+        {
+            Map map = __state == null ? pawn?.MapHeld : __state.map;
+            // Hospital clears patient data on death, but the corpse can still save its old lord ref.
+            bool notified = ServicePawnUtility.NotifyLordPawnLost(__state == null ? null : __state.lord, pawn, PawnLostCondition.Killed);
+            int cleaned = ServicePawnUtility.CleanupTerminalPawnReferences(map, pawn);
+            ServiceDebugUtility.LogAudit("HospitalPatientDied cleanup pawn=" + ServiceDebugUtility.PawnAuditSummary(pawn) + " lordNotified=" + notified + " refsCleaned=" + cleaned);
+            ServiceLifecycleUtility.ReleasePawn(pawn, "Hospital patient died");
+        }
+
         public static void HospitalPatientArrivesTryExecutePostfix(object __instance, IncidentParms parms, ref bool __result)
         {
             try
@@ -222,6 +237,33 @@ namespace SpaceServices
             }
             string typeName = worker == null ? "" : worker.GetType().FullName ?? "";
             return typeName.IndexOf("MassCasualty", StringComparison.OrdinalIgnoreCase) >= 0;
+        }
+    }
+
+    public sealed class HospitalPatientDeathState
+    {
+        public Map map;
+        public Lord lord;
+
+        public static HospitalPatientDeathState Capture(Pawn pawn)
+        {
+            return new HospitalPatientDeathState
+            {
+                map = pawn == null ? null : pawn.MapHeld ?? pawn.Map,
+                lord = SafeLord(pawn)
+            };
+        }
+
+        private static Lord SafeLord(Pawn pawn)
+        {
+            try
+            {
+                return pawn == null ? null : pawn.GetLord();
+            }
+            catch
+            {
+                return null;
+            }
         }
     }
 }

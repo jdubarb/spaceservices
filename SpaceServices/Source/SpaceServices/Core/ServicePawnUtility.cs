@@ -82,6 +82,24 @@ namespace SpaceServices
             return cleaned;
         }
 
+        public static bool NotifyLordPawnLost(Lord lord, Pawn pawn, PawnLostCondition condition)
+        {
+            if (lord == null || pawn == null)
+            {
+                return false;
+            }
+            try
+            {
+                lord.Notify_PawnLost(pawn, condition);
+                return true;
+            }
+            catch (Exception ex)
+            {
+                Log.Warning("[Space Services] Could not notify service pawn lord about pawn loss: " + ex.Message);
+                return false;
+            }
+        }
+
         public static bool ClearJobLord(Job job)
         {
             if (job != null && job.lord != null)
