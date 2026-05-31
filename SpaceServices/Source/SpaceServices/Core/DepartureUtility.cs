@@ -119,6 +119,7 @@ namespace SpaceServices
                 ServiceDebugUtility.LogAudit("TryExitSpawnedPawn before prep " + ServiceDebugUtility.PawnAuditSummary(pawn));
                 PreparePawnJobsForExit(pawn);
                 ServiceDebugUtility.LogAudit("TryExitSpawnedPawn after prep " + ServiceDebugUtility.PawnAuditSummary(pawn));
+                CleanupDepartingPawnReferences(map, pawn);
                 LogServicePawnRemoval(pawn, "ExitMap", reason);
                 pawn.ExitMap(false, Rot4.Invalid);
                 int runtimeLords = ServicePawnUtility.ClearRuntimeLordReferences(pawn);
