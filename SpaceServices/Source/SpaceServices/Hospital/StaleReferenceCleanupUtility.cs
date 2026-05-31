@@ -213,17 +213,7 @@ namespace SpaceServices
 
         private static int CleanupBrokenDirectRelations(Map map)
         {
-            int removed = 0;
-            HashSet<Pawn> knownPawns = ServicePawnUtility.KnownPersistentPawnsForCleanup();
-            foreach (Pawn pawn in PawnsToClean(map))
-            {
-                if (pawn == null || pawn.relations == null || pawn.relations.DirectRelations == null)
-                {
-                    continue;
-                }
-                removed += pawn.relations.DirectRelations.RemoveAll(relation => relation == null || relation.otherPawn == null || relation.otherPawn.Destroyed || !knownPawns.Contains(relation.otherPawn));
-            }
-            return removed;
+            return ServicePawnUtility.CleanupBrokenDirectRelations(map);
         }
 
         private static IEnumerable<Pawn> PawnsToClean(Map map)

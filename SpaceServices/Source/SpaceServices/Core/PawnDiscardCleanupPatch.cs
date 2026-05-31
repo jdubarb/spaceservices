@@ -18,7 +18,12 @@ namespace SpaceServices
     {
         public static void Prefix(Pawn __instance)
         {
+            Map map = __instance == null ? null : __instance.MapHeld;
             int cleaned = ServicePawnUtility.CleanupInvalidDirectRelations(__instance);
+            // Pawn.Discard clears direct relations through vanilla reciprocal removal; sanitize
+            // incoming references first so half-departed service pawns cannot crash world-pawn GC.
+            cleaned += ServicePawnUtility.CleanupDirectRelationsReferencing(__instance, map);
+            cleaned += ServicePawnUtility.CleanupRelationshipRecordsReferencing(__instance);
             if (cleaned > 0)
             {
                 ServiceDebugUtility.LogAudit("Cleaned invalid direct relations before pawn discard: pawn=" + ServiceDebugUtility.PawnAuditSummary(__instance) + " count=" + cleaned);

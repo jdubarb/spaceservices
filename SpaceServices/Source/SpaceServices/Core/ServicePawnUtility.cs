@@ -78,6 +78,7 @@ namespace SpaceServices
             }
             int cleaned = ClearRuntimeLordReferences(pawn);
             cleaned += CleanupInvalidDirectRelations(pawn);
+            cleaned += CleanupDirectRelationsReferencing(pawn, map);
             cleaned += CleanupLordOwnedPawnReferences(map, pawn);
             cleaned += CleanupRelationshipRecordsReferencing(pawn);
             return cleaned;
@@ -85,16 +86,63 @@ namespace SpaceServices
 
         public static int CleanupInvalidDirectRelations(Pawn pawn)
         {
+            return CleanupInvalidDirectRelations(pawn, KnownPersistentPawns());
+        }
+
+        public static int CleanupDirectRelationsReferencing(Pawn targetPawn, Map map = null)
+        {
+            if (targetPawn == null)
+            {
+                return 0;
+            }
+            HashSet<Pawn> knownPawns = KnownPersistentPawns();
+            int removed = 0;
+            foreach (Pawn pawn in PawnsForRelationCleanup(map, knownPawns))
+            {
+                if (pawn == null || pawn.relations == null || pawn.relations.DirectRelations == null)
+                {
+                    continue;
+                }
+                removed += pawn.relations.DirectRelations.RemoveAll(relation =>
+                    relation == null ||
+                    relation.otherPawn == targetPawn ||
+                    IsInvalidDirectRelation(pawn, relation, knownPawns));
+            }
+            return removed;
+        }
+
+        public static int CleanupBrokenDirectRelations(Map map = null)
+        {
+            HashSet<Pawn> knownPawns = KnownPersistentPawns();
+            int removed = 0;
+            foreach (Pawn pawn in PawnsForRelationCleanup(map, knownPawns))
+            {
+                removed += CleanupInvalidDirectRelations(pawn, knownPawns);
+            }
+            return removed;
+        }
+
+        private static int CleanupInvalidDirectRelations(Pawn pawn, HashSet<Pawn> knownPawns)
+        {
             if (pawn == null || pawn.relations == null || pawn.relations.DirectRelations == null)
             {
                 return 0;
             }
-            return pawn.relations.DirectRelations.RemoveAll(relation =>
-                relation == null ||
-                relation.def == null ||
-                relation.otherPawn == null ||
-                relation.otherPawn.Destroyed ||
-                relation.otherPawn.relations == null);
+            return pawn.relations.DirectRelations.RemoveAll(relation => IsInvalidDirectRelation(pawn, relation, knownPawns));
+        }
+
+        private static bool IsInvalidDirectRelation(Pawn owner, DirectPawnRelation relation, HashSet<Pawn> knownPawns)
+        {
+            if (relation == null || relation.def == null || relation.otherPawn == null)
+            {
+                return true;
+            }
+            Pawn otherPawn = relation.otherPawn;
+            return otherPawn == owner ||
+                otherPawn.Destroyed ||
+                otherPawn.relations == null ||
+                otherPawn.relations.DirectRelations == null ||
+                (knownPawns != null && !knownPawns.Contains(otherPawn));
         }
 
         public static bool NotifyLordPawnLost(Lord lord, Pawn pawn, PawnLostCondition condition)
@@ -196,6 +244,39 @@ namespace SpaceServices
         public static HashSet<Pawn> KnownPersistentPawnsForCleanup()
         {
             return KnownPersistentPawns();
+        }
+
+        private static IEnumerable<Pawn> PawnsForRelationCleanup(Map map, HashSet<Pawn> knownPawns)
+        {
+            HashSet<Pawn> pawns = new HashSet<Pawn>();
+            if (knownPawns != null)
+            {
+                foreach (Pawn pawn in knownPawns)
+                {
+                    if (pawn != null)
+                    {
+                        pawns.Add(pawn);
+                    }
+                }
+            }
+            if (map != null && map.mapPawns != null)
+            {
+                foreach (Pawn pawn in map.mapPawns.AllPawnsSpawned)
+                {
+                    if (pawn != null)
+                    {
+                        pawns.Add(pawn);
+                    }
+                }
+                foreach (Pawn pawn in map.mapPawns.AllPawnsUnspawned)
+                {
+                    if (pawn != null)
+                    {
+                        pawns.Add(pawn);
+                    }
+                }
+            }
+            return pawns;
         }
 
         private static int CleanupRelationshipRecordReferences(Func<Pawn, bool> shouldRemove)
