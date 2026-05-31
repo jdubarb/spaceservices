@@ -488,9 +488,9 @@ namespace SpaceServices
             {
                 return;
             }
-            // Draw from the building draw pass so the icon shares the pad texture's exact center.
+            // Keep the mode mark painted on the pad surface instead of floating over shuttles.
             Vector3 drawPos = baseDrawPos;
-            drawPos.y = AltitudeLayer.MetaOverlays.AltitudeFor() + 0.15f;
+            drawPos.y = AltitudeLayer.FloorEmplacement.AltitudeFor() + 0.03f;
             Graphics.DrawMesh(MeshPool.GridPlane(OverlaySize), drawPos, Quaternion.identity, overlay, 0);
         }
 
