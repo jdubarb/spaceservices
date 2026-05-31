@@ -39,7 +39,7 @@ namespace SpaceServices
         private int modeVersion = 2;
         public bool requireVacSafeRoof = false;
         public bool preferShuttle = true;
-        public bool requirePower = false;
+        public bool requirePower = true;
         public string reservedForGroup;
         public int reservedAtTick;
 
@@ -95,14 +95,9 @@ namespace SpaceServices
                 reason = "pad unavailable";
                 return false;
             }
-            if (requirePower)
+            if (!HasRequiredPower(out reason))
             {
-                CompPowerTrader power = parent.TryGetComp<CompPowerTrader>();
-                if (power != null && !power.PowerOn)
-                {
-                    reason = "power is off";
-                    return false;
-                }
+                return false;
             }
             if (!AllowsUse(use))
             {
@@ -110,10 +105,6 @@ namespace SpaceServices
                 return false;
             }
             if (!ServiceEnvironmentUtility.IsRoofAccessible(parent, out reason))
-            {
-                return false;
-            }
-            if (requireVacSafeRoof && !ServiceEnvironmentUtility.HasFullFlyThroughRoof(parent, out reason))
             {
                 return false;
             }
@@ -128,21 +119,24 @@ namespace SpaceServices
                 reason = "pad unavailable";
                 return false;
             }
-            if (requirePower)
+            if (!HasRequiredPower(out reason))
             {
-                CompPowerTrader power = parent.TryGetComp<CompPowerTrader>();
-                if (power != null && !power.PowerOn)
-                {
-                    reason = "power is off";
-                    return false;
-                }
+                return false;
             }
             if (!ServiceEnvironmentUtility.IsRoofAccessible(parent, out reason))
             {
                 return false;
             }
-            if (requireVacSafeRoof && !ServiceEnvironmentUtility.HasFullFlyThroughRoof(parent, out reason))
+            return true;
+        }
+
+        private bool HasRequiredPower(out string reason)
+        {
+            reason = null;
+            CompPowerTrader power = parent == null ? null : parent.TryGetComp<CompPowerTrader>();
+            if (power != null && !power.PowerOn)
             {
+                reason = "power is off";
                 return false;
             }
             return true;
@@ -161,8 +155,6 @@ namespace SpaceServices
                 SpaceServiceEligibility eligibility = SafeEligibility(parent.Map);
                 float vacuum = SafeMaxVacuum();
                 bool roofAccessible = SafeRoofAccessible(out string roofReason);
-                string vacRoofReason;
-                bool vacRoofOk = !requireVacSafeRoof || SafeFullFlyThroughRoof(out vacRoofReason);
                 bool usable = SafeGenerallyUsable(out string usableReason);
                 SpaceServicesMapComponent comp = parent.Map.GetComponent<SpaceServicesMapComponent>();
 
@@ -176,10 +168,6 @@ namespace SpaceServices
                 builder.AppendLine("Damage: immune");
                 builder.AppendLine("Vacuum exposed: " + (vacuum > 0.001f ? "yes (" + vacuum.ToStringPercent() + ")" : "no"));
                 builder.AppendLine("Roof accessible: " + (roofAccessible ? "yes, " + SafeRoofAccessReport() : "no, " + roofReason));
-                if (requireVacSafeRoof)
-                {
-                    builder.AppendLine("Vac-safe roof required: " + (vacRoofOk ? "satisfied" : "not satisfied"));
-                }
                 builder.AppendLine("Map: " + (eligibility.allowed ? "eligible" : "blocked"));
                 builder.Append("Overall: " + (usable ? "usable" : "not usable, " + usableReason));
                 return builder.ToString().TrimEnd();
@@ -451,8 +439,6 @@ namespace SpaceServices
             yield return ModeCommand(ServicePadMode.Shared, "JDB_SpaceServices_Gizmo_ModeShared", "JDB_SpaceServices_Gizmo_ModeSharedDesc", SharedIcon);
             yield return ModeCommand(ServicePadMode.HospitalPriority, "JDB_SpaceServices_Gizmo_ModeHospitalPriority", "JDB_SpaceServices_Gizmo_ModeHospitalPriorityDesc", HospitalIcon);
             yield return ModeCommand(ServicePadMode.HospitalityPriority, "JDB_SpaceServices_Gizmo_ModeHospitalityPriority", "JDB_SpaceServices_Gizmo_ModeHospitalityPriorityDesc", HospitalityIcon);
-            yield return Toggle("JDB_SpaceServices_Gizmo_RequireVacRoof", () => requireVacSafeRoof, v => requireVacSafeRoof = v);
-            yield return Toggle("JDB_SpaceServices_Gizmo_RequirePower", () => requirePower, v => requirePower = v);
             if (ShouldShowDevGizmos())
             {
                 yield return DebugDangerToggle();
@@ -489,7 +475,7 @@ namespace SpaceServices
             {
                 return;
             }
-            Vector3 drawPos = parent.DrawPos;
+            Vector3 drawPos = parent.OccupiedRect().CenterCell.ToVector3Shifted();
             drawPos.y = AltitudeLayer.MetaOverlays.AltitudeFor() + 0.15f;
             overlay.Draw(drawPos, Rot4.North, parent);
         }

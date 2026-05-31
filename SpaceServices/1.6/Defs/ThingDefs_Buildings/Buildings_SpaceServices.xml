@@ -27,13 +27,13 @@
       <Flammability>0</Flammability>
     </statBases>
     <costList>
-      <Steel>25</Steel>
-      <ComponentIndustrial>1</ComponentIndustrial>
+      <Steel>250</Steel>
+      <ComponentIndustrial>5</ComponentIndustrial>
     </costList>
     <comps>
       <li Class="CompProperties_Power">
         <compClass>CompPowerTrader</compClass>
-        <basePowerConsumption>50</basePowerConsumption>
+        <basePowerConsumption>300</basePowerConsumption>
       </li>
       <li Class="SpaceServices.CompProperties_SpaceServicePad" />
     </comps>

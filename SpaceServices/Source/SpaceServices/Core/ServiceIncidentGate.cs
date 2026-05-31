@@ -3,6 +3,7 @@ using RimWorld;
 using System;
 using System.Collections;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Linq;
 using System.Reflection;
 using System.Text;
@@ -79,6 +80,10 @@ namespace SpaceServices
 
         public static bool TrafficRateAllows(string incidentDefName, Map map)
         {
+            if (IsDebugIncidentExecution())
+            {
+                return true;
+            }
             float rate = TrafficRateFor(incidentDefName);
             if (rate <= 0f)
             {
@@ -132,6 +137,33 @@ namespace SpaceServices
         private static string TrafficRateKey(string incidentDefName, Map map)
         {
             return (map == null ? -1 : map.uniqueID) + ":" + (incidentDefName ?? "");
+        }
+
+        public static bool IsDebugIncidentExecution()
+        {
+            if (!Prefs.DevMode && !DebugSettings.godMode)
+            {
+                return false;
+            }
+            try
+            {
+                StackTrace trace = new StackTrace(false);
+                foreach (StackFrame frame in trace.GetFrames() ?? Array.Empty<StackFrame>())
+                {
+                    string typeName = frame.GetMethod()?.DeclaringType?.FullName ?? "";
+                    if (typeName.IndexOf("DebugActionsIncidents", StringComparison.OrdinalIgnoreCase) >= 0 ||
+                        typeName.IndexOf("Dialog_Debug", StringComparison.OrdinalIgnoreCase) >= 0 ||
+                        typeName.IndexOf("DebugActionNode", StringComparison.OrdinalIgnoreCase) >= 0 ||
+                        typeName.IndexOf("DebugTabMenu", StringComparison.OrdinalIgnoreCase) >= 0)
+                    {
+                        return true;
+                    }
+                }
+            }
+            catch
+            {
+            }
+            return false;
         }
 
     }
