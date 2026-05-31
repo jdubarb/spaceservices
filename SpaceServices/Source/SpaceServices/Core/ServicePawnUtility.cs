@@ -77,9 +77,24 @@ namespace SpaceServices
                 return 0;
             }
             int cleaned = ClearRuntimeLordReferences(pawn);
+            cleaned += CleanupInvalidDirectRelations(pawn);
             cleaned += CleanupLordOwnedPawnReferences(map, pawn);
             cleaned += CleanupRelationshipRecordsReferencing(pawn);
             return cleaned;
+        }
+
+        public static int CleanupInvalidDirectRelations(Pawn pawn)
+        {
+            if (pawn == null || pawn.relations == null || pawn.relations.DirectRelations == null)
+            {
+                return 0;
+            }
+            return pawn.relations.DirectRelations.RemoveAll(relation =>
+                relation == null ||
+                relation.def == null ||
+                relation.otherPawn == null ||
+                relation.otherPawn.Destroyed ||
+                relation.otherPawn.relations == null);
         }
 
         public static bool NotifyLordPawnLost(Lord lord, Pawn pawn, PawnLostCondition condition)
