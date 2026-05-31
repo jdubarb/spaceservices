@@ -17,7 +17,6 @@ namespace SpaceServices
     {
         public static void Install(Harmony harmony)
         {
-            SpaceportsPatches.Install(harmony);
             HospitalPatches.Install(harmony);
             HospitalityPatches.Install(harmony);
             TraderShipsPatches.Install(harmony);

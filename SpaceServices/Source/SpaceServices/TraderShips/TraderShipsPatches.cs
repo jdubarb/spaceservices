@@ -17,7 +17,7 @@ namespace SpaceServices
     {
         public static void Install(Harmony harmony)
         {
-            // Reserved for the Trader Ships integration pass after Spaceports support settles.
+            // Reserved for the Trader Ships integration pass.
         }
     }
 }

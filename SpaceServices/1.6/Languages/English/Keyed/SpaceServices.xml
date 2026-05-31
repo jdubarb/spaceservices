@@ -1,14 +1,21 @@
 <?xml version="1.0" encoding="utf-8"?>
 <LanguageData>
   <JDB_SpaceServices_Settings_SectionGeneral>General</JDB_SpaceServices_Settings_SectionGeneral>
+  <JDB_SpaceServices_Settings_SectionVerbose>Verbose logging</JDB_SpaceServices_Settings_SectionVerbose>
   <JDB_SpaceServices_Settings_SectionHospitality>Hospitality</JDB_SpaceServices_Settings_SectionHospitality>
   <JDB_SpaceServices_Settings_SectionTraffic>Traffic rates</JDB_SpaceServices_Settings_SectionTraffic>
   <JDB_SpaceServices_Settings_SectionCompatibility>Compatibility</JDB_SpaceServices_Settings_SectionCompatibility>
 
   <JDB_SpaceServices_Settings_DebugLogging>Debug logging</JDB_SpaceServices_Settings_DebugLogging>
-  <JDB_SpaceServices_Settings_DebugLoggingDesc>Write normal Space Services diagnostics to the RimWorld log.</JDB_SpaceServices_Settings_DebugLoggingDesc>
-  <JDB_SpaceServices_Settings_VerboseDevLogging>Verbose dev logging</JDB_SpaceServices_Settings_VerboseDevLogging>
-  <JDB_SpaceServices_Settings_VerboseDevLoggingDesc>Write extra lifecycle and service pawn diagnostics. This is mostly for active debugging.</JDB_SpaceServices_Settings_VerboseDevLoggingDesc>
+  <JDB_SpaceServices_Settings_DebugLoggingDesc>Write normal core Space Services diagnostics to the RimWorld log. Integration details use their own verbose toggles below.</JDB_SpaceServices_Settings_DebugLoggingDesc>
+  <JDB_SpaceServices_Settings_VerboseCoreLogging>Core lifecycle verbose logging</JDB_SpaceServices_Settings_VerboseCoreLogging>
+  <JDB_SpaceServices_Settings_VerboseCoreLoggingDesc>Write extra shared lifecycle, shuttle, cleanup, and service pawn diagnostics. Does not enable Hospital, Hospitality, or Trader Ships logs.</JDB_SpaceServices_Settings_VerboseCoreLoggingDesc>
+  <JDB_SpaceServices_Settings_VerboseHospitalLogging>Hospital verbose logging</JDB_SpaceServices_Settings_VerboseHospitalLogging>
+  <JDB_SpaceServices_Settings_VerboseHospitalLoggingDesc>Write extra Hospital patient arrival, departure, and cleanup diagnostics.</JDB_SpaceServices_Settings_VerboseHospitalLoggingDesc>
+  <JDB_SpaceServices_Settings_VerboseHospitalityLogging>Hospitality verbose logging</JDB_SpaceServices_Settings_VerboseHospitalityLogging>
+  <JDB_SpaceServices_Settings_VerboseHospitalityLoggingDesc>Write extra Hospitality guest arrival, bed, lord, and departure diagnostics.</JDB_SpaceServices_Settings_VerboseHospitalityLoggingDesc>
+  <JDB_SpaceServices_Settings_VerboseTraderShipsLogging>Trader Ships verbose logging</JDB_SpaceServices_Settings_VerboseTraderShipsLogging>
+  <JDB_SpaceServices_Settings_VerboseTraderShipsLoggingDesc>Write extra Trader Ships bridge diagnostics when that integration is active.</JDB_SpaceServices_Settings_VerboseTraderShipsLoggingDesc>
   <JDB_SpaceServices_Settings_AutoExtract>Auto-extract fallback</JDB_SpaceServices_Settings_AutoExtract>
   <JDB_SpaceServices_Settings_AutoExtractDesc>Let Space Services recover service visitors that are ready to leave but get stuck outside the normal departure path.</JDB_SpaceServices_Settings_AutoExtractDesc>
   <JDB_SpaceServices_Settings_Hospital>Hospital support</JDB_SpaceServices_Settings_Hospital>
@@ -34,8 +41,6 @@
   <JDB_SpaceServices_Settings_HospitalityVisitorTrafficRate>Hospitality visitor traffic: {0}x</JDB_SpaceServices_Settings_HospitalityVisitorTrafficRate>
   <JDB_SpaceServices_Settings_HospitalityVisitorTrafficRateDesc>Deterministic rate for native Hospitality visitor incidents, and interval scaler for fallback visits.</JDB_SpaceServices_Settings_HospitalityVisitorTrafficRateDesc>
   <JDB_SpaceServices_Settings_HospitalityFallbackRateNote>Hospitality fallback interval is scaled by visitor traffic rate while override is enabled.</JDB_SpaceServices_Settings_HospitalityFallbackRateNote>
-  <JDB_SpaceServices_Settings_Spaceports>Spaceports bridge</JDB_SpaceServices_Settings_Spaceports>
-  <JDB_SpaceServices_Settings_SpaceportsDesc>Enable compatibility patches for Rimsential Spaceports when it is active.</JDB_SpaceServices_Settings_SpaceportsDesc>
   <JDB_SpaceServices_Settings_SealedNoSuit>Allow sealed non-vacsuit arrivals</JDB_SpaceServices_Settings_SealedNoSuit>
   <JDB_SpaceServices_Settings_SealedNoSuitDesc>Allow arrivals without forced vacsuits when the selected service pad is in a safe sealed environment.</JDB_SpaceServices_Settings_SealedNoSuitDesc>
 

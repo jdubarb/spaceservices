@@ -13,6 +13,14 @@ using Verse.AI.Group;
 
 namespace SpaceServices
 {
+    public enum ServiceLogIntegration
+    {
+        Core,
+        Hospital,
+        Hospitality,
+        TraderShips
+    }
+
     public static class ServiceDebugUtility
     {
         private static readonly Dictionary<string, int> LastLogTickByKey = new Dictionary<string, int>();
@@ -34,57 +42,183 @@ namespace SpaceServices
             }
         }
 
-        public static bool VerboseLogging
+        public static bool AnyVerboseLogging
         {
             get
             {
-                return SpaceServicesMod.Settings != null && SpaceServicesMod.Settings.verboseDevLogging;
+                return VerboseLogging(ServiceLogIntegration.Core) ||
+                    VerboseLogging(ServiceLogIntegration.Hospital) ||
+                    VerboseLogging(ServiceLogIntegration.Hospitality) ||
+                    VerboseLogging(ServiceLogIntegration.TraderShips);
+            }
+        }
+
+        public static bool VerboseLogging(ServiceLogIntegration integration)
+        {
+            if (SpaceServicesMod.Settings == null)
+            {
+                return false;
+            }
+            switch (integration)
+            {
+                case ServiceLogIntegration.Hospital:
+                    return SpaceServicesMod.Settings.verboseHospitalLogging;
+                case ServiceLogIntegration.Hospitality:
+                    return SpaceServicesMod.Settings.verboseHospitalityLogging;
+                case ServiceLogIntegration.TraderShips:
+                    return SpaceServicesMod.Settings.verboseTraderShipsLogging;
+                default:
+                    return SpaceServicesMod.Settings.verboseCoreLogging;
             }
         }
 
         public static void Log(string message)
         {
-            if (DebugLogging)
+            Log(GuessIntegration(message), message);
+        }
+
+        public static void Log(ServiceLogIntegration integration, string message)
+        {
+            if (NormalLogging(integration))
             {
                 Verse.Log.Message("[Space Services] " + message);
+            }
+        }
+
+        public static void LogWarning(ServiceLogIntegration integration, string message)
+        {
+            if (NormalLogging(integration))
+            {
+                Verse.Log.Warning("[Space Services] " + message);
             }
         }
 
         public static void LogVerbose(string message)
         {
-            if (VerboseLogging)
+            LogVerbose(GuessIntegration(message), message);
+        }
+
+        public static void LogVerbose(ServiceLogIntegration integration, string message)
+        {
+            // Verbose output is for trace-level diagnostics: arrivals, lords, records, and patch decisions.
+            if (VerboseLogging(integration))
             {
-                Verse.Log.Message("[Space Services] " + message);
+                Verse.Log.Message("[Space Services] [" + IntegrationLabel(integration) + "] " + message);
             }
         }
 
         public static void LogAudit(string message)
         {
-            if (DebugLogging || VerboseLogging)
+            LogAudit(GuessIntegration(message), message);
+        }
+
+        public static void LogAudit(ServiceLogIntegration integration, string message)
+        {
+            if (VerboseLogging(integration))
             {
-                Verse.Log.Message("[Space Services] [audit] " + message);
+                Verse.Log.Message("[Space Services] [" + IntegrationLabel(integration) + " audit] " + message);
             }
         }
 
         public static void LogThrottled(string key, string message)
         {
-            LogThrottled(key, message, GenDate.TicksPerHour);
+            LogThrottled(GuessIntegration(message), key, message, GenDate.TicksPerHour);
         }
 
         public static void LogThrottled(string key, string message, int intervalTicks)
         {
-            if (!DebugLogging || string.IsNullOrEmpty(key))
+            LogThrottled(GuessIntegration(message), key, message, intervalTicks);
+        }
+
+        public static void LogThrottled(ServiceLogIntegration integration, string key, string message)
+        {
+            LogThrottled(integration, key, message, GenDate.TicksPerHour);
+        }
+
+        public static void LogThrottled(ServiceLogIntegration integration, string key, string message, int intervalTicks)
+        {
+            if (!NormalLogging(integration) || string.IsNullOrEmpty(key))
             {
                 return;
             }
             int tick = Find.TickManager == null ? 0 : Find.TickManager.TicksGame;
             int lastTick;
+            // Repeated blockers can fire every tick during bad map states; throttle by stable keys.
             if (LastLogTickByKey.TryGetValue(key, out lastTick) && tick < lastTick + intervalTicks)
             {
                 return;
             }
             LastLogTickByKey[key] = tick;
-            Verse.Log.Message("[Space Services] " + message);
+            Verse.Log.Message("[Space Services] [" + IntegrationLabel(integration) + "] " + message);
+        }
+
+        private static bool NormalLogging(ServiceLogIntegration integration)
+        {
+            // Core debug remains the broad "is Space Services alive" switch. Integrations require their own toggles.
+            if (integration == ServiceLogIntegration.Core)
+            {
+                return DebugLogging || VerboseLogging(ServiceLogIntegration.Core);
+            }
+            return VerboseLogging(integration);
+        }
+
+        public static ServiceLogIntegration IntegrationForServiceKind(string serviceKind)
+        {
+            if (string.Equals(serviceKind, "hospital", StringComparison.OrdinalIgnoreCase))
+            {
+                return ServiceLogIntegration.Hospital;
+            }
+            if (string.Equals(serviceKind, "hospitality", StringComparison.OrdinalIgnoreCase))
+            {
+                return ServiceLogIntegration.Hospitality;
+            }
+            if (string.Equals(serviceKind, "traderShips", StringComparison.OrdinalIgnoreCase) ||
+                string.Equals(serviceKind, "trader-ships", StringComparison.OrdinalIgnoreCase))
+            {
+                return ServiceLogIntegration.TraderShips;
+            }
+            return ServiceLogIntegration.Core;
+        }
+
+        private static ServiceLogIntegration GuessIntegration(string message)
+        {
+            if (message == null)
+            {
+                return ServiceLogIntegration.Core;
+            }
+            if (message.IndexOf("Trader Ships", StringComparison.OrdinalIgnoreCase) >= 0 ||
+                message.IndexOf("TraderShips", StringComparison.OrdinalIgnoreCase) >= 0)
+            {
+                return ServiceLogIntegration.TraderShips;
+            }
+            if (message.IndexOf("Hospitality", StringComparison.OrdinalIgnoreCase) >= 0 ||
+                message.IndexOf("Guest", StringComparison.OrdinalIgnoreCase) >= 0 ||
+                message.IndexOf("visitor", StringComparison.OrdinalIgnoreCase) >= 0)
+            {
+                return ServiceLogIntegration.Hospitality;
+            }
+            if (message.IndexOf("Hospital", StringComparison.OrdinalIgnoreCase) >= 0 ||
+                message.IndexOf("Patient", StringComparison.OrdinalIgnoreCase) >= 0 ||
+                message.IndexOf("MassCasualty", StringComparison.OrdinalIgnoreCase) >= 0)
+            {
+                return ServiceLogIntegration.Hospital;
+            }
+            return ServiceLogIntegration.Core;
+        }
+
+        private static string IntegrationLabel(ServiceLogIntegration integration)
+        {
+            switch (integration)
+            {
+                case ServiceLogIntegration.Hospital:
+                    return "hospital";
+                case ServiceLogIntegration.Hospitality:
+                    return "hospitality";
+                case ServiceLogIntegration.TraderShips:
+                    return "trader-ships";
+                default:
+                    return "core";
+            }
         }
 
         public static string PawnAuditSummary(Pawn pawn)

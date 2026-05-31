@@ -15,6 +15,9 @@ namespace SpaceServices
 {
     public class SpaceServicesMod : Mod
     {
+        private const float SettingsViewHeight = 980f;
+        private static Vector2 settingsScrollPosition;
+
         public static SpaceServicesSettings Settings;
 
         public SpaceServicesMod(ModContentPack content) : base(content)
@@ -29,14 +32,24 @@ namespace SpaceServices
 
         public override void DoSettingsWindowContents(Rect inRect)
         {
+            Rect viewRect = new Rect(0f, 0f, inRect.width - 16f, SettingsViewHeight);
+            Widgets.BeginScrollView(inRect, ref settingsScrollPosition, viewRect);
             Listing_Standard listing = new Listing_Standard();
-            listing.Begin(inRect);
+            listing.Begin(viewRect);
+
+            // Settings are grouped by the debugging workflow: global behavior, per-integration logs,
+            // service-specific rules, traffic pacing, then soft-mod compatibility.
             Section(listing, "JDB_SpaceServices_Settings_SectionGeneral");
             Checkbox(listing, "JDB_SpaceServices_Settings_DebugLogging", ref Settings.debugLogging);
-            Checkbox(listing, "JDB_SpaceServices_Settings_VerboseDevLogging", ref Settings.verboseDevLogging);
             Checkbox(listing, "JDB_SpaceServices_Settings_AutoExtract", ref Settings.autoExtractFallback);
             Checkbox(listing, "JDB_SpaceServices_Settings_Hospital", ref Settings.enableHospital);
             Checkbox(listing, "JDB_SpaceServices_Settings_Hospitality", ref Settings.enableHospitality);
+
+            Section(listing, "JDB_SpaceServices_Settings_SectionVerbose");
+            Checkbox(listing, "JDB_SpaceServices_Settings_VerboseCoreLogging", ref Settings.verboseCoreLogging);
+            Checkbox(listing, "JDB_SpaceServices_Settings_VerboseHospitalLogging", ref Settings.verboseHospitalLogging);
+            Checkbox(listing, "JDB_SpaceServices_Settings_VerboseHospitalityLogging", ref Settings.verboseHospitalityLogging);
+            Checkbox(listing, "JDB_SpaceServices_Settings_VerboseTraderShipsLogging", ref Settings.verboseTraderShipsLogging);
 
             Section(listing, "JDB_SpaceServices_Settings_SectionHospitality");
             Checkbox(listing, "JDB_SpaceServices_Settings_HospitalityRequireBeds", ref Settings.hospitalityRequireGuestBeds);
@@ -48,6 +61,7 @@ namespace SpaceServices
             Checkbox(listing, "JDB_SpaceServices_Settings_TrafficRateOverride", ref Settings.trafficRateOverride);
             if (Settings.trafficRateOverride)
             {
+                // Rates are deterministic accumulators, not chance rolls. At 0.25x, every fourth eligible attempt passes.
                 Settings.hospitalPatientTrafficRate = RateSlider(listing, "JDB_SpaceServices_Settings_HospitalPatientTrafficRate", Settings.hospitalPatientTrafficRate);
                 Settings.hospitalMassCasualtyTrafficRate = RateSlider(listing, "JDB_SpaceServices_Settings_HospitalMassCasualtyTrafficRate", Settings.hospitalMassCasualtyTrafficRate);
                 Settings.hospitalityVisitorTrafficRate = RateSlider(listing, "JDB_SpaceServices_Settings_HospitalityVisitorTrafficRate", Settings.hospitalityVisitorTrafficRate);
@@ -59,9 +73,9 @@ namespace SpaceServices
             }
 
             Section(listing, "JDB_SpaceServices_Settings_SectionCompatibility");
-            Checkbox(listing, "JDB_SpaceServices_Settings_Spaceports", ref Settings.enableSpaceportsBridge);
             Checkbox(listing, "JDB_SpaceServices_Settings_SealedNoSuit", ref Settings.allowSealedNoSuitArrivals);
             listing.End();
+            Widgets.EndScrollView();
             Settings.Write();
         }
 
@@ -94,6 +108,10 @@ namespace SpaceServices
     public class SpaceServicesSettings : ModSettings
     {
         public bool debugLogging = true;
+        public bool verboseCoreLogging = false;
+        public bool verboseHospitalLogging = false;
+        public bool verboseHospitalityLogging = false;
+        public bool verboseTraderShipsLogging = false;
         public bool verboseDevLogging = false;
         public bool autoExtractFallback = true;
         public bool enableHospital = true;
@@ -103,17 +121,30 @@ namespace SpaceServices
         public bool hospitalityVacuumGuard = false;
         public bool hospitalityFallbackScheduler = true;
         public float hospitalityFallbackIntervalDays = 1.5f;
+        // Traffic rates are deliberately capped at 1.00x. Space services should not become an event overclocker.
         public bool trafficRateOverride = true;
         public float hospitalPatientTrafficRate = 0.25f;
         public float hospitalMassCasualtyTrafficRate = 0.25f;
         public float hospitalityVisitorTrafficRate = 0.25f;
-        public bool enableSpaceportsBridge = true;
         public bool allowSealedNoSuitArrivals = false;
 
         public override void ExposeData()
         {
             Scribe_Values.Look(ref debugLogging, "debugLogging", true);
+            // Keep the old all-verbose debug save field as a one-load migration path for test saves.
             Scribe_Values.Look(ref verboseDevLogging, "verboseDevLogging", false);
+            Scribe_Values.Look(ref verboseCoreLogging, "verboseCoreLogging", false);
+            Scribe_Values.Look(ref verboseHospitalLogging, "verboseHospitalLogging", false);
+            Scribe_Values.Look(ref verboseHospitalityLogging, "verboseHospitalityLogging", false);
+            Scribe_Values.Look(ref verboseTraderShipsLogging, "verboseTraderShipsLogging", false);
+            if (Scribe.mode == LoadSaveMode.PostLoadInit && verboseDevLogging)
+            {
+                verboseCoreLogging = true;
+                verboseHospitalLogging = true;
+                verboseHospitalityLogging = true;
+                verboseTraderShipsLogging = true;
+                verboseDevLogging = false;
+            }
             Scribe_Values.Look(ref autoExtractFallback, "autoExtractFallback", true);
             Scribe_Values.Look(ref enableHospital, "enableHospital", true);
             Scribe_Values.Look(ref enableHospitality, "enableHospitality", true);
@@ -130,7 +161,6 @@ namespace SpaceServices
             hospitalPatientTrafficRate = QuantizeRate(hospitalPatientTrafficRate);
             hospitalMassCasualtyTrafficRate = QuantizeRate(hospitalMassCasualtyTrafficRate);
             hospitalityVisitorTrafficRate = QuantizeRate(hospitalityVisitorTrafficRate);
-            Scribe_Values.Look(ref enableSpaceportsBridge, "enableSpaceportsBridge", true);
             Scribe_Values.Look(ref allowSealedNoSuitArrivals, "allowSealedNoSuitArrivals", false);
         }
 
