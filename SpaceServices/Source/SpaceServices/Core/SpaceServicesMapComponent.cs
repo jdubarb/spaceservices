@@ -18,7 +18,7 @@ namespace SpaceServices
         public List<ServiceGroupRecord> serviceGroups = new List<ServiceGroupRecord>();
         private readonly List<ScheduledServiceShuttleArrival> pendingShuttleArrivals = new List<ScheduledServiceShuttleArrival>();
         private readonly List<ScheduledHospitalityIncident> pendingHospitalityIncidents = new List<ScheduledHospitalityIncident>();
-        private const int StaleReferenceCleanupVersion = 7;
+        private const int StaleReferenceCleanupVersion = 8;
         private const int HospitalitySchedulerBlockedRetryTicks = 15000;
         private int nextDebugTick;
         private int nextLifecycleTick;

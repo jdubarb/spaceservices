@@ -45,6 +45,12 @@ namespace SpaceServices
             }
             int cleared = 0;
             cleared += ClearJobLord(pawn.CurJob) ? 1 : 0;
+            Lord pawnLord = Reflect.GetMember(pawn, "lord") as Lord;
+            if (pawnLord != null)
+            {
+                Reflect.SetMember(pawn, "lord", null);
+                cleared++;
+            }
             foreach (ThingComp comp in pawn.AllComps ?? new List<ThingComp>())
             {
                 if (comp == null)
