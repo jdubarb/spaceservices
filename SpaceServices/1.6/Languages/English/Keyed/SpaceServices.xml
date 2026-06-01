@@ -20,6 +20,8 @@
   <JDB_SpaceServices_Settings_HospitalDesc>Enable space-map handling for Hospital patient arrivals and departures.</JDB_SpaceServices_Settings_HospitalDesc>
   <JDB_SpaceServices_Settings_Hospitality>Hospitality support</JDB_SpaceServices_Settings_Hospitality>
   <JDB_SpaceServices_Settings_HospitalityDesc>Enable space-map handling for Hospitality guest arrivals and departures.</JDB_SpaceServices_Settings_HospitalityDesc>
+  <JDB_SpaceServices_Settings_ReplaceExternalTabs>Replace Hospital/Hospitality tabs</JDB_SpaceServices_Settings_ReplaceExternalTabs>
+  <JDB_SpaceServices_Settings_ReplaceExternalTabsDesc>Hide the native Hospital and Hospitality bottom tabs and use the Space Services tab as the combined entry point. Disable this to show all three tabs.</JDB_SpaceServices_Settings_ReplaceExternalTabsDesc>
   <JDB_SpaceServices_Settings_HospitalityRequireBeds>Require free guest beds for Hospitality arrivals</JDB_SpaceServices_Settings_HospitalityRequireBeds>
   <JDB_SpaceServices_Settings_HospitalityRequireBedsDesc>Block new Hospitality guest groups unless enough free guest beds are available.</JDB_SpaceServices_Settings_HospitalityRequireBedsDesc>
   <JDB_SpaceServices_Settings_HospitalityAutoDepartBedless>Auto-depart Hospitality guests without beds</JDB_SpaceServices_Settings_HospitalityAutoDepartBedless>
@@ -69,11 +71,11 @@
   <JDB_SpaceServices_Panel_OpenHospitality>Open Hospitality</JDB_SpaceServices_Panel_OpenHospitality>
   <JDB_SpaceServices_Panel_DebugLimits>Debug limits</JDB_SpaceServices_Panel_DebugLimits>
   <JDB_SpaceServices_Panel_HospitalPatientLimit>Hospital patient limit: {0}</JDB_SpaceServices_Panel_HospitalPatientLimit>
-  <JDB_SpaceServices_Panel_HospitalPatientLimitDesc>Debug-only cap for tracked Hospital patients. Off means no cap.</JDB_SpaceServices_Panel_HospitalPatientLimitDesc>
+  <JDB_SpaceServices_Panel_HospitalPatientLimitDesc>Debug-only cap for tracked Hospital patients. Minimum blocks new patients; maximum removes the cap.</JDB_SpaceServices_Panel_HospitalPatientLimitDesc>
   <JDB_SpaceServices_Panel_HospitalityGroupLimit>Hospitality group limit: {0}</JDB_SpaceServices_Panel_HospitalityGroupLimit>
-  <JDB_SpaceServices_Panel_HospitalityGroupLimitDesc>Debug-only cap for tracked Hospitality guest groups. Off means no cap.</JDB_SpaceServices_Panel_HospitalityGroupLimitDesc>
+  <JDB_SpaceServices_Panel_HospitalityGroupLimitDesc>Debug-only cap for tracked Hospitality guest groups. Minimum blocks new groups; maximum removes the cap.</JDB_SpaceServices_Panel_HospitalityGroupLimitDesc>
   <JDB_SpaceServices_Panel_HospitalityPawnLimit>Hospitality guest limit: {0}</JDB_SpaceServices_Panel_HospitalityPawnLimit>
-  <JDB_SpaceServices_Panel_HospitalityPawnLimitDesc>Debug-only cap for tracked Hospitality guest pawns. Off means no cap.</JDB_SpaceServices_Panel_HospitalityPawnLimitDesc>
+  <JDB_SpaceServices_Panel_HospitalityPawnLimitDesc>Debug-only cap for tracked Hospitality guest pawns. Minimum blocks new guests; maximum removes the cap.</JDB_SpaceServices_Panel_HospitalityPawnLimitDesc>
   <JDB_SpaceServices_Panel_ForceDanger>Force Hospitality danger</JDB_SpaceServices_Panel_ForceDanger>
   <JDB_SpaceServices_Panel_ForceDangerDesc>Debug toggle that makes Hospitality arrivals wave off and departures wait as if danger is active.</JDB_SpaceServices_Panel_ForceDangerDesc>
 </LanguageData>

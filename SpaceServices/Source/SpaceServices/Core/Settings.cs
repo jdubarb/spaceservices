@@ -44,6 +44,7 @@ namespace SpaceServices
             Checkbox(listing, "JDB_SpaceServices_Settings_AutoExtract", ref Settings.autoExtractFallback);
             Checkbox(listing, "JDB_SpaceServices_Settings_Hospital", ref Settings.enableHospital);
             Checkbox(listing, "JDB_SpaceServices_Settings_Hospitality", ref Settings.enableHospitality);
+            Checkbox(listing, "JDB_SpaceServices_Settings_ReplaceExternalTabs", ref Settings.replaceExternalServiceTabs);
 
             Section(listing, "JDB_SpaceServices_Settings_SectionVerbose");
             Checkbox(listing, "JDB_SpaceServices_Settings_VerboseCoreLogging", ref Settings.verboseCoreLogging);
@@ -76,6 +77,7 @@ namespace SpaceServices
             listing.End();
             Widgets.EndScrollView();
             Settings.Write();
+            SpaceServicesMainButtonUtility.ApplyServiceTabVisibility();
         }
 
         private static void Section(Listing_Standard listing, string translationKey)
@@ -114,6 +116,7 @@ namespace SpaceServices
         public bool autoExtractFallback = true;
         public bool enableHospital = true;
         public bool enableHospitality = true;
+        public bool replaceExternalServiceTabs = true;
         public bool hospitalityRequireGuestBeds = true;
         public bool hospitalityAutoDepartBedlessGuests = true;
         public bool hospitalityVacuumGuard = false;
@@ -144,6 +147,7 @@ namespace SpaceServices
             Scribe_Values.Look(ref autoExtractFallback, "autoExtractFallback", true);
             Scribe_Values.Look(ref enableHospital, "enableHospital", true);
             Scribe_Values.Look(ref enableHospitality, "enableHospitality", true);
+            Scribe_Values.Look(ref replaceExternalServiceTabs, "replaceExternalServiceTabs", true);
             Scribe_Values.Look(ref hospitalityRequireGuestBeds, "hospitalityRequireGuestBeds", true);
             Scribe_Values.Look(ref hospitalityAutoDepartBedlessGuests, "hospitalityAutoDepartBedlessGuests", true);
             Scribe_Values.Look(ref hospitalityVacuumGuard, "hospitalityVacuumGuard", false);

@@ -113,10 +113,12 @@ namespace SpaceServices
 
         private static int LimitSlider(Listing_Standard listing, string translationKey, int value, int max)
         {
-            int clamped = Mathf.Clamp(value, 0, max);
-            string display = clamped <= 0 ? "off" : clamped.ToString();
-            float next = listing.SliderLabeled(translationKey.Translate(display), clamped, 0, max, 0.5f, (translationKey + "Desc").Translate());
-            return Mathf.RoundToInt(next);
+            int noLimitValue = max + 1;
+            int sliderValue = value < 0 ? noLimitValue : Mathf.Clamp(value, 0, max);
+            string display = value < 0 ? "no limit" : value == 0 ? "none" : value.ToString();
+            float next = listing.SliderLabeled(translationKey.Translate(display), sliderValue, 0, noLimitValue, 0.5f, (translationKey + "Desc").Translate());
+            int rounded = Mathf.RoundToInt(next);
+            return rounded >= noLimitValue ? -1 : rounded;
         }
     }
 }

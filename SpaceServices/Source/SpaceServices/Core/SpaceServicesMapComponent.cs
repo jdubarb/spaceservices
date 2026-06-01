@@ -30,9 +30,10 @@ namespace SpaceServices
         private bool staleReferenceCleanupDone;
         private int staleReferenceCleanupVersion;
         public bool debugForceHospitalityDanger;
-        public int debugHospitalPatientLimit;
-        public int debugHospitalityGroupLimit;
-        public int debugHospitalityPawnLimit;
+        private int debugLimitSemanticsVersion;
+        public int debugHospitalPatientLimit = -1;
+        public int debugHospitalityGroupLimit = -1;
+        public int debugHospitalityPawnLimit = -1;
 
         public SpaceServicesMapComponent(Map map) : base(map)
         {
@@ -61,9 +62,31 @@ namespace SpaceServices
             Scribe_Values.Look(ref staleReferenceCleanupVersion, "staleReferenceCleanupVersion", 0);
             Scribe_Values.Look(ref nextHospitalityServiceVisitTick, "nextHospitalityServiceVisitTick", 0);
             Scribe_Values.Look(ref debugForceHospitalityDanger, "debugForceHospitalityDanger", false);
-            Scribe_Values.Look(ref debugHospitalPatientLimit, "debugHospitalPatientLimit", 0);
-            Scribe_Values.Look(ref debugHospitalityGroupLimit, "debugHospitalityGroupLimit", 0);
-            Scribe_Values.Look(ref debugHospitalityPawnLimit, "debugHospitalityPawnLimit", 0);
+            if (Scribe.mode == LoadSaveMode.Saving)
+            {
+                debugLimitSemanticsVersion = 1;
+            }
+            Scribe_Values.Look(ref debugLimitSemanticsVersion, "debugLimitSemanticsVersion", 0);
+            Scribe_Values.Look(ref debugHospitalPatientLimit, "debugHospitalPatientLimit", -1);
+            Scribe_Values.Look(ref debugHospitalityGroupLimit, "debugHospitalityGroupLimit", -1);
+            Scribe_Values.Look(ref debugHospitalityPawnLimit, "debugHospitalityPawnLimit", -1);
+            if (Scribe.mode == LoadSaveMode.PostLoadInit && debugLimitSemanticsVersion < 1)
+            {
+                // Previous dev builds used 0 as unlimited. New UI uses 0 as "block arrivals".
+                if (debugHospitalPatientLimit == 0)
+                {
+                    debugHospitalPatientLimit = -1;
+                }
+                if (debugHospitalityGroupLimit == 0)
+                {
+                    debugHospitalityGroupLimit = -1;
+                }
+                if (debugHospitalityPawnLimit == 0)
+                {
+                    debugHospitalityPawnLimit = -1;
+                }
+                debugLimitSemanticsVersion = 1;
+            }
             Scribe_Collections.Look(ref pendingShuttleArrivals, "pendingShuttleArrivals", LookMode.Deep);
             Scribe_Collections.Look(ref pendingHospitalityIncidents, "pendingHospitalityIncidents", LookMode.Deep);
             if (pendingShuttleArrivals == null)

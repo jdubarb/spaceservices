@@ -19,7 +19,7 @@ namespace SpaceServices
         {
             reason = null;
             SpaceServicesMapComponent comp = map == null ? null : map.GetComponent<SpaceServicesMapComponent>();
-            if (comp == null || comp.debugHospitalPatientLimit <= 0)
+            if (comp == null || comp.debugHospitalPatientLimit < 0)
             {
                 return true;
             }
@@ -43,12 +43,12 @@ namespace SpaceServices
 
             int groups = CountActiveGroups(map, "hospitality");
             int pawns = CountActiveServicePawns(map, "hospitality");
-            if (comp.debugHospitalityGroupLimit > 0 && groups + Math.Max(1, incomingGroups) > comp.debugHospitalityGroupLimit)
+            if (comp.debugHospitalityGroupLimit >= 0 && groups + Math.Max(1, incomingGroups) > comp.debugHospitalityGroupLimit)
             {
                 reason = "debug Hospitality group limit " + comp.debugHospitalityGroupLimit + " reached (" + groups + " active)";
                 return false;
             }
-            if (comp.debugHospitalityPawnLimit > 0 && pawns + Math.Max(1, incomingPawns) > comp.debugHospitalityPawnLimit)
+            if (comp.debugHospitalityPawnLimit >= 0 && pawns + Math.Max(1, incomingPawns) > comp.debugHospitalityPawnLimit)
             {
                 reason = "debug Hospitality pawn limit " + comp.debugHospitalityPawnLimit + " reached (" + pawns + " active)";
                 return false;

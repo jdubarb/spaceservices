@@ -17,8 +17,14 @@ namespace SpaceServices
     {
         public static void HideReplacedServiceTabs()
         {
-            SetMainButtonVisible("Patients", false);
-            SetMainButtonVisible("Guests", false);
+            ApplyServiceTabVisibility();
+        }
+
+        public static void ApplyServiceTabVisibility()
+        {
+            bool showExternal = SpaceServicesMod.Settings != null && !SpaceServicesMod.Settings.replaceExternalServiceTabs;
+            SetMainButtonVisible("Patients", showExternal);
+            SetMainButtonVisible("Guests", showExternal);
         }
 
         public static bool OpenNativeTab(string defName)
