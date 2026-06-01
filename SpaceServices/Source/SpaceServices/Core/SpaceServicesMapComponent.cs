@@ -23,6 +23,7 @@ namespace SpaceServices
         private const int HospitalitySchedulerBlockedRetryTicks = 15000;
         private int nextDebugTick;
         private int nextLifecycleTick;
+        private int nextMedPodAssistTick;
         private int nextReservationWatchTick;
         private bool servicePadCacheDirty = true;
         private List<Thing> cachedServicePads = new List<Thing>();
@@ -105,6 +106,11 @@ namespace SpaceServices
             ServiceShuttleUtility.TickPendingArrivals(map, pendingShuttleArrivals);
             TickPendingHospitalityIncidents();
             TickNaturalHospitalityScheduler();
+            if (Find.TickManager.TicksGame >= nextMedPodAssistTick)
+            {
+                nextMedPodAssistTick = Find.TickManager.TicksGame + 1000;
+                ServiceMedPodUtility.TickMapServicePawns(map);
+            }
             if (Find.TickManager.TicksGame >= nextLifecycleTick)
             {
                 nextLifecycleTick = Find.TickManager.TicksGame + ServiceLifecycleUtility.NextTickInterval(serviceGroups);

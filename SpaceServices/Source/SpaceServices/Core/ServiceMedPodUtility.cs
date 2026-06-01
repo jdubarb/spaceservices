@@ -15,6 +15,22 @@ namespace SpaceServices
         private static readonly Dictionary<int, int> NextMedPodSearchTickByPawnId = new Dictionary<int, int>();
         private static readonly Dictionary<int, int> NextMedPodAssistTickByPawnId = new Dictionary<int, int>();
 
+        public static void TickMapServicePawns(Map map)
+        {
+            if (SpaceServicesMod.Settings == null || !SpaceServicesMod.Settings.medPodServiceBridge)
+            {
+                return;
+            }
+            if (map == null || map.mapPawns == null || !SpaceServiceMapDetector.IsServiceEligible(map))
+            {
+                return;
+            }
+            foreach (Pawn pawn in map.mapPawns.AllPawnsSpawned)
+            {
+                TryStartMedPodJob(pawn);
+            }
+        }
+
         public static void TickServiceMedPodAssist(Map map, ServiceGroupRecord record)
         {
             if (SpaceServicesMod.Settings == null || !SpaceServicesMod.Settings.medPodServiceBridge)
@@ -57,6 +73,7 @@ namespace SpaceServices
             if (medPod == null)
             {
                 NextMedPodSearchTickByPawnId[pawn.thingIDNumber] = tick + FailedJobSearchCooldownTicks;
+                ServiceDebugUtility.LogThrottled(ServiceLogIntegration.Core, "medpod-no-pod-" + pawn.thingIDNumber, "MedPod assist found no valid MedPod for " + ServiceDebugUtility.PawnAuditSummary(pawn), GenDate.TicksPerHour);
                 return false;
             }
 
@@ -114,15 +131,62 @@ namespace SpaceServices
             {
                 return false;
             }
-            if (!ServiceLifecycleUtility.TryFindRecordForPawn(pawn, out _, out ServiceGroupRecord record))
+            if (ServicePawnUtility.IsPlayerOwnedPawn(pawn))
             {
                 return false;
+            }
+            if (!ServiceLifecycleUtility.TryFindRecordForPawn(pawn, out _, out ServiceGroupRecord record))
+            {
+                return IsActiveHospitalPatient(pawn) || IsActiveHospitalityGuest(pawn);
             }
             if (record == null || record.state != "arrived")
             {
                 return false;
             }
             return record.serviceKind == "hospital" || record.serviceKind == "hospitality";
+        }
+
+        private static bool IsActiveHospitalPatient(Pawn pawn)
+        {
+            if (pawn == null || pawn.MapHeld == null)
+            {
+                return false;
+            }
+            object hospital = HospitalIncidentGate.FindHospitalComponent(pawn.MapHeld);
+            System.Collections.IDictionary patients = hospital == null ? null : Reflect.GetMember(hospital, "Patients") as System.Collections.IDictionary;
+            return patients != null && patients.Contains(pawn);
+        }
+
+        private static bool IsActiveHospitalityGuest(Pawn pawn)
+        {
+            object comp = CompGuest(pawn);
+            if (comp == null)
+            {
+                return false;
+            }
+            return Reflect.BoolMember(comp, "arrived") && !Reflect.BoolMember(comp, "sentAway");
+        }
+
+        private static object CompGuest(Pawn pawn)
+        {
+            if (pawn == null || pawn.AllComps == null)
+            {
+                return null;
+            }
+            Type compType = AccessTools.TypeByName("Hospitality.CompGuest");
+            foreach (ThingComp comp in pawn.AllComps)
+            {
+                if (comp == null)
+                {
+                    continue;
+                }
+                Type type = comp.GetType();
+                if ((compType != null && compType.IsAssignableFrom(type)) || type.FullName == "Hospitality.CompGuest")
+                {
+                    return comp;
+                }
+            }
+            return null;
         }
 
         private static Thing FindBestMedPod(Pawn pawn)
