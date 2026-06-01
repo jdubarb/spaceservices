@@ -5,6 +5,15 @@ using Verse;
 
 namespace SpaceServices
 {
+    public static class ServicePadEventPatches
+    {
+        public static void Install(Harmony harmony)
+        {
+            OptionalModPatches.PatchIfExists(harmony, AccessTools.Method(typeof(MapDrawer), "Notify_RoofChanged"), typeof(ServicePadRoofChangedPatch), postfix: nameof(ServicePadRoofChangedPatch.Postfix));
+            OptionalModPatches.PatchIfExists(harmony, AccessTools.Method(typeof(MapDrawer), "NotifyRoofChanged"), typeof(ServicePadRoofChangedPatch), postfix: nameof(ServicePadRoofChangedPatch.Postfix));
+        }
+    }
+
     [HarmonyPatch]
     public static class ServicePadPowerSignalPatch
     {
@@ -23,14 +32,8 @@ namespace SpaceServices
         }
     }
 
-    [HarmonyPatch]
     public static class ServicePadRoofChangedPatch
     {
-        public static MethodBase TargetMethod()
-        {
-            return AccessTools.Method(typeof(MapDrawer), "Notify_RoofChanged");
-        }
-
         public static void Postfix(MapDrawer __instance, IntVec3 c)
         {
             Map map = Reflect.GetMember(__instance, "map") as Map;

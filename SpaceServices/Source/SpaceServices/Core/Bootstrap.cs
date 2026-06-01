@@ -24,6 +24,7 @@ namespace SpaceServices
         static SpaceServicesBootstrap()
         {
             Harmony.PatchAll(Assembly.GetExecutingAssembly());
+            ServicePadEventPatches.Install(Harmony);
             OptionalModPatches.Install(Harmony);
             LongEventHandler.ExecuteWhenFinished(ArchitectMenuPatch.InjectArchitectDesignators);
             ServiceDebugUtility.Log(ServiceLogIntegration.Core, "Loaded.");
