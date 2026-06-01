@@ -20,6 +20,7 @@ namespace SpaceServices
         private static readonly Dictionary<int, bool> sealedArrivalSuitRolls = new Dictionary<int, bool>();
         private const string InjectedVacGearTag = "JDB_SpaceServices_AutoVacGear";
         private const float AutoSetSelectionChance = 0.35f;
+        public const float PracticalVacuumSuitTarget = 0.9f;
         private static StatDef vacuumResistance;
         private static List<VacuumApparelCandidate> cachedAutoCandidates;
 
@@ -58,7 +59,7 @@ namespace SpaceServices
             {
                 if (ShouldProvideSuitForArrival(pawn, map, cell))
                 {
-                    SuitPawnForVacuum(pawn, vacuum);
+                    SuitPawnForVacuum(pawn, Mathf.Min(vacuum, PracticalVacuumSuitTarget));
                 }
                 else
                 {

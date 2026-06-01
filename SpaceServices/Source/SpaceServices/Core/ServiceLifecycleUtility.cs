@@ -974,7 +974,7 @@ namespace SpaceServices
         {
             return pawns != null &&
                 pawns.Count > 0 &&
-                pawns.All(pawn => pawn != null && !pawn.Destroyed && VacSuitUtility.VacuumResistance(pawn) >= 0.95f);
+                pawns.All(pawn => pawn != null && !pawn.Destroyed && VacSuitUtility.VacuumResistance(pawn) + 0.001f >= VacSuitUtility.PracticalVacuumSuitTarget);
         }
 
         private static bool IsVacuumPad(Thing pad)

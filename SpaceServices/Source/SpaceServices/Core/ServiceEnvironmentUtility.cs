@@ -185,7 +185,7 @@ namespace SpaceServices
                 reason = "departure pad unavailable";
                 return false;
             }
-            float vacuum = GetMaxVacuum(pad);
+            float vacuum = Mathf.Min(GetMaxVacuum(pad), VacSuitUtility.PracticalVacuumSuitTarget);
             foreach (Pawn pawn in pawns ?? Enumerable.Empty<Pawn>())
             {
                 if (pawn == null || pawn.Destroyed)
@@ -195,7 +195,7 @@ namespace SpaceServices
                 float resistance = VacSuitUtility.VacuumResistance(pawn);
                 if (resistance + Epsilon < vacuum)
                 {
-                    reason = "departure pad vacuum " + vacuum.ToStringPercent() + " exceeds " + pawn.LabelShortCap + "'s vacuum resistance " + resistance.ToStringPercent();
+                    reason = "departure pad requires " + vacuum.ToStringPercent() + " practical vacuum resistance; " + pawn.LabelShortCap + " has " + resistance.ToStringPercent();
                     return false;
                 }
             }
