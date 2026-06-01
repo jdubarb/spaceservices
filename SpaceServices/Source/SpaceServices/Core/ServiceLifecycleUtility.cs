@@ -316,10 +316,6 @@ namespace SpaceServices
                 {
                     GuardHospitalityGuestsFromVacuum(map, record);
                 }
-                if ((record.serviceKind == "hospital" || record.serviceKind == "hospitality") && record.state == "arrived")
-                {
-                    ServiceMedPodUtility.TickServiceMedPodAssist(map, record);
-                }
                 if (record.serviceKind == "hospitality" && record.state == "arrived" &&
                     SpaceServicesMod.Settings != null && SpaceServicesMod.Settings.hospitalityAutoDepartBedlessGuests &&
                     ShouldCheckHospitalityBedless(record) &&
