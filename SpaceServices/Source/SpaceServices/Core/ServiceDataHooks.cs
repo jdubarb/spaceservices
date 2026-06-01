@@ -110,7 +110,6 @@ namespace SpaceServices
         public List<string> requiredPackageIds;
         public List<string> adultApparelDefNames;
         public List<string> childApparelDefNames;
-        public List<string> removalApparelDefNames;
 
         public bool AppliesTo(Pawn pawn)
         {
@@ -128,30 +127,6 @@ namespace SpaceServices
             return SpaceServiceDefFilters.ResolveThingDefs(names);
         }
 
-        public IEnumerable<string> AllRemovalDefNames()
-        {
-            if (!adultApparelDefNames.NullOrEmpty())
-            {
-                foreach (string name in adultApparelDefNames)
-                {
-                    yield return name;
-                }
-            }
-            if (!childApparelDefNames.NullOrEmpty())
-            {
-                foreach (string name in childApparelDefNames)
-                {
-                    yield return name;
-                }
-            }
-            if (!removalApparelDefNames.NullOrEmpty())
-            {
-                foreach (string name in removalApparelDefNames)
-                {
-                    yield return name;
-                }
-            }
-        }
     }
 
     public static class SpaceServiceDefFilters
