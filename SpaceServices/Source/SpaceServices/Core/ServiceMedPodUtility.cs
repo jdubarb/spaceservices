@@ -69,11 +69,11 @@ namespace SpaceServices
                 return false;
             }
 
-            Thing medPod = FindBestMedPod(pawn);
+            Thing medPod = FindBestMedPod(pawn) ?? FindBestServiceMedPod(pawn);
             if (medPod == null)
             {
                 NextMedPodSearchTickByPawnId[pawn.thingIDNumber] = tick + FailedJobSearchCooldownTicks;
-                ServiceDebugUtility.LogThrottled(ServiceLogIntegration.Core, "medpod-no-pod-" + pawn.thingIDNumber, "MedPod assist found no valid MedPod for " + ServiceDebugUtility.PawnAuditSummary(pawn), GenDate.TicksPerHour);
+                ServiceDebugUtility.LogThrottled(ServiceLogIntegration.Core, "medpod-no-pod-" + pawn.thingIDNumber, "MedPod assist found no valid MedPod for " + ServiceDebugUtility.PawnAuditSummary(pawn) + " " + MedPodMapSummary(pawn), GenDate.TicksPerHour);
                 return false;
             }
 
@@ -208,6 +208,110 @@ namespace SpaceServices
             }
         }
 
+        private static Thing FindBestServiceMedPod(Pawn pawn)
+        {
+            Map map = pawn == null ? null : pawn.MapHeld;
+            Type restUtility = AccessTools.TypeByName("MedPod.MedPodRestUtility");
+            MethodInfo validator = restUtility == null ? null : AccessTools.Method(restUtility, "IsValidMedPodFor");
+            if (map == null || validator == null)
+            {
+                return null;
+            }
+
+            Thing best = null;
+            float bestDistance = float.MaxValue;
+            foreach (Thing medPod in AllMedPods(map))
+            {
+                if (!ValidServiceMedPod(validator, medPod, pawn))
+                {
+                    continue;
+                }
+                float distance = pawn.Position.DistanceToSquared(medPod.Position);
+                if (distance < bestDistance)
+                {
+                    best = medPod;
+                    bestDistance = distance;
+                }
+            }
+            if (best != null)
+            {
+                ServiceDebugUtility.LogThrottled(ServiceLogIntegration.Core, "medpod-service-lookup-" + pawn.thingIDNumber, "Space Services selected MedPod by service lookup for " + ServiceDebugUtility.PawnAuditSummary(pawn) + " pod=" + best.ThingID, GenDate.TicksPerHour);
+            }
+            return best;
+        }
+
+        private static bool ValidServiceMedPod(MethodInfo validator, Thing medPod, Pawn pawn)
+        {
+            foreach (object guestStatus in GuestStatusCandidates(pawn))
+            {
+                try
+                {
+                    object result = validator.Invoke(null, new[] { medPod, pawn, pawn, guestStatus });
+                    if (result is bool && (bool)result)
+                    {
+                        return true;
+                    }
+                }
+                catch (Exception ex)
+                {
+                    ServiceDebugUtility.LogThrottled(ServiceLogIntegration.Core, "medpod-validator-failed", "MedPod validator failed during service lookup: " + ex.GetType().Name + " " + ex.Message, GenDate.TicksPerHour);
+                    return false;
+                }
+            }
+            return false;
+        }
+
+        private static IEnumerable<object> GuestStatusCandidates(Pawn pawn)
+        {
+            object status = pawn == null || pawn.guest == null ? null : Reflect.GetMember(pawn.guest, "GuestStatus");
+            if (status != null)
+            {
+                yield return status;
+            }
+            yield return GuestStatus.Guest;
+            yield return null;
+        }
+
+        private static IEnumerable<Thing> AllMedPods(Map map)
+        {
+            if (map == null || map.listerThings == null)
+            {
+                yield break;
+            }
+            Type medPodType = AccessTools.TypeByName("MedPod.Building_BedMedPod");
+            foreach (Thing thing in map.listerThings.AllThings)
+            {
+                Type type = thing == null ? null : thing.GetType();
+                if (type != null && ((medPodType != null && medPodType.IsAssignableFrom(type)) || type.FullName == "MedPod.Building_BedMedPod"))
+                {
+                    yield return thing;
+                }
+            }
+        }
+
+        private static string MedPodMapSummary(Pawn pawn)
+        {
+            Map map = pawn == null ? null : pawn.MapHeld;
+            if (map == null)
+            {
+                return "medPods=no-map";
+            }
+            List<string> parts = new List<string>();
+            foreach (Thing medPod in AllMedPods(map))
+            {
+                Building_Bed bed = medPod as Building_Bed;
+                CompPowerTrader power = medPod.TryGetComp<CompPowerTrader>();
+                parts.Add(medPod.ThingID +
+                    ": spawned=" + medPod.Spawned +
+                    ", forbidden=" + medPod.IsForbidden(pawn) +
+                    ", medical=" + (bed != null && bed.Medical) +
+                    ", prisoner=" + (bed != null && bed.ForPrisoners) +
+                    ", allowGuests=" + Reflect.BoolMember(medPod, "allowGuests", false) +
+                    ", power=" + (power == null || power.PowerOn) +
+                    ", reserve=" + pawn.CanReserve(medPod));
+            }
+            return "medPods=[" + string.Join("; ", parts.ToArray()) + "]";
+        }
     }
 
     public sealed class JobGiver_ServicePawnGoToMedPod : ThinkNode_JobGiver
