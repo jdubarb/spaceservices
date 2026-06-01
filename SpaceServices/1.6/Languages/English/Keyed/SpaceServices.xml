@@ -44,7 +44,7 @@
   <JDB_SpaceServices_Settings_SealedNoSuit>Allow sealed non-vacsuit arrivals</JDB_SpaceServices_Settings_SealedNoSuit>
   <JDB_SpaceServices_Settings_SealedNoSuitDesc>Allow arrivals without forced vacsuits when the selected service pad is in a safe sealed environment.</JDB_SpaceServices_Settings_SealedNoSuitDesc>
   <JDB_SpaceServices_Settings_MedPodBridge>MedPod service-pawn bridge</JDB_SpaceServices_Settings_MedPodBridge>
-  <JDB_SpaceServices_Settings_MedPodBridgeDesc>Experimental. Let tracked Hospital patients and Hospitality guests try MedPod jobs on service maps, and count guest-enabled MedPods as Hospital capacity when Hospital does not.</JDB_SpaceServices_Settings_MedPodBridgeDesc>
+  <JDB_SpaceServices_Settings_MedPodBridgeDesc>Experimental. Let MedPod accept active Hospital patients and Hospitality guests on service maps even when their hidden medical-care level is below MedPod's normal threshold.</JDB_SpaceServices_Settings_MedPodBridgeDesc>
 
   <JDB_SpaceServices_Gizmo_ModeHospitalOnly>Hospital only</JDB_SpaceServices_Gizmo_ModeHospitalOnly>
   <JDB_SpaceServices_Gizmo_ModeHospitalOnlyDesc>Use this pad only for Hospital patient arrivals and departures.</JDB_SpaceServices_Gizmo_ModeHospitalOnlyDesc>
