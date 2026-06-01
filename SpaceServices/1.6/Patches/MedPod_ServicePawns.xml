@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Patch>
+  <Operation Class="PatchOperationFindMod">
+    <mods>
+      <li>MedPod</li>
+    </mods>
+    <match Class="PatchOperationSequence">
+      <operations>
+        <li Class="PatchOperationFindMod">
+          <mods>
+            <li>Hospital</li>
+          </mods>
+          <match Class="PatchOperationAdd">
+            <xpath>Defs/DutyDef[defName="Patient"]/thinkNode/subNodes/li[@Class="ThinkNode_Tagger"]/subNodes</xpath>
+            <order>Prepend</order>
+            <value>
+              <li Class="SpaceServices.JobGiver_ServicePawnGoToMedPod" />
+            </value>
+          </match>
+        </li>
+        <li Class="PatchOperationFindMod">
+          <mods>
+            <li>Hospitality</li>
+          </mods>
+          <match Class="PatchOperationInsert">
+            <xpath>Defs/DutyDef[defName="Relax"]/thinkNode/subNodes/li[@Class="Hospitality.ThinkNode_OnlyAllowed"]/subNodes/li[@Class="ThinkNode_SubtreesByTag" and insertTag="Humanlike_PreMain"]</xpath>
+            <value>
+              <li Class="SpaceServices.JobGiver_ServicePawnGoToMedPod" />
+            </value>
+          </match>
+        </li>
+      </operations>
+    </match>
+  </Operation>
+</Patch>

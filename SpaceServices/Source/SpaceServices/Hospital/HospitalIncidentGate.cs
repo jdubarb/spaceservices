@@ -34,8 +34,8 @@ namespace SpaceServices
             {
                 return false;
             }
-            int freeBeds = CallInt(hospital, "FreeMedicalBeds", -1);
-            if (freeBeds == 0 || CallBool(hospital, "IsFull", false))
+            int freeBeds = EffectiveFreeMedicalBeds(hospital, map);
+            if (freeBeds == 0 || (CallBool(hospital, "IsFull", false) && freeBeds <= 0))
             {
                 return false;
             }
@@ -76,7 +76,9 @@ namespace SpaceServices
                 return trafficReason;
             }
             return "open=" + CallBool(hospital, "IsOpen", true) +
-                ", freeBeds=" + CallInt(hospital, "FreeMedicalBeds", -1) +
+                ", freeBeds=" + EffectiveFreeMedicalBeds(hospital, map) +
+                ", nativeFreeBeds=" + CallInt(hospital, "FreeMedicalBeds", -1) +
+                ", medPodExtraBeds=" + ServiceMedPodUtility.ExtraHospitalMedPodCapacity(map) +
                 ", bedCount=" + CallInt(hospital, "BedCount", -1) +
                 ", full=" + CallBool(hospital, "IsFull", false) +
                 ", freePatientPads=" + ServicePadUtility.CountServicePads(map, ServiceUse.Patient) +
@@ -121,6 +123,13 @@ namespace SpaceServices
             {
                 return GenHostility.AnyHostileActiveThreatToPlayer(map, true);
             }
+        }
+
+        private static int EffectiveFreeMedicalBeds(object hospital, Map map)
+        {
+            int freeBeds = CallInt(hospital, "FreeMedicalBeds", -1);
+            int extraMedPods = ServiceMedPodUtility.ExtraHospitalMedPodCapacity(map);
+            return freeBeds < 0 ? freeBeds : freeBeds + extraMedPods;
         }
 
         private static bool CallBool(object target, string methodName, bool fallback)

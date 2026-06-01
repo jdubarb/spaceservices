@@ -237,7 +237,7 @@ namespace SpaceServices
             map.GetComponent<SpaceServicesMapComponent>()?.RequestLifecycleTickSoon(reason);
         }
 
-        private static bool TryFindRecordForPawn(Pawn pawn, out Map map, out ServiceGroupRecord record)
+        public static bool TryFindRecordForPawn(Pawn pawn, out Map map, out ServiceGroupRecord record)
         {
             map = null;
             record = null;
