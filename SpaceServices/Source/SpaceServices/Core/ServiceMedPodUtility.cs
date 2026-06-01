@@ -2,7 +2,6 @@ using HarmonyLib;
 using RimWorld;
 using System;
 using System.Collections.Generic;
-using System.Linq;
 using System.Reflection;
 using Verse;
 using Verse.AI;
@@ -11,8 +10,30 @@ namespace SpaceServices
 {
     public static class ServiceMedPodUtility
     {
-        private const int FailedJobSearchCooldownTicks = 250;
-        private static readonly Dictionary<int, int> NextMedPodCheckTickByPawnId = new Dictionary<int, int>();
+        private const int FailedJobSearchCooldownTicks = 1000;
+        private const int AssistCooldownTicks = 1000;
+        private static readonly Dictionary<int, int> NextMedPodSearchTickByPawnId = new Dictionary<int, int>();
+        private static readonly Dictionary<int, int> NextMedPodAssistTickByPawnId = new Dictionary<int, int>();
+
+        public static void TickServiceMedPodAssist(Map map, ServiceGroupRecord record)
+        {
+            if (SpaceServicesMod.Settings == null || !SpaceServicesMod.Settings.medPodServiceBridge)
+            {
+                return;
+            }
+            if (map == null || record == null || record.pawns == null || record.state != "arrived")
+            {
+                return;
+            }
+            if (record.serviceKind != "hospital" && record.serviceKind != "hospitality")
+            {
+                return;
+            }
+            foreach (Pawn pawn in record.pawns)
+            {
+                TryStartMedPodJob(pawn);
+            }
+        }
 
         public static bool TryMakeMedPodJob(Pawn pawn, out Job job)
         {
@@ -27,7 +48,7 @@ namespace SpaceServices
             }
 
             int tick = Find.TickManager == null ? 0 : Find.TickManager.TicksGame;
-            if (NextMedPodCheckTickByPawnId.TryGetValue(pawn.thingIDNumber, out int nextTick) && tick < nextTick)
+            if (NextMedPodSearchTickByPawnId.TryGetValue(pawn.thingIDNumber, out int nextTick) && tick < nextTick)
             {
                 return false;
             }
@@ -35,7 +56,7 @@ namespace SpaceServices
             Thing medPod = FindBestMedPod(pawn);
             if (medPod == null)
             {
-                NextMedPodCheckTickByPawnId[pawn.thingIDNumber] = tick + FailedJobSearchCooldownTicks;
+                NextMedPodSearchTickByPawnId[pawn.thingIDNumber] = tick + FailedJobSearchCooldownTicks;
                 return false;
             }
 
@@ -53,31 +74,34 @@ namespace SpaceServices
             return true;
         }
 
-        public static int ExtraHospitalMedPodCapacity(Map map)
+        public static bool TryStartMedPodJob(Pawn pawn)
         {
-            if (SpaceServicesMod.Settings == null || !SpaceServicesMod.Settings.medPodServiceBridge)
+            if (pawn == null || pawn.jobs == null || pawn.Downed || pawn.InMentalState || pawn.CurJobDef == DefDatabase<JobDef>.GetNamedSilentFail("PatientGoToMedPod"))
             {
-                return 0;
-            }
-            if (map == null || !SpaceServiceMapDetector.IsServiceEligible(map))
-            {
-                return 0;
+                return false;
             }
 
-            int count = 0;
-            foreach (Thing medPod in AllMedPods(map))
+            int tick = Find.TickManager == null ? 0 : Find.TickManager.TicksGame;
+            if (NextMedPodAssistTickByPawnId.TryGetValue(pawn.thingIDNumber, out int nextTick) && tick < nextTick)
             {
-                if (!BasicUsableMedPod(medPod))
-                {
-                    continue;
-                }
-                if (HospitalCountsBed(medPod))
-                {
-                    continue;
-                }
-                count++;
+                return false;
             }
-            return count;
+            NextMedPodAssistTickByPawnId[pawn.thingIDNumber] = tick + AssistCooldownTicks;
+
+            if (!TryMakeMedPodJob(pawn, out Job job))
+            {
+                return false;
+            }
+
+            // Hospital and Hospitality may leave a service pawn resting in a normal bed.
+            // The bridge is opt-in, so gently override that job when MedPod says a pod is valid.
+            bool started = pawn.jobs.TryTakeOrderedJob(job, JobTag.Misc);
+            if (started)
+            {
+                ServiceDebugUtility.LogThrottled(ServiceLogIntegration.Core, "medpod-assist-start-" + pawn.thingIDNumber, "MedPod assist started job for " + ServiceDebugUtility.PawnAuditSummary(pawn), GenDate.TicksPerHour);
+                ServiceDebugUtility.LogVerbose(ServiceLogIntegration.Core, "MedPod assist started job for " + ServiceDebugUtility.PawnAuditSummary(pawn));
+            }
+            return started;
         }
 
         private static bool CanServicePawnSeekMedPod(Pawn pawn)
@@ -120,47 +144,6 @@ namespace SpaceServices
             }
         }
 
-        private static IEnumerable<Thing> AllMedPods(Map map)
-        {
-            if (map == null || map.listerThings == null)
-            {
-                yield break;
-            }
-            foreach (Thing thing in map.listerThings.AllThings)
-            {
-                if (IsMedPod(thing))
-                {
-                    yield return thing;
-                }
-            }
-        }
-
-        private static bool IsMedPod(Thing thing)
-        {
-            return thing != null && (thing.GetType().FullName ?? "") == "MedPod.Building_BedMedPod";
-        }
-
-        private static bool BasicUsableMedPod(Thing medPod)
-        {
-            Building_Bed bed = medPod as Building_Bed;
-            if (bed == null || !bed.Spawned || bed.Destroyed || !bed.Medical || bed.ForPrisoners || bed.def == null || bed.def.building == null || !bed.def.building.bed_humanlike)
-            {
-                return false;
-            }
-            if (bed.IsBurning() || bed.IsBrokenDown() || !Reflect.BoolMember(bed, "allowGuests", false))
-            {
-                return false;
-            }
-            CompPowerTrader power = bed.TryGetComp<CompPowerTrader>();
-            return power == null || power.PowerOn;
-        }
-
-        private static bool HospitalCountsBed(Thing medPod)
-        {
-            ThingWithComps thingWithComps = medPod as ThingWithComps;
-            ThingComp comp = thingWithComps == null || thingWithComps.AllComps == null ? null : thingWithComps.AllComps.FirstOrDefault(candidate => candidate != null && (candidate.GetType().FullName ?? "") == "Hospital.CompHospitalBed");
-            return comp != null && Reflect.BoolMember(comp, "Hospital", false);
-        }
     }
 
     public sealed class JobGiver_ServicePawnGoToMedPod : ThinkNode_JobGiver

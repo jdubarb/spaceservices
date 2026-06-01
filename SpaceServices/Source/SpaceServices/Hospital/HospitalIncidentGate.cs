@@ -78,7 +78,6 @@ namespace SpaceServices
             return "open=" + CallBool(hospital, "IsOpen", true) +
                 ", freeBeds=" + EffectiveFreeMedicalBeds(hospital, map) +
                 ", nativeFreeBeds=" + CallInt(hospital, "FreeMedicalBeds", -1) +
-                ", medPodExtraBeds=" + ServiceMedPodUtility.ExtraHospitalMedPodCapacity(map) +
                 ", bedCount=" + CallInt(hospital, "BedCount", -1) +
                 ", full=" + CallBool(hospital, "IsFull", false) +
                 ", freePatientPads=" + ServicePadUtility.CountServicePads(map, ServiceUse.Patient) +
@@ -127,9 +126,8 @@ namespace SpaceServices
 
         private static int EffectiveFreeMedicalBeds(object hospital, Map map)
         {
-            int freeBeds = CallInt(hospital, "FreeMedicalBeds", -1);
-            int extraMedPods = ServiceMedPodUtility.ExtraHospitalMedPodCapacity(map);
-            return freeBeds < 0 ? freeBeds : freeBeds + extraMedPods;
+            // Hospital's own hospital-bed flag remains authoritative, including for MedPods.
+            return CallInt(hospital, "FreeMedicalBeds", -1);
         }
 
         private static bool CallBool(object target, string methodName, bool fallback)
