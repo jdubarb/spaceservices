@@ -1,0 +1,18 @@
+<Analyzer>
+  <SpaceServices>
+    <Types>
+      <li>SpaceServices.SpaceServicesMapComponent</li>
+      <li>SpaceServices.ServiceLifecycleUtility</li>
+      <li>SpaceServices.ServicePadUtility</li>
+      <li>SpaceServices.CompSpaceServicePad</li>
+      <li>SpaceServices.ServiceEnvironmentUtility</li>
+      <li>SpaceServices.ServiceDangerUtility</li>
+      <li>SpaceServices.ServiceShuttleUtility</li>
+      <li>SpaceServices.HospitalIncidentGate</li>
+      <li>SpaceServices.HospitalityIncidentGate</li>
+      <li>SpaceServices.HospitalPatchHandlers</li>
+      <li>SpaceServices.HospitalityPatchHandlers</li>
+      <li>SpaceServices.Alert_SpaceServicesDepartureBlocked</li>
+    </Types>
+  </SpaceServices>
+</Analyzer>
