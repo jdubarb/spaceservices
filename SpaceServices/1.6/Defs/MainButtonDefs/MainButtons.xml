@@ -6,6 +6,6 @@
     <description>Review Space Services traffic, patients, guests, and debug controls.</description>
     <tabWindowClass>SpaceServices.MainTabWindow_SpaceServices</tabWindowClass>
     <order>53</order>
-    <iconPath>Things/Building/SpaceServices/ServiceLandingPad</iconPath>
+    <iconPath>UI/Buttons/MainButtons/SpaceServices</iconPath>
   </MainButtonDef>
 </Defs>
