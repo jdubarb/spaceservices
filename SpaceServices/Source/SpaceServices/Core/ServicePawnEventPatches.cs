@@ -67,14 +67,14 @@ namespace SpaceServices
     [HarmonyPatch(typeof(Lord), nameof(Lord.Notify_PawnLost))]
     public static class ServiceLordPawnLostPatch
     {
-        public static void Postfix(Pawn p, PawnLostCondition condition)
+        public static void Postfix(Pawn pawn, PawnLostCondition cond)
         {
-            if (ServicePawnUtility.IsTerminalPawn(p) || ServicePawnUtility.IsPlayerOwnedPawn(p))
+            if (ServicePawnUtility.IsTerminalPawn(pawn) || ServicePawnUtility.IsPlayerOwnedPawn(pawn))
             {
-                ServiceLifecycleUtility.ReleasePawn(p, "tracked service lord lost terminal/player pawn: " + condition);
+                ServiceLifecycleUtility.ReleasePawn(pawn, "tracked service lord lost terminal/player pawn: " + cond);
                 return;
             }
-            ServiceLifecycleUtility.MarkPawnDirty(p, "tracked service lord lost pawn: " + condition);
+            ServiceLifecycleUtility.MarkPawnDirty(pawn, "tracked service lord lost pawn: " + cond);
         }
     }
 }
