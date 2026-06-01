@@ -145,6 +145,11 @@ namespace SpaceServices
                 return;
             }
             Thing innerThing = ThingMaker.MakeThing(shipThingDef);
+            ServiceShuttlePayload payload = innerThing as ServiceShuttlePayload;
+            if (payload != null)
+            {
+                payload.visualDefName = visual.id;
+            }
             // Graphic_Multi payloads are made off-map, so set the service pad facing explicitly.
             innerThing.Rotation = visual.rotation;
             SkyfallerMaker.SpawnSkyfaller(skyfallerDef, innerThing, cell, map);
@@ -213,6 +218,7 @@ namespace SpaceServices
         public ThingDef shipThingDef;
         public ThingDef incomingSkyfallerDef;
         public ThingDef leavingSkyfallerDef;
+        public GraphicData graphicData;
         private static readonly Dictionary<string, List<ShuttleVisual>> VisualsByKind = new Dictionary<string, List<ShuttleVisual>>(StringComparer.OrdinalIgnoreCase);
 
         public static ShuttleVisual Resolve()
@@ -275,7 +281,7 @@ namespace SpaceServices
             {
                 if (def != null && def.AppliesTo(serviceKind))
                 {
-                    ShuttleVisual visual = FromNames(def.defName, def.weight, def.shipThingDefName, def.incomingSkyfallerDefName, def.leavingSkyfallerDefName, def.rotation);
+                    ShuttleVisual visual = FromNames(def.defName, def.weight, def.shipThingDefName, def.incomingSkyfallerDefName, def.leavingSkyfallerDefName, def.rotation, def.graphicData);
                     if (visual != null && TryReserveVisualId(seen, visual.id, "def"))
                     {
                         visuals.Add(visual);
@@ -290,8 +296,9 @@ namespace SpaceServices
                 {
                     continue;
                 }
-                string shipDefName = string.IsNullOrEmpty(extension.shipThingDefName) ? thingDef.defName : extension.shipThingDefName;
-                ShuttleVisual visual = FromNames(thingDef.defName, extension.weight, shipDefName, extension.incomingSkyfallerDefName, extension.leavingSkyfallerDefName, extension.rotation);
+                string shipDefName = !string.IsNullOrEmpty(extension.shipThingDefName) ? extension.shipThingDefName :
+                    extension.graphicData == null ? thingDef.defName : "JDB_ServiceShuttlePayload";
+                ShuttleVisual visual = FromNames(thingDef.defName, extension.weight, shipDefName, extension.incomingSkyfallerDefName, extension.leavingSkyfallerDefName, extension.rotation, extension.graphicData);
                 if (visual != null && TryReserveVisualId(seen, visual.id, "extension"))
                 {
                     visuals.Add(visual);
@@ -314,7 +321,7 @@ namespace SpaceServices
             return false;
         }
 
-        private static ShuttleVisual FromNames(string id, float weight, string shipThingDefName, string incomingSkyfallerDefName, string leavingSkyfallerDefName, Rot4 rotation)
+        private static ShuttleVisual FromNames(string id, float weight, string shipThingDefName, string incomingSkyfallerDefName, string leavingSkyfallerDefName, Rot4 rotation, GraphicData graphicData)
         {
             if (weight <= 0f)
             {
@@ -351,7 +358,8 @@ namespace SpaceServices
                 rotation = rotation,
                 shipThingDef = payload,
                 incomingSkyfallerDef = incoming,
-                leavingSkyfallerDef = leaving
+                leavingSkyfallerDef = leaving,
+                graphicData = graphicData
             };
         }
 
@@ -363,7 +371,60 @@ namespace SpaceServices
                 "JDB_ServiceShuttlePayload",
                 "JDB_ServiceShuttleIncoming",
                 "JDB_ServiceShuttleLeaving",
-                Rot4.East);
+                Rot4.East,
+                null);
+        }
+    }
+
+    public sealed class ServiceShuttlePayload : Thing
+    {
+        public string visualDefName;
+
+        public override Graphic Graphic
+        {
+            get
+            {
+                Graphic graphic = ServiceShuttleGraphicUtility.GraphicFor(visualDefName);
+                return graphic ?? base.Graphic;
+            }
+        }
+
+        public override void ExposeData()
+        {
+            base.ExposeData();
+            Scribe_Values.Look(ref visualDefName, "visualDefName");
+        }
+    }
+
+    public static class ServiceShuttleGraphicUtility
+    {
+        public static Graphic GraphicFor(string visualDefName)
+        {
+            if (string.IsNullOrEmpty(visualDefName))
+            {
+                return null;
+            }
+            SpaceServiceShuttleVisualDef def = DefDatabase<SpaceServiceShuttleVisualDef>.GetNamedSilentFail(visualDefName);
+            GraphicData graphicData = def == null ? null : def.graphicData;
+            if (graphicData == null)
+            {
+                ThingDef thingDef = DefDatabase<ThingDef>.GetNamedSilentFail(visualDefName);
+                SpaceServiceShuttleVisualExtension extension = thingDef == null ? null : thingDef.GetModExtension<SpaceServiceShuttleVisualExtension>();
+                graphicData = extension == null ? null : extension.graphicData;
+            }
+            if (graphicData == null)
+            {
+                return null;
+            }
+            try
+            {
+                return graphicData.Graphic;
+            }
+            catch (Exception ex)
+            {
+                ServiceDebugUtility.LogThrottled("bad-shuttle-graphic-" + visualDefName, "Failed to resolve shuttle visual graphic " + visualDefName + ": " + ex.Message, GenDate.TicksPerDay);
+                return null;
+            }
         }
     }
 }

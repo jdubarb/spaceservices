@@ -23,6 +23,7 @@ namespace SpaceServices
         public string incomingSkyfallerDefName;
         public string leavingSkyfallerDefName;
         public Rot4 rotation = Rot4.East;
+        public GraphicData graphicData;
 
         public bool AppliesTo(string serviceKind)
         {
@@ -41,6 +42,7 @@ namespace SpaceServices
         public string incomingSkyfallerDefName;
         public string leavingSkyfallerDefName;
         public Rot4 rotation = Rot4.East;
+        public GraphicData graphicData;
 
         public bool AppliesTo(string serviceKind)
         {

@@ -7,9 +7,195 @@
     <shipThingDefName>JDB_ServiceShuttlePayload</shipThingDefName>
     <incomingSkyfallerDefName>JDB_ServiceShuttleIncoming</incomingSkyfallerDefName>
     <leavingSkyfallerDefName>JDB_ServiceShuttleLeaving</leavingSkyfallerDefName>
+    <graphicData>
+      <graphicClass>Graphic_Multi</graphicClass>
+      <texPath>Things/Building/PassengerShuttle/PassengerShuttle</texPath>
+      <shaderType>CutoutComplex</shaderType>
+      <drawSize>(3,5)</drawSize>
+    </graphicData>
     <serviceKinds>
       <li>hospital</li>
       <li>hospitality</li>
     </serviceKinds>
+  </SpaceServices.SpaceServiceShuttleVisualDef>
+
+  <SpaceServices.SpaceServiceShuttleVisualDef>
+    <defName>JDB_Visual_UltratecPassengerShuttle</defName>
+    <label>Ultratec passenger shuttle</label>
+    <weight>1</weight>
+    <shipThingDefName>JDB_ServiceShuttlePayload</shipThingDefName>
+    <incomingSkyfallerDefName>JDB_ServiceShuttleIncoming</incomingSkyfallerDefName>
+    <leavingSkyfallerDefName>JDB_ServiceShuttleLeaving</leavingSkyfallerDefName>
+    <graphicData>
+      <graphicClass>Graphic_Multi</graphicClass>
+      <texPath>UltratecPassengerShuttle/UltratecPassengerShuttle</texPath>
+      <shaderType>CutoutComplex</shaderType>
+      <drawSize>(3,5)</drawSize>
+    </graphicData>
+    <requiredPackageIds>
+      <li>barbedwire.UltratecPassengerShuttle</li>
+    </requiredPackageIds>
+  </SpaceServices.SpaceServiceShuttleVisualDef>
+
+  <SpaceServices.SpaceServiceShuttleVisualDef>
+    <defName>JDB_Visual_StealthShuttle</defName>
+    <label>stealth shuttle</label>
+    <weight>1</weight>
+    <shipThingDefName>JDB_ServiceShuttlePayload</shipThingDefName>
+    <incomingSkyfallerDefName>JDB_ServiceShuttleIncoming</incomingSkyfallerDefName>
+    <leavingSkyfallerDefName>JDB_ServiceShuttleLeaving</leavingSkyfallerDefName>
+    <graphicData>
+      <graphicClass>Graphic_Multi</graphicClass>
+      <texPath>Things/Building/StealthShuttle/StealthShuttle</texPath>
+      <shaderType>CutoutComplex</shaderType>
+      <drawSize>(3,5)</drawSize>
+    </graphicData>
+    <requiredPackageIds>
+      <li>mrwireman.StealthShuttle</li>
+    </requiredPackageIds>
+  </SpaceServices.SpaceServiceShuttleVisualDef>
+
+  <SpaceServices.SpaceServiceShuttleVisualDef>
+    <defName>JDB_Visual_JunkShuttle</defName>
+    <label>junk shuttle</label>
+    <weight>1</weight>
+    <shipThingDefName>JDB_ServiceShuttlePayload</shipThingDefName>
+    <incomingSkyfallerDefName>JDB_ServiceShuttleIncoming</incomingSkyfallerDefName>
+    <leavingSkyfallerDefName>JDB_ServiceShuttleLeaving</leavingSkyfallerDefName>
+    <graphicData>
+      <graphicClass>Graphic_Multi</graphicClass>
+      <texPath>JunkShuttle</texPath>
+      <shaderType>CutoutComplex</shaderType>
+      <drawSize>(3,5)</drawSize>
+    </graphicData>
+    <requiredPackageIds>
+      <li>antediluvianjunk.Odyssey.Transport.Shuttle</li>
+    </requiredPackageIds>
+  </SpaceServices.SpaceServiceShuttleVisualDef>
+
+  <SpaceServices.SpaceServiceShuttleVisualDef>
+    <defName>JDB_Visual_GravShuttle</defName>
+    <label>grav shuttle</label>
+    <weight>1</weight>
+    <shipThingDefName>JDB_ServiceShuttlePayload</shipThingDefName>
+    <incomingSkyfallerDefName>JDB_ServiceShuttleIncoming</incomingSkyfallerDefName>
+    <leavingSkyfallerDefName>JDB_ServiceShuttleLeaving</leavingSkyfallerDefName>
+    <graphicData>
+      <graphicClass>Graphic_Multi</graphicClass>
+      <texPath>GravShuttle/GravShuttle</texPath>
+      <shaderType>CutoutComplex</shaderType>
+      <drawSize>(3,5)</drawSize>
+    </graphicData>
+    <requiredPackageIds>
+      <li>TurboPickle.GravShuttle</li>
+    </requiredPackageIds>
+  </SpaceServices.SpaceServiceShuttleVisualDef>
+
+  <SpaceServices.SpaceServiceShuttleVisualDef>
+    <defName>JDB_Visual_PersonalShuttle</defName>
+    <label>personal shuttle</label>
+    <weight>1</weight>
+    <shipThingDefName>JDB_ServiceShuttlePayload</shipThingDefName>
+    <incomingSkyfallerDefName>JDB_ServiceShuttleIncoming</incomingSkyfallerDefName>
+    <leavingSkyfallerDefName>JDB_ServiceShuttleLeaving</leavingSkyfallerDefName>
+    <graphicData>
+      <graphicClass>Graphic_Multi</graphicClass>
+      <texPath>Things/Building/TTSS_PersonalShuttle/TTSS_PersonalShuttle_Inactive</texPath>
+      <shaderType>CutoutComplex</shaderType>
+      <drawSize>(3,3)</drawSize>
+    </graphicData>
+    <requiredPackageIds>
+      <li>Trouperton.TrystanTravellersShuttleSchematics</li>
+    </requiredPackageIds>
+  </SpaceServices.SpaceServiceShuttleVisualDef>
+
+  <SpaceServices.SpaceServiceShuttleVisualDef>
+    <defName>JDB_Visual_MechanitorShuttle</defName>
+    <label>mechanitor shuttle</label>
+    <weight>1</weight>
+    <shipThingDefName>JDB_ServiceShuttlePayload</shipThingDefName>
+    <incomingSkyfallerDefName>JDB_ServiceShuttleIncoming</incomingSkyfallerDefName>
+    <leavingSkyfallerDefName>JDB_ServiceShuttleLeaving</leavingSkyfallerDefName>
+    <graphicData>
+      <graphicClass>Graphic_Multi</graphicClass>
+      <texPath>MechanitorShip</texPath>
+      <shaderType>CutoutComplex</shaderType>
+      <drawSize>(3,5)</drawSize>
+    </graphicData>
+    <requiredPackageIds>
+      <li>toshtaru.Odyssey.Transport.Shuttle</li>
+    </requiredPackageIds>
+  </SpaceServices.SpaceServiceShuttleVisualDef>
+
+  <SpaceServices.SpaceServiceShuttleVisualDef>
+    <defName>JDB_Visual_TransportDrone</defName>
+    <label>transport drone shuttle</label>
+    <weight>1</weight>
+    <shipThingDefName>JDB_ServiceShuttlePayload</shipThingDefName>
+    <incomingSkyfallerDefName>JDB_ServiceShuttleIncoming</incomingSkyfallerDefName>
+    <leavingSkyfallerDefName>JDB_ServiceShuttleLeaving</leavingSkyfallerDefName>
+    <graphicData>
+      <graphicClass>Graphic_Multi</graphicClass>
+      <texPath>TransportDrone</texPath>
+      <shaderType>CutoutComplex</shaderType>
+      <drawSize>(3,5)</drawSize>
+    </graphicData>
+    <requiredPackageIds>
+      <li>toshtaru.Odyssey.Transport.Shuttle</li>
+    </requiredPackageIds>
+  </SpaceServices.SpaceServiceShuttleVisualDef>
+
+  <SpaceServices.SpaceServiceShuttleVisualDef>
+    <defName>JDB_Visual_VRShuttle</defName>
+    <label>heavy shuttle</label>
+    <weight>1</weight>
+    <shipThingDefName>JDB_ServiceShuttlePayload</shipThingDefName>
+    <incomingSkyfallerDefName>JDB_ServiceShuttleIncoming</incomingSkyfallerDefName>
+    <leavingSkyfallerDefName>JDB_ServiceShuttleLeaving</leavingSkyfallerDefName>
+    <graphicData>
+      <graphicClass>Graphic_Multi</graphicClass>
+      <texPath>VRShuttle/VRShuttle</texPath>
+      <shaderType>CutoutComplex</shaderType>
+      <drawSize>(3,5)</drawSize>
+    </graphicData>
+    <requiredPackageIds>
+      <li>misstalls.VRShuttle</li>
+    </requiredPackageIds>
+  </SpaceServices.SpaceServiceShuttleVisualDef>
+
+  <SpaceServices.SpaceServiceShuttleVisualDef>
+    <defName>JDB_Visual_DeserterShuttle</defName>
+    <label>deserter shuttle</label>
+    <weight>1</weight>
+    <shipThingDefName>JDB_ServiceShuttlePayload</shipThingDefName>
+    <incomingSkyfallerDefName>JDB_ServiceShuttleIncoming</incomingSkyfallerDefName>
+    <leavingSkyfallerDefName>JDB_ServiceShuttleLeaving</leavingSkyfallerDefName>
+    <graphicData>
+      <graphicClass>Graphic_Single</graphicClass>
+      <texPath>Structures/Misc/DeserterShuttle</texPath>
+      <shaderType>CutoutComplex</shaderType>
+      <drawSize>(7,5)</drawSize>
+    </graphicData>
+    <requiredPackageIds>
+      <li>OskarPotocki.VFE.Deserters</li>
+    </requiredPackageIds>
+  </SpaceServices.SpaceServiceShuttleVisualDef>
+
+  <SpaceServices.SpaceServiceShuttleVisualDef>
+    <defName>JDB_Visual_ImperialArmoredShuttle</defName>
+    <label>imperial armored shuttle</label>
+    <weight>1</weight>
+    <shipThingDefName>JDB_ServiceShuttlePayload</shipThingDefName>
+    <incomingSkyfallerDefName>JDB_ServiceShuttleIncoming</incomingSkyfallerDefName>
+    <leavingSkyfallerDefName>JDB_ServiceShuttleLeaving</leavingSkyfallerDefName>
+    <graphicData>
+      <graphicClass>Graphic_Single</graphicClass>
+      <texPath>Shuttle/ImperialArmoredShuttle/ImperialArmoredShuttle</texPath>
+      <shaderType>CutoutComplex</shaderType>
+      <drawSize>(7,5)</drawSize>
+    </graphicData>
+    <requiredPackageIds>
+      <li>OskarPotocki.VFE.Empire</li>
+    </requiredPackageIds>
   </SpaceServices.SpaceServiceShuttleVisualDef>
 </Defs>
