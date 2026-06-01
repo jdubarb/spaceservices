@@ -27,6 +27,7 @@ namespace SpaceServices
             ServicePadEventPatches.Install(Harmony);
             OptionalModPatches.Install(Harmony);
             LongEventHandler.ExecuteWhenFinished(ArchitectMenuPatch.InjectArchitectDesignators);
+            LongEventHandler.ExecuteWhenFinished(SpaceServicesMainButtonUtility.HideReplacedServiceTabs);
             ServiceDebugUtility.Log(ServiceLogIntegration.Core, "Loaded.");
         }
     }

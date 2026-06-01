@@ -137,6 +137,36 @@ namespace SpaceServices
             return true;
         }
 
+        public bool MeetsDepartureRequirements(ServiceUse use)
+        {
+            string reason;
+            return MeetsDepartureRequirements(use, out reason);
+        }
+
+        public bool MeetsDepartureRequirements(ServiceUse use, out string reason)
+        {
+            reason = null;
+            if (parent == null || parent.Destroyed || parent.Map == null)
+            {
+                reason = "pad unavailable";
+                return false;
+            }
+            if (!HasRequiredPower(out reason))
+            {
+                return false;
+            }
+            if (!AllowsDepartureUse(use))
+            {
+                reason = "pad mode is " + ModeLabel();
+                return false;
+            }
+            if (!ServiceEnvironmentUtility.IsRoofAccessible(parent, out reason))
+            {
+                return false;
+            }
+            return true;
+        }
+
         public bool MeetsOperationalRequirements(out string reason)
         {
             reason = null;
@@ -306,11 +336,11 @@ namespace SpaceServices
         private bool CanServeAnyActiveUse(out string reason)
         {
             reason = null;
-            if (AllowsUse(ServiceUse.Patient) && MeetsUseRequirements(ServiceUse.Patient, out reason))
+            if (AllowsDepartureUse(ServiceUse.Patient) && MeetsDepartureRequirements(ServiceUse.Patient, out reason))
             {
                 return true;
             }
-            if (AllowsUse(ServiceUse.Guest) && MeetsUseRequirements(ServiceUse.Guest, out reason))
+            if (AllowsDepartureUse(ServiceUse.Guest) && MeetsDepartureRequirements(ServiceUse.Guest, out reason))
             {
                 return true;
             }
@@ -338,6 +368,10 @@ namespace SpaceServices
             if (activeMode == ServicePadMode.HospitalityPriority)
             {
                 return "hospitality priority";
+            }
+            if (activeMode == ServicePadMode.DeparturesOnly)
+            {
+                return "departures only";
             }
             return activeMode.ToString();
         }
@@ -561,6 +595,11 @@ namespace SpaceServices
             return false;
         }
 
+        public bool AllowsDepartureUse(ServiceUse use)
+        {
+            return activeMode == ServicePadMode.DeparturesOnly || AllowsUse(use);
+        }
+
         public bool Prioritizes(ServiceUse use)
         {
             if (!AllowsUse(use))
@@ -586,9 +625,13 @@ namespace SpaceServices
 
         public int PriorityRank(ServiceUse use)
         {
-            if (!AllowsUse(use))
+            if (!AllowsDepartureUse(use))
             {
                 return 99;
+            }
+            if (activeMode == ServicePadMode.DeparturesOnly)
+            {
+                return 4;
             }
             if (activeMode == ServicePadMode.HospitalOnly || activeMode == ServicePadMode.HospitalityOnly)
             {
@@ -662,6 +705,7 @@ namespace SpaceServices
             yield return ModeCommand(ServicePadMode.Shared, "JDB_SpaceServices_Gizmo_ModeShared", "JDB_SpaceServices_Gizmo_ModeSharedDesc", SharedIcon, getter, setter);
             yield return ModeCommand(ServicePadMode.HospitalPriority, "JDB_SpaceServices_Gizmo_ModeHospitalPriority", "JDB_SpaceServices_Gizmo_ModeHospitalPriorityDesc", HospitalIcon, getter, setter);
             yield return ModeCommand(ServicePadMode.HospitalityPriority, "JDB_SpaceServices_Gizmo_ModeHospitalityPriority", "JDB_SpaceServices_Gizmo_ModeHospitalityPriorityDesc", HospitalityIcon, getter, setter);
+            yield return ModeCommand(ServicePadMode.DeparturesOnly, "JDB_SpaceServices_Gizmo_ModeDeparturesOnly", "JDB_SpaceServices_Gizmo_ModeDeparturesOnlyDesc", SharedIcon, getter, setter);
         }
 
         private static Command_Toggle ModeCommand(ServicePadMode mode, string labelKey, string descKey, Texture2D icon, Func<ServicePadMode> getter, Action<ServicePadMode> setter)
@@ -732,6 +776,7 @@ namespace SpaceServices
         Shared,
         HospitalPriority,
         HospitalityPriority,
+        DeparturesOnly,
         Hospital,
         Hospitality,
         Trade
@@ -806,6 +851,31 @@ namespace SpaceServices
                     }
                 }
                 if (rank >= 3 && !yieldedAny)
+                {
+                    yield break;
+                }
+            }
+        }
+
+        public static IEnumerable<Thing> AllDeparturePads(Map map, ServiceUse use)
+        {
+            if (map == null)
+            {
+                yield break;
+            }
+            for (int rank = 0; rank <= 99; rank++)
+            {
+                bool yieldedAny = false;
+                foreach (Thing building in AllServicePadBuildings(map))
+                {
+                    CompSpaceServicePad comp = building.TryGetComp<CompSpaceServicePad>();
+                    if (comp != null && comp.PriorityRank(use) == rank && comp.MeetsDepartureRequirements(use))
+                    {
+                        yieldedAny = true;
+                        yield return building;
+                    }
+                }
+                if (rank >= 4 && !yieldedAny)
                 {
                     yield break;
                 }

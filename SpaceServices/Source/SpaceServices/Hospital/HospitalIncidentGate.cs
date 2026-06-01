@@ -44,6 +44,11 @@ namespace SpaceServices
             {
                 return false;
             }
+            int incomingPatients = incidentDefName == "MassCasualtyEvent" ? 3 : 1;
+            if (!ServiceDebugLimits.HospitalAllows(map, incidentDefName, incomingPatients, out _))
+            {
+                return false;
+            }
             if (!Reflect.BoolMember(hospital, "AcceptDanger", false) && HospitalDangersOnMap(map))
             {
                 return false;
@@ -78,7 +83,14 @@ namespace SpaceServices
                 ", patientPadPriority=" + ServicePadUtility.PriorityReadinessReport(map, ServiceUse.Patient) +
                 ", massCasualties=" + Reflect.BoolMember(hospital, "MassCasualties", true) +
                 ", acceptDanger=" + Reflect.BoolMember(hospital, "AcceptDanger", false) +
-                ", danger=" + HospitalDangersOnMap(map);
+                ", danger=" + HospitalDangersOnMap(map) +
+                DebugLimitReport(map, incidentDefName);
+        }
+
+        private static string DebugLimitReport(Map map, string incidentDefName)
+        {
+            int incomingPatients = incidentDefName == "MassCasualtyEvent" ? 3 : 1;
+            return ServiceDebugLimits.HospitalAllows(map, incidentDefName, incomingPatients, out string reason) ? "" : ", " + reason;
         }
 
         public static object FindHospitalComponent(Map map)

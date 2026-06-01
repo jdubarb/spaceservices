@@ -849,7 +849,7 @@ namespace SpaceServices
             }
             List<Pawn> pawns = record.pawns == null ? new List<Pawn>() : record.pawns.Where(pawn => pawn != null && !pawn.Destroyed).ToList();
             // Pick only pads the service pawns can survive at, then prefer matching priority and reasonable vacuum routing.
-            List<Thing> candidates = ServicePadUtility.AllServicePads(map, use)
+            List<Thing> candidates = ServicePadUtility.AllDeparturePads(map, use)
                 .Where(pad => PadCanSafelyServe(pad, use, pawns, record.id, ShouldBypassGuestArea(record)))
                 .ToList();
             if (candidates.Count == 0)
@@ -997,7 +997,7 @@ namespace SpaceServices
             {
                 return false;
             }
-            if (!comp.MeetsUseRequirements(use))
+            if (!comp.MeetsDepartureRequirements(use))
             {
                 return false;
             }
@@ -1021,7 +1021,7 @@ namespace SpaceServices
                 return false;
             }
             bool modeBypass = AllowsDepartureModeFallback(record, pad, use);
-            bool operational = modeBypass ? comp.MeetsOperationalRequirements(out string ignoredReason) : comp.MeetsUseRequirements(use);
+            bool operational = modeBypass ? comp.MeetsOperationalRequirements(out string ignoredReason) : comp.MeetsDepartureRequirements(use);
             if (!operational)
             {
                 return false;
@@ -1549,7 +1549,7 @@ namespace SpaceServices
                 }
                 string padReason;
                 bool modeFallback = AllowsDepartureModeFallback(record, pad, use);
-                bool requirementsMet = modeFallback ? comp.MeetsOperationalRequirements(out padReason) : comp.MeetsUseRequirements(use, out padReason);
+                bool requirementsMet = modeFallback ? comp.MeetsOperationalRequirements(out padReason) : comp.MeetsDepartureRequirements(use, out padReason);
                 if (!requirementsMet)
                 {
                     firstBlockedReason = firstBlockedReason ?? "service pad blocked: " + (padReason ?? "settings block this service");
@@ -1602,7 +1602,7 @@ namespace SpaceServices
                 return false;
             }
             bool modeFallback = AllowsDepartureModeFallback(record, record.reservedPad, use);
-            bool requirementsMet = modeFallback ? comp.MeetsOperationalRequirements(out reason) : comp.MeetsUseRequirements(use, out reason);
+            bool requirementsMet = modeFallback ? comp.MeetsOperationalRequirements(out reason) : comp.MeetsDepartureRequirements(use, out reason);
             if (!requirementsMet)
             {
                 reason = "departure pad blocked: " + (reason ?? "settings block this service");

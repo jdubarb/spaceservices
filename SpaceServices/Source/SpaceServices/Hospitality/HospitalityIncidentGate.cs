@@ -46,7 +46,12 @@ namespace SpaceServices
             {
                 return false;
             }
-            return !RequiresGuestBedCapacity() || HospitalityBedUtility.Report(map).freeBeds >= EstimatedBedDemand(incidentDefName, worker);
+            int demand = EstimatedBedDemand(incidentDefName, worker);
+            if (!ServiceDebugLimits.HospitalityAllows(map, 1, demand, out _))
+            {
+                return false;
+            }
+            return !RequiresGuestBedCapacity() || HospitalityBedUtility.Report(map).freeBeds >= demand;
         }
 
         public static string ReadinessReport(string incidentDefName, Map map)
@@ -90,9 +95,21 @@ namespace SpaceServices
             {
                 HospitalityBedReport beds = HospitalityBedUtility.Report(map);
                 int demand = EstimatedBedDemand(incidentDefName, worker);
+                if (!ServiceDebugLimits.HospitalityAllows(map, 1, demand, out string limitReason))
+                {
+                    return limitReason;
+                }
                 if (beds.freeBeds < demand)
                 {
                     return "not enough free guest beds, need " + demand + " (" + beds.ToSummary() + ")";
+                }
+            }
+            else
+            {
+                int demand = EstimatedBedDemand(incidentDefName, worker);
+                if (!ServiceDebugLimits.HospitalityAllows(map, 1, demand, out string limitReason))
+                {
+                    return limitReason;
                 }
             }
             return "ready";

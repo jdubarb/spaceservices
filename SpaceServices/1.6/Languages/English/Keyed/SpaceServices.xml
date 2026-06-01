@@ -52,6 +52,28 @@
   <JDB_SpaceServices_Gizmo_ModeHospitalPriorityDesc>Use this pad for Hospital and Hospitality traffic, preferring Hospital patients.</JDB_SpaceServices_Gizmo_ModeHospitalPriorityDesc>
   <JDB_SpaceServices_Gizmo_ModeHospitalityPriority>Hospitality priority</JDB_SpaceServices_Gizmo_ModeHospitalityPriority>
   <JDB_SpaceServices_Gizmo_ModeHospitalityPriorityDesc>Use this pad for Hospital and Hospitality traffic, preferring Hospitality guests.</JDB_SpaceServices_Gizmo_ModeHospitalityPriorityDesc>
+  <JDB_SpaceServices_Gizmo_ModeDeparturesOnly>Departures only</JDB_SpaceServices_Gizmo_ModeDeparturesOnly>
+  <JDB_SpaceServices_Gizmo_ModeDeparturesOnlyDesc>Let existing Hospital patients and Hospitality guests leave through this pad, but block new arrivals from choosing it.</JDB_SpaceServices_Gizmo_ModeDeparturesOnlyDesc>
   <JDB_SpaceServices_Gizmo_ReportMap>Report service map status</JDB_SpaceServices_Gizmo_ReportMap>
   <JDB_SpaceServices_Gizmo_ReportMapDesc>Write the current map's Space Services eligibility reasons to the log.</JDB_SpaceServices_Gizmo_ReportMapDesc>
+
+  <JDB_SpaceServices_Panel_Title>Space Services</JDB_SpaceServices_Panel_Title>
+  <JDB_SpaceServices_Panel_NoMap>No current map.</JDB_SpaceServices_Panel_NoMap>
+  <JDB_SpaceServices_Panel_MapStatus>Map: {0}</JDB_SpaceServices_Panel_MapStatus>
+  <JDB_SpaceServices_Panel_Pads>Service pads: {0} total, {1} accepting patients, {2} accepting guests</JDB_SpaceServices_Panel_Pads>
+  <JDB_SpaceServices_Panel_HospitalSummary>Hospital: {0} tracked groups, {1} tracked patients</JDB_SpaceServices_Panel_HospitalSummary>
+  <JDB_SpaceServices_Panel_HospitalitySummary>Hospitality: {0} tracked groups, {1} tracked guests</JDB_SpaceServices_Panel_HospitalitySummary>
+  <JDB_SpaceServices_Panel_DebugDangerOn>Debug Hospitality danger is forced on.</JDB_SpaceServices_Panel_DebugDangerOn>
+  <JDB_SpaceServices_Panel_NativePanels>Native panels</JDB_SpaceServices_Panel_NativePanels>
+  <JDB_SpaceServices_Panel_OpenHospital>Open Hospital</JDB_SpaceServices_Panel_OpenHospital>
+  <JDB_SpaceServices_Panel_OpenHospitality>Open Hospitality</JDB_SpaceServices_Panel_OpenHospitality>
+  <JDB_SpaceServices_Panel_DebugLimits>Debug limits</JDB_SpaceServices_Panel_DebugLimits>
+  <JDB_SpaceServices_Panel_HospitalPatientLimit>Hospital patient limit: {0}</JDB_SpaceServices_Panel_HospitalPatientLimit>
+  <JDB_SpaceServices_Panel_HospitalPatientLimitDesc>Debug-only cap for tracked Hospital patients. Off means no cap.</JDB_SpaceServices_Panel_HospitalPatientLimitDesc>
+  <JDB_SpaceServices_Panel_HospitalityGroupLimit>Hospitality group limit: {0}</JDB_SpaceServices_Panel_HospitalityGroupLimit>
+  <JDB_SpaceServices_Panel_HospitalityGroupLimitDesc>Debug-only cap for tracked Hospitality guest groups. Off means no cap.</JDB_SpaceServices_Panel_HospitalityGroupLimitDesc>
+  <JDB_SpaceServices_Panel_HospitalityPawnLimit>Hospitality guest limit: {0}</JDB_SpaceServices_Panel_HospitalityPawnLimit>
+  <JDB_SpaceServices_Panel_HospitalityPawnLimitDesc>Debug-only cap for tracked Hospitality guest pawns. Off means no cap.</JDB_SpaceServices_Panel_HospitalityPawnLimitDesc>
+  <JDB_SpaceServices_Panel_ForceDanger>Force Hospitality danger</JDB_SpaceServices_Panel_ForceDanger>
+  <JDB_SpaceServices_Panel_ForceDangerDesc>Debug toggle that makes Hospitality arrivals wave off and departures wait as if danger is active.</JDB_SpaceServices_Panel_ForceDangerDesc>
 </LanguageData>

@@ -30,6 +30,9 @@ namespace SpaceServices
         private bool staleReferenceCleanupDone;
         private int staleReferenceCleanupVersion;
         public bool debugForceHospitalityDanger;
+        public int debugHospitalPatientLimit;
+        public int debugHospitalityGroupLimit;
+        public int debugHospitalityPawnLimit;
 
         public SpaceServicesMapComponent(Map map) : base(map)
         {
@@ -58,6 +61,9 @@ namespace SpaceServices
             Scribe_Values.Look(ref staleReferenceCleanupVersion, "staleReferenceCleanupVersion", 0);
             Scribe_Values.Look(ref nextHospitalityServiceVisitTick, "nextHospitalityServiceVisitTick", 0);
             Scribe_Values.Look(ref debugForceHospitalityDanger, "debugForceHospitalityDanger", false);
+            Scribe_Values.Look(ref debugHospitalPatientLimit, "debugHospitalPatientLimit", 0);
+            Scribe_Values.Look(ref debugHospitalityGroupLimit, "debugHospitalityGroupLimit", 0);
+            Scribe_Values.Look(ref debugHospitalityPawnLimit, "debugHospitalityPawnLimit", 0);
             Scribe_Collections.Look(ref pendingShuttleArrivals, "pendingShuttleArrivals", LookMode.Deep);
             Scribe_Collections.Look(ref pendingHospitalityIncidents, "pendingHospitalityIncidents", LookMode.Deep);
             if (pendingShuttleArrivals == null)

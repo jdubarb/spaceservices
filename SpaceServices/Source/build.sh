@@ -25,5 +25,6 @@ dotnet "$CSC" \
   -r:"$MANAGED/UnityEngine.dll" \
   -r:"$MANAGED/UnityEngine.CoreModule.dll" \
   -r:"$MANAGED/UnityEngine.IMGUIModule.dll" \
+  -r:"$MANAGED/UnityEngine.TextRenderingModule.dll" \
   -r:"$HARMONY" \
   "${SOURCES[@]}"
