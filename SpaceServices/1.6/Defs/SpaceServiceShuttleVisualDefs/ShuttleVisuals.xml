@@ -195,6 +195,7 @@
       <shaderType>CutoutComplex</shaderType>
       <drawSize>(7,5)</drawSize>
     </graphicData>
+    <angleOffset>-90</angleOffset>
     <requiredPackageIds>
       <li>OskarPotocki.VFE.Empire</li>
     </requiredPackageIds>
