@@ -23,6 +23,7 @@ namespace SpaceServices
     public static class ServiceDebugUtility
     {
         private static readonly Dictionary<string, int> LastLogTickByKey = new Dictionary<string, int>();
+        private static int nextLogKeyPruneTick;
 
         public static IncidentParms PatientArrivalParms(Map map)
         {
@@ -140,6 +141,7 @@ namespace SpaceServices
                 return;
             }
             int tick = Find.TickManager == null ? 0 : Find.TickManager.TicksGame;
+            PruneLogKeys(tick);
             int lastTick;
             // Repeated blockers can fire every tick during bad map states; throttle by stable keys.
             if (LastLogTickByKey.TryGetValue(key, out lastTick) && tick < lastTick + intervalTicks)
@@ -148,6 +150,27 @@ namespace SpaceServices
             }
             LastLogTickByKey[key] = tick;
             Verse.Log.Message("[Space Services] [" + IntegrationLabel(integration) + "] " + message);
+        }
+
+        private static void PruneLogKeys(int tick)
+        {
+            if (tick < nextLogKeyPruneTick || LastLogTickByKey.Count < 256)
+            {
+                return;
+            }
+            nextLogKeyPruneTick = tick + GenDate.TicksPerDay;
+            List<string> staleKeys = new List<string>();
+            foreach (KeyValuePair<string, int> pair in LastLogTickByKey)
+            {
+                if (tick > pair.Value + GenDate.TicksPerDay * 3)
+                {
+                    staleKeys.Add(pair.Key);
+                }
+            }
+            foreach (string staleKey in staleKeys)
+            {
+                LastLogTickByKey.Remove(staleKey);
+            }
         }
 
         private static bool NormalLogging(ServiceLogIntegration integration)

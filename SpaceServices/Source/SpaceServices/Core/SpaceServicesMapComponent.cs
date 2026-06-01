@@ -17,12 +17,15 @@ namespace SpaceServices
     {
         public List<ServiceGroupRecord> serviceGroups = new List<ServiceGroupRecord>();
         public List<PrebuildPadModeRecord> prebuildPadModes = new List<PrebuildPadModeRecord>();
-        private readonly List<ScheduledServiceShuttleArrival> pendingShuttleArrivals = new List<ScheduledServiceShuttleArrival>();
-        private readonly List<ScheduledHospitalityIncident> pendingHospitalityIncidents = new List<ScheduledHospitalityIncident>();
+        private List<ScheduledServiceShuttleArrival> pendingShuttleArrivals = new List<ScheduledServiceShuttleArrival>();
+        private List<ScheduledHospitalityIncident> pendingHospitalityIncidents = new List<ScheduledHospitalityIncident>();
         private const int StaleReferenceCleanupVersion = 9;
         private const int HospitalitySchedulerBlockedRetryTicks = 15000;
         private int nextDebugTick;
         private int nextLifecycleTick;
+        private int nextReservationWatchTick;
+        private bool servicePadCacheDirty = true;
+        private List<Thing> cachedServicePads = new List<Thing>();
         private int nextHospitalityServiceVisitTick;
         private bool staleReferenceCleanupDone;
         private int staleReferenceCleanupVersion;
@@ -55,6 +58,16 @@ namespace SpaceServices
             Scribe_Values.Look(ref staleReferenceCleanupVersion, "staleReferenceCleanupVersion", 0);
             Scribe_Values.Look(ref nextHospitalityServiceVisitTick, "nextHospitalityServiceVisitTick", 0);
             Scribe_Values.Look(ref debugForceHospitalityDanger, "debugForceHospitalityDanger", false);
+            Scribe_Collections.Look(ref pendingShuttleArrivals, "pendingShuttleArrivals", LookMode.Deep);
+            Scribe_Collections.Look(ref pendingHospitalityIncidents, "pendingHospitalityIncidents", LookMode.Deep);
+            if (pendingShuttleArrivals == null)
+            {
+                pendingShuttleArrivals = new List<ScheduledServiceShuttleArrival>();
+            }
+            if (pendingHospitalityIncidents == null)
+            {
+                pendingHospitalityIncidents = new List<ScheduledHospitalityIncident>();
+            }
         }
 
         public override void MapComponentTick()
@@ -95,18 +108,68 @@ namespace SpaceServices
 
         private void ReleaseTransientArrivalReservations()
         {
+            HashSet<string> pendingReservations = new HashSet<string>();
+            foreach (ScheduledHospitalityIncident incident in pendingHospitalityIncidents)
+            {
+                if (incident != null && !string.IsNullOrEmpty(incident.reservationId))
+                {
+                    pendingReservations.Add(incident.reservationId);
+                }
+            }
             foreach (Thing pad in ServicePadUtility.AllServicePadBuildings(map))
             {
                 CompSpaceServicePad comp = pad.TryGetComp<CompSpaceServicePad>();
-                if (comp != null && comp.reservedForGroup != null && comp.reservedForGroup.StartsWith("hospitality-arrival-", StringComparison.Ordinal))
+                if (comp != null &&
+                    comp.reservedForGroup != null &&
+                    comp.reservedForGroup.StartsWith("hospitality-arrival-", StringComparison.Ordinal) &&
+                    !pendingReservations.Contains(comp.reservedForGroup))
                 {
                     comp.ForceRelease();
                 }
             }
         }
 
+        public void DirtyServicePadCache()
+        {
+            servicePadCacheDirty = true;
+        }
+
+        public List<Thing> CachedServicePadBuildings()
+        {
+            if (cachedServicePads == null)
+            {
+                cachedServicePads = new List<Thing>();
+                servicePadCacheDirty = true;
+            }
+            if (!servicePadCacheDirty)
+            {
+                cachedServicePads.RemoveAll(pad => pad == null || pad.Destroyed || pad.Map != map || pad.TryGetComp<CompSpaceServicePad>() == null);
+                return cachedServicePads;
+            }
+
+            servicePadCacheDirty = false;
+            cachedServicePads.Clear();
+            if (map == null || map.listerBuildings == null)
+            {
+                return cachedServicePads;
+            }
+            foreach (Building building in map.listerBuildings.allBuildingsColonist)
+            {
+                if (building != null && !building.Destroyed && building.TryGetComp<CompSpaceServicePad>() != null)
+                {
+                    cachedServicePads.Add(building);
+                }
+            }
+            return cachedServicePads;
+        }
+
         private void WatchServicePadReservations()
         {
+            if (Find.TickManager != null && Find.TickManager.TicksGame < nextReservationWatchTick)
+            {
+                return;
+            }
+            nextReservationWatchTick = (Find.TickManager == null ? 0 : Find.TickManager.TicksGame) + GenDate.TicksPerHour;
             foreach (Thing pad in ServicePadUtility.AllServicePadBuildings(map))
             {
                 CompSpaceServicePad comp = pad == null ? null : pad.TryGetComp<CompSpaceServicePad>();
@@ -177,6 +240,10 @@ namespace SpaceServices
                 worker = worker,
                 parms = parms,
                 pad = pad,
+                incidentDef = Reflect.GetMember(worker, "def") as IncidentDef,
+                faction = parms.faction,
+                spawnCenter = parms.spawnCenter,
+                sendLetter = parms.sendLetter,
                 reservationId = reservationId,
                 incidentDefName = IncidentDefName(worker),
                 expectedBedDemand = expectedBedDemand,
@@ -202,9 +269,11 @@ namespace SpaceServices
                     continue;
                 }
                 pendingHospitalityIncidents.RemoveAt(i);
+                incident.EnsureRuntime(map);
                 if (incident.pad == null || incident.pad.Destroyed || !incident.pad.Spawned || incident.worker == null || incident.parms == null)
                 {
                     ServiceDebugUtility.LogAudit("TickPendingHospitalityIncidents dropping invalid pending incident reservation=" + incident.reservationId + " pad=" + ServiceDebugUtility.ThingAuditSummary(incident.pad) + " worker=" + (incident.worker != null) + " parms=" + (incident.parms != null));
+                    ReleaseArrivalReservation(incident);
                     continue;
                 }
                 if (!HospitalityStillEnabledForMap(map) || !PadStillUsableForGuests(incident.pad))
@@ -354,7 +423,7 @@ namespace SpaceServices
                 return false;
             }
 
-            ServiceShuttleUtility.SpawnArrival(map, pad.Position, "hospitality", visual == null ? null : visual.id);
+            ServiceShuttleUtility.SpawnArrival(map, pad.Position, visual);
             Messages.Message("Space Services: visitors inbound", pad, MessageTypeDefOf.NeutralEvent, false);
             ServiceDebugUtility.Log("Queued service hospitality visitors from " + faction.Name + " at " + pad.Position);
             return true;
@@ -435,7 +504,7 @@ namespace SpaceServices
         }
     }
 
-    public sealed class ScheduledServiceShuttleArrival : IThingHolder
+    public sealed class ScheduledServiceShuttleArrival : IThingHolder, IExposable
     {
         public IntVec3 cell;
         public int touchdownTick;
@@ -450,6 +519,20 @@ namespace SpaceServices
             things = new ThingOwner<Thing>(this, oneStackOnly: false);
         }
 
+        public void ExposeData()
+        {
+            Scribe_Values.Look(ref cell, "cell", IntVec3.Invalid);
+            Scribe_Values.Look(ref touchdownTick, "touchdownTick", 0);
+            Scribe_Values.Look(ref shuttleThingDefName, "shuttleThingDefName");
+            Scribe_Values.Look(ref shuttleVisualDefName, "shuttleVisualDefName");
+            Scribe_Values.Look(ref showDeparture, "showDeparture", true);
+            Scribe_Deep.Look(ref things, "things", this);
+            if (things == null)
+            {
+                things = new ThingOwner<Thing>(this, oneStackOnly: false);
+            }
+        }
+
         public void GetChildHolders(List<IThingHolder> outChildren)
         {
             ThingOwnerUtility.AppendThingHoldersFromThings(outChildren, GetDirectlyHeldThings());
@@ -461,16 +544,62 @@ namespace SpaceServices
         }
     }
 
-    public sealed class ScheduledHospitalityIncident
+    public sealed class ScheduledHospitalityIncident : IExposable
     {
         public object worker;
         public IncidentParms parms;
         public Thing pad;
+        public IncidentDef incidentDef;
+        public Faction faction;
+        public IntVec3 spawnCenter;
+        public bool sendLetter = true;
         public string reservationId;
         public string incidentDefName;
         public int expectedBedDemand;
         public string shuttleThingDefName;
         public string shuttleVisualDefName;
         public int touchdownTick;
+
+        public void ExposeData()
+        {
+            Scribe_Defs.Look(ref incidentDef, "incidentDef");
+            Scribe_References.Look(ref faction, "faction");
+            Scribe_References.Look(ref pad, "pad");
+            Scribe_Values.Look(ref spawnCenter, "spawnCenter", IntVec3.Invalid);
+            Scribe_Values.Look(ref sendLetter, "sendLetter", true);
+            Scribe_Values.Look(ref reservationId, "reservationId");
+            Scribe_Values.Look(ref incidentDefName, "incidentDefName");
+            Scribe_Values.Look(ref expectedBedDemand, "expectedBedDemand", 1);
+            Scribe_Values.Look(ref shuttleThingDefName, "shuttleThingDefName");
+            Scribe_Values.Look(ref shuttleVisualDefName, "shuttleVisualDefName");
+            Scribe_Values.Look(ref touchdownTick, "touchdownTick", 0);
+            if (Scribe.mode == LoadSaveMode.PostLoadInit && incidentDef == null && !string.IsNullOrEmpty(incidentDefName))
+            {
+                incidentDef = DefDatabase<IncidentDef>.GetNamedSilentFail(incidentDefName);
+            }
+        }
+
+        public void EnsureRuntime(Map map)
+        {
+            if (worker != null && parms != null)
+            {
+                return;
+            }
+            if (incidentDef == null && !string.IsNullOrEmpty(incidentDefName))
+            {
+                incidentDef = DefDatabase<IncidentDef>.GetNamedSilentFail(incidentDefName);
+            }
+            worker = incidentDef == null ? null : incidentDef.Worker;
+            if (worker == null || map == null)
+            {
+                return;
+            }
+            IncidentCategoryDef category = incidentDef.category ?? IncidentCategoryDefOf.Misc;
+            parms = StorytellerUtility.DefaultParmsNow(category, map);
+            parms.target = map;
+            parms.faction = faction;
+            parms.spawnCenter = pad != null && !pad.Destroyed ? pad.Position : spawnCenter;
+            parms.sendLetter = sendLetter;
+        }
     }
 }

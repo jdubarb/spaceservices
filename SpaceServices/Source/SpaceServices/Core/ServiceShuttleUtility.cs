@@ -28,6 +28,12 @@ namespace SpaceServices
             SpawnSkyfaller(map, cell, ShuttleVisual.Resolve(serviceKind, visualDefName), true);
         }
 
+        public static void SpawnArrival(Map map, IntVec3 cell, ShuttleVisual visual)
+        {
+            ServiceDebugUtility.LogAudit("SpawnArrivalShuttle cell=" + cell + " map=" + (map == null ? "null" : map.Index.ToString()));
+            SpawnSkyfaller(map, cell, visual, true);
+        }
+
         public static void SpawnDeparture(Map map, IntVec3 cell)
         {
             SpawnDeparture(map, cell, null, null);
@@ -37,6 +43,12 @@ namespace SpaceServices
         {
             ServiceDebugUtility.LogAudit("SpawnDepartureShuttle cell=" + cell + " map=" + (map == null ? "null" : map.Index.ToString()));
             SpawnSkyfaller(map, cell, ShuttleVisual.Resolve(serviceKind, visualDefName), false);
+        }
+
+        public static void SpawnDeparture(Map map, IntVec3 cell, ShuttleVisual visual)
+        {
+            ServiceDebugUtility.LogAudit("SpawnDepartureShuttle cell=" + cell + " map=" + (map == null ? "null" : map.Index.ToString()));
+            SpawnSkyfaller(map, cell, visual, false);
         }
 
         public static bool TryReplaceDropPodWithArrivalShuttle(IntVec3 cell, Map map, ActiveTransporterInfo info, Faction faction, bool showArrival, bool showDeparture)
@@ -201,6 +213,7 @@ namespace SpaceServices
         public ThingDef shipThingDef;
         public ThingDef incomingSkyfallerDef;
         public ThingDef leavingSkyfallerDef;
+        private static readonly Dictionary<string, List<ShuttleVisual>> VisualsByKind = new Dictionary<string, List<ShuttleVisual>>(StringComparer.OrdinalIgnoreCase);
 
         public static ShuttleVisual Resolve()
         {
@@ -209,13 +222,19 @@ namespace SpaceServices
 
         public static ShuttleVisual Resolve(string serviceKind, string visualDefName)
         {
-            List<ShuttleVisual> visuals = AvailableVisuals(serviceKind).ToList();
+            List<ShuttleVisual> visuals = AvailableVisuals(serviceKind);
             if (!string.IsNullOrEmpty(visualDefName))
             {
                 ShuttleVisual exact = visuals.FirstOrDefault(visual => string.Equals(visual.id, visualDefName, StringComparison.OrdinalIgnoreCase));
                 if (exact != null)
                 {
                     return exact;
+                }
+                ServiceDebugUtility.LogThrottled("missing-shuttle-visual-" + visualDefName, "Saved shuttle visual " + visualDefName + " is no longer available; using deterministic fallback.", GenDate.TicksPerDay);
+                ShuttleVisual fallback = FallbackVisual();
+                if (fallback != null)
+                {
+                    return fallback;
                 }
             }
             if (visuals.Count == 0)
@@ -235,16 +254,31 @@ namespace SpaceServices
             return visuals[visuals.Count - 1];
         }
 
-        private static IEnumerable<ShuttleVisual> AvailableVisuals(string serviceKind)
+        private static List<ShuttleVisual> AvailableVisuals(string serviceKind)
         {
+            string key = (serviceKind ?? "").Trim();
+            List<ShuttleVisual> cached;
+            if (VisualsByKind.TryGetValue(key, out cached))
+            {
+                return cached;
+            }
+            cached = BuildAvailableVisuals(serviceKind);
+            VisualsByKind[key] = cached;
+            return cached;
+        }
+
+        private static List<ShuttleVisual> BuildAvailableVisuals(string serviceKind)
+        {
+            List<ShuttleVisual> visuals = new List<ShuttleVisual>();
+            HashSet<string> seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
             foreach (SpaceServiceShuttleVisualDef def in DefDatabase<SpaceServiceShuttleVisualDef>.AllDefsListForReading)
             {
                 if (def != null && def.AppliesTo(serviceKind))
                 {
                     ShuttleVisual visual = FromNames(def.defName, def.weight, def.shipThingDefName, def.incomingSkyfallerDefName, def.leavingSkyfallerDefName, def.rotation);
-                    if (visual != null)
+                    if (visual != null && TryReserveVisualId(seen, visual.id, "def"))
                     {
-                        yield return visual;
+                        visuals.Add(visual);
                     }
                 }
             }
@@ -258,15 +292,34 @@ namespace SpaceServices
                 }
                 string shipDefName = string.IsNullOrEmpty(extension.shipThingDefName) ? thingDef.defName : extension.shipThingDefName;
                 ShuttleVisual visual = FromNames(thingDef.defName, extension.weight, shipDefName, extension.incomingSkyfallerDefName, extension.leavingSkyfallerDefName, extension.rotation);
-                if (visual != null)
+                if (visual != null && TryReserveVisualId(seen, visual.id, "extension"))
                 {
-                    yield return visual;
+                    visuals.Add(visual);
                 }
             }
+            return visuals;
+        }
+
+        private static bool TryReserveVisualId(HashSet<string> seen, string id, string source)
+        {
+            if (string.IsNullOrEmpty(id))
+            {
+                return false;
+            }
+            if (seen.Add(id))
+            {
+                return true;
+            }
+            ServiceDebugUtility.LogThrottled("duplicate-shuttle-visual-" + id, "Duplicate shuttle visual id " + id + " from " + source + " ignored; first loaded visual wins.", GenDate.TicksPerDay);
+            return false;
         }
 
         private static ShuttleVisual FromNames(string id, float weight, string shipThingDefName, string incomingSkyfallerDefName, string leavingSkyfallerDefName, Rot4 rotation)
         {
+            if (weight <= 0f)
+            {
+                return null;
+            }
             if (string.IsNullOrEmpty(shipThingDefName))
             {
                 shipThingDefName = "JDB_ServiceShuttlePayload";
@@ -294,7 +347,7 @@ namespace SpaceServices
             return new ShuttleVisual
             {
                 id = id,
-                weight = Math.Max(0.001f, weight),
+                weight = weight,
                 rotation = rotation,
                 shipThingDef = payload,
                 incomingSkyfallerDef = incoming,

@@ -20,6 +20,9 @@ namespace SpaceServices
         private const int HospitalityBedlessDepartureGraceTicks = 2500 * 16;
         private const int PickupBoardingHardTimeoutTicks = 2500;
         private const float VacuumPadDistanceTolerance = 2.5f;
+        private const int BlockedDepartureCacheTicks = 60;
+        private static readonly List<ServiceDepartureBlock> CachedDepartureBlocks = new List<ServiceDepartureBlock>();
+        private static int cachedDepartureBlocksTick = -999999;
 
         public static int NextTickInterval(List<ServiceGroupRecord> records)
         {
@@ -247,11 +250,14 @@ namespace SpaceServices
                     records.RemoveAt(i);
                     continue;
                 }
-                List<Pawn> previouslyTrackedPawns = record.pawns == null ? new List<Pawn>() : record.pawns.Where(pawn => pawn != null).Distinct().ToList();
-                foreach (Pawn terminalPawn in previouslyTrackedPawns.Where(pawn => ServicePawnUtility.IsTerminalPawn(pawn)).Distinct())
+                List<Pawn> previouslyTrackedPawns = DistinctNonNullPawns(record.pawns);
+                foreach (Pawn terminalPawn in previouslyTrackedPawns)
                 {
-                    // Death/destruction skips the normal shuttle extraction path, so clear lord refs here.
-                    ServicePawnUtility.CleanupTerminalPawnReferences(map, terminalPawn);
+                    if (ServicePawnUtility.IsTerminalPawn(terminalPawn))
+                    {
+                        // Death/destruction skips the normal shuttle extraction path, so clear lord refs here.
+                        ServicePawnUtility.CleanupTerminalPawnReferences(map, terminalPawn);
+                    }
                 }
                 record.pawns = ActiveTrackedPawns(map, record);
                 if (!SamePawnSet(previouslyTrackedPawns, record.pawns))
@@ -467,36 +473,73 @@ namespace SpaceServices
 
         private static IntVec3 FindHospitalitySafeCell(Map map, Thing pad, Pawn pawn)
         {
-            IEnumerable<IntVec3> candidates = Enumerable.Empty<IntVec3>();
-            Room room = pad != null && pad.Spawned ? pad.Position.GetRoom(map) : null;
-            if (room != null)
-            {
-                candidates = room.Cells;
-            }
             if (pad != null && pad.Spawned)
             {
-                candidates = candidates.Concat(GenRadial.RadialCellsAround(pad.Position, 12f, true));
+                IntVec3 nearPad = BestSafeReachableCell(GenRadial.RadialCellsAround(pad.Position, 12f, true), map, pawn, pad.Position);
+                if (nearPad.IsValid)
+                {
+                    return nearPad;
+                }
             }
-            candidates = candidates.Concat(GenRadial.RadialCellsAround(pawn.Position, 12f, true));
+            IntVec3 nearPawn = BestSafeReachableCell(GenRadial.RadialCellsAround(pawn.Position, 12f, true), map, pawn, pawn.Position);
+            if (nearPawn.IsValid)
+            {
+                return nearPawn;
+            }
+            Room room = pad != null && pad.Spawned ? pad.Position.GetRoom(map) : null;
+            return room == null ? IntVec3.Invalid : BestSafeReachableCell(room.Cells, map, pawn, pad.Position);
+        }
 
-            return candidates
-                .Where(cell => cell.InBounds(map) && cell.Standable(map))
-                .Where(cell => cell.GetFirstPawn(map) == null || cell == pawn.Position)
-                .Where(cell => ServiceEnvironmentUtility.IsSafeForPawn(pawn, map, cell))
-                .Where(cell => pawn.CanReach(cell, PathEndMode.OnCell, Danger.Deadly))
-                .OrderBy(cell => pad != null && pad.Spawned ? cell.DistanceToSquared(pad.Position) : cell.DistanceToSquared(pawn.Position))
-                .DefaultIfEmpty(IntVec3.Invalid)
-                .First();
+        private static IntVec3 BestSafeReachableCell(IEnumerable<IntVec3> cells, Map map, Pawn pawn, IntVec3 origin)
+        {
+            IntVec3 best = IntVec3.Invalid;
+            int bestDistance = int.MaxValue;
+            foreach (IntVec3 cell in cells ?? Enumerable.Empty<IntVec3>())
+            {
+                if (!cell.InBounds(map) ||
+                    !cell.Standable(map) ||
+                    (cell.GetFirstPawn(map) != null && cell != pawn.Position) ||
+                    !ServiceEnvironmentUtility.IsSafeForPawn(pawn, map, cell) ||
+                    !pawn.CanReach(cell, PathEndMode.OnCell, Danger.Deadly))
+                {
+                    continue;
+                }
+                int distance = cell.DistanceToSquared(origin);
+                if (distance < bestDistance)
+                {
+                    best = cell;
+                    bestDistance = distance;
+                }
+            }
+            return best;
         }
 
         private static List<Pawn> ActiveTrackedPawns(Map map, ServiceGroupRecord record)
         {
-            List<Pawn> pawns = record == null || record.pawns == null ? new List<Pawn>() : record.pawns.Where(p => !ServicePawnUtility.IsTerminalPawn(p)).Distinct().ToList();
+            List<Pawn> pawns = new List<Pawn>();
+            if (record != null && record.pawns != null)
+            {
+                HashSet<Pawn> seen = new HashSet<Pawn>();
+                foreach (Pawn pawn in record.pawns)
+                {
+                    if (pawn != null && !ServicePawnUtility.IsTerminalPawn(pawn) && seen.Add(pawn))
+                    {
+                        pawns.Add(pawn);
+                    }
+                }
+            }
             if (record == null || record.serviceKind != "hospital" || pawns.Count == 0)
             {
                 if (record != null && record.serviceKind == "hospitality")
                 {
-                    return pawns.Where(IsActiveHospitalityServicePawn).ToList();
+                    for (int i = pawns.Count - 1; i >= 0; i--)
+                    {
+                        if (!IsActiveHospitalityServicePawn(pawns[i]))
+                        {
+                            pawns.RemoveAt(i);
+                        }
+                    }
+                    return pawns;
                 }
                 return pawns;
             }
@@ -508,7 +551,15 @@ namespace SpaceServices
                 return pawns;
             }
 
-            return pawns.Where(pawn => pawn.Spawned || hospitalPatients.Contains(pawn)).ToList();
+            for (int i = pawns.Count - 1; i >= 0; i--)
+            {
+                Pawn pawn = pawns[i];
+                if (!pawn.Spawned && !hospitalPatients.Contains(pawn))
+                {
+                    pawns.RemoveAt(i);
+                }
+            }
+            return pawns;
         }
 
         private static bool IsActiveHospitalityServicePawn(Pawn pawn)
@@ -688,7 +739,7 @@ namespace SpaceServices
             record.pickupShuttleTouchdownTick = Find.TickManager.TicksGame + ServiceShuttleUtility.ArrivalTouchdownDelayTicks;
             record.pickupShuttleThingDefName = visual.shipThingDef.defName;
             record.pickupShuttleVisualDefName = visual.id;
-            ServiceShuttleUtility.SpawnArrival(record.reservedPad.Map, record.reservedPad.Position, record.serviceKind, visual.id);
+            ServiceShuttleUtility.SpawnArrival(record.reservedPad.Map, record.reservedPad.Position, visual);
             ServiceDebugUtility.Log("Pickup shuttle inbound for " + record.serviceKind + " service group " + record.id + ": " + reason);
             ServiceDebugUtility.LogAudit("BeginPickupShuttle " + RecordAudit(record) + " touchdownTick=" + record.pickupShuttleTouchdownTick + " ship=" + record.pickupShuttleThingDefName + " visual=" + record.pickupShuttleVisualDefName + " reason=" + (reason ?? "none"));
         }
@@ -787,13 +838,17 @@ namespace SpaceServices
             {
                 return float.MaxValue;
             }
-            List<Pawn> spawned = pawns == null ? new List<Pawn>() : pawns.Where(pawn => pawn != null && pawn.Spawned).ToList();
-            float score = spawned.Sum(pawn =>
+            float score = 0f;
+            foreach (Pawn pawn in pawns ?? Enumerable.Empty<Pawn>())
             {
+                if (pawn == null || !pawn.Spawned)
+                {
+                    continue;
+                }
                 IntVec3 waitCell = DepartureWaitCell(pad, pawn, ShouldBypassGuestArea(record));
                 IntVec3 target = waitCell.IsValid ? waitCell : pad.Position;
-                return pawn.Position.DistanceToSquared(target);
-            });
+                score += pawn.Position.DistanceToSquared(target);
+            }
             CompSpaceServicePad comp = pad.TryGetComp<CompSpaceServicePad>();
             if (comp != null)
             {
@@ -804,13 +859,18 @@ namespace SpaceServices
 
         private static float DepartureTravelDistance(ServiceGroupRecord record, Thing pad, List<Pawn> pawns)
         {
-            List<Pawn> spawned = pawns == null ? new List<Pawn>() : pawns.Where(pawn => pawn != null && pawn.Spawned).ToList();
-            return spawned.Sum(pawn =>
+            float total = 0f;
+            foreach (Pawn pawn in pawns ?? Enumerable.Empty<Pawn>())
             {
+                if (pawn == null || !pawn.Spawned)
+                {
+                    continue;
+                }
                 IntVec3 waitCell = DepartureWaitCell(pad, pawn, ShouldBypassGuestArea(record));
                 IntVec3 target = waitCell.IsValid ? waitCell : pad.Position;
-                return pawn.Position.DistanceToSquared(target);
-            });
+                total += pawn.Position.DistanceToSquared(target);
+            }
+            return total;
         }
 
         private static bool ShouldPreferVacuumDeparturePad(List<Pawn> pawns)
@@ -1082,6 +1142,10 @@ namespace SpaceServices
                     ServiceDebugUtility.LogAudit("GuideDepartingPawnsToPad cannot reach waitCell=" + waitCell + " pawn=" + ServiceDebugUtility.PawnAuditSummary(pawn) + " record=" + RecordAudit(record));
                     continue;
                 }
+                if (PawnAlreadyGoingTo(pawn, waitCell))
+                {
+                    continue;
+                }
                 ServiceDebugUtility.LogAudit("GuideDepartingPawnsToPad ordered waitCell=" + waitCell + " pawn=" + ServiceDebugUtility.PawnAuditSummary(pawn) + " record=" + RecordAudit(record));
                 pawn.jobs.TryTakeOrderedJob(ServiceGotoJob(waitCell, bypassGuestArea), JobTag.Misc);
             }
@@ -1118,6 +1182,10 @@ namespace SpaceServices
                 if (!bypassGuestArea && !pawn.CanReach(boardCell, PathEndMode.OnCell, Danger.Deadly))
                 {
                     ServiceDebugUtility.LogAudit("GuideBoardingPawnsToShuttle cannot reach boardCell=" + boardCell + " pawn=" + ServiceDebugUtility.PawnAuditSummary(pawn) + " record=" + RecordAudit(record));
+                    continue;
+                }
+                if (PawnAlreadyGoingTo(pawn, boardCell))
+                {
                     continue;
                 }
                 ServiceDebugUtility.LogAudit("GuideBoardingPawnsToShuttle ordered boardCell=" + boardCell + " pawn=" + ServiceDebugUtility.PawnAuditSummary(pawn) + " record=" + RecordAudit(record));
@@ -1203,17 +1271,7 @@ namespace SpaceServices
             {
                 return IntVec3.Invalid;
             }
-            CellRect boardingRect = PickupBoardingRect(pad);
-            List<IntVec3> candidates = boardingRect.Cells
-                .Where(cell => cell.InBounds(map) && cell.Standable(map) && (cell.GetFirstPawn(map) == null || cell == pawn.Position))
-                .OrderBy(cell => cell.DistanceToSquared(pawn.Position))
-                .ThenBy(cell => cell.DistanceToSquared(pad.Position))
-                .ToList();
-            IntVec3 reachable = candidates
-                .Where(cell => pawn.CanReach(cell, PathEndMode.OnCell, Danger.Deadly))
-                .DefaultIfEmpty(IntVec3.Invalid)
-                .First();
-            return reachable.IsValid || !bypassGuestArea ? reachable : candidates.DefaultIfEmpty(IntVec3.Invalid).First();
+            return BestReachableCell(PickupBoardingRect(pad), pad, pawn, bypassGuestArea, false);
         }
 
         private static CellRect PickupBoardingRect(Thing pad)
@@ -1229,24 +1287,79 @@ namespace SpaceServices
             {
                 return IntVec3.Invalid;
             }
-            CellRect padRect = pad.OccupiedRect();
-            CellRect noWaitRect = padRect.ExpandedBy(1);
-            // The ring is intentionally tight so the shuttle is visibly picking up from this pad.
-            List<IntVec3> candidates = padRect.ExpandedBy(2).Cells
-                .Where(cell => cell.InBounds(map) && !noWaitRect.Contains(cell) && SameRoomAsPad(pad, cell) && cell.Standable(map) && (cell.GetFirstPawn(map) == null || cell == pawn.Position))
-                .OrderBy(cell => cell.DistanceToSquared(pawn.Position))
-                .ThenBy(cell => cell.DistanceToSquared(pad.Position))
-                .ToList();
-            IntVec3 reachable = candidates
-                .Where(cell => pawn.CanReach(cell, PathEndMode.OnCell, Danger.Deadly))
-                .DefaultIfEmpty(IntVec3.Invalid)
-                .First();
-            return reachable.IsValid || !bypassGuestArea ? reachable : candidates.DefaultIfEmpty(IntVec3.Invalid).First();
+            return BestReachableCell(pad.OccupiedRect().ExpandedBy(2), pad, pawn, bypassGuestArea, true);
+        }
+
+        private static IntVec3 BestReachableCell(CellRect searchRect, Thing pad, Pawn pawn, bool bypassGuestArea, bool stagingRing)
+        {
+            Map map = pad == null ? null : pad.Map;
+            if (map == null || pawn == null)
+            {
+                return IntVec3.Invalid;
+            }
+            CellRect noWaitRect = stagingRing ? pad.OccupiedRect().ExpandedBy(1) : CellRect.Empty;
+            IntVec3 bestReachable = IntVec3.Invalid;
+            IntVec3 bestFallback = IntVec3.Invalid;
+            int bestReachablePawnDist = int.MaxValue;
+            int bestReachablePadDist = int.MaxValue;
+            int bestFallbackPawnDist = int.MaxValue;
+            int bestFallbackPadDist = int.MaxValue;
+
+            foreach (IntVec3 cell in searchRect.Cells)
+            {
+                if (!cell.InBounds(map) || !cell.Standable(map) || (cell.GetFirstPawn(map) != null && cell != pawn.Position))
+                {
+                    continue;
+                }
+                if (stagingRing && (noWaitRect.Contains(cell) || !SameRoomAsPad(pad, cell)))
+                {
+                    continue;
+                }
+                int pawnDist = cell.DistanceToSquared(pawn.Position);
+                int padDist = cell.DistanceToSquared(pad.Position);
+                if (BetterCell(pawnDist, padDist, bestFallbackPawnDist, bestFallbackPadDist))
+                {
+                    bestFallback = cell;
+                    bestFallbackPawnDist = pawnDist;
+                    bestFallbackPadDist = padDist;
+                }
+                if (pawn.CanReach(cell, PathEndMode.OnCell, Danger.Deadly) && BetterCell(pawnDist, padDist, bestReachablePawnDist, bestReachablePadDist))
+                {
+                    bestReachable = cell;
+                    bestReachablePawnDist = pawnDist;
+                    bestReachablePadDist = padDist;
+                }
+            }
+
+            return bestReachable.IsValid || !bypassGuestArea ? bestReachable : bestFallback;
+        }
+
+        private static bool BetterCell(int pawnDist, int padDist, int bestPawnDist, int bestPadDist)
+        {
+            return pawnDist < bestPawnDist || (pawnDist == bestPawnDist && padDist < bestPadDist);
+        }
+
+        private static bool PawnAlreadyGoingTo(Pawn pawn, IntVec3 cell)
+        {
+            Job job = pawn == null ? null : pawn.CurJob;
+            return job != null && job.def == JobDefOf.Goto && job.targetA.IsValid && job.targetA.Cell == cell;
         }
 
         public static List<ServiceDepartureBlock> BlockedDepartures()
         {
-            List<ServiceDepartureBlock> blocks = new List<ServiceDepartureBlock>();
+            int tick = Find.TickManager == null ? 0 : Find.TickManager.TicksGame;
+            if (tick < cachedDepartureBlocksTick + BlockedDepartureCacheTicks)
+            {
+                return CachedDepartureBlocks;
+            }
+            CachedDepartureBlocks.Clear();
+            cachedDepartureBlocksTick = tick;
+            BuildBlockedDepartures(CachedDepartureBlocks);
+            return CachedDepartureBlocks;
+        }
+
+        private static void BuildBlockedDepartures(List<ServiceDepartureBlock> blocks)
+        {
             foreach (Map map in Find.Maps ?? Enumerable.Empty<Map>())
             {
                 SpaceServicesMapComponent comp = map == null ? null : map.GetComponent<SpaceServicesMapComponent>();
@@ -1304,7 +1417,6 @@ namespace SpaceServices
                     }
                 }
             }
-            return blocks;
         }
 
         private static bool ShouldReportDepartureBlock(ServiceGroupRecord record)
@@ -1477,6 +1589,24 @@ namespace SpaceServices
                 }
             }
             return true;
+        }
+
+        private static List<Pawn> DistinctNonNullPawns(List<Pawn> pawns)
+        {
+            List<Pawn> result = new List<Pawn>();
+            if (pawns == null)
+            {
+                return result;
+            }
+            HashSet<Pawn> seen = new HashSet<Pawn>();
+            foreach (Pawn pawn in pawns)
+            {
+                if (pawn != null && seen.Add(pawn))
+                {
+                    result.Add(pawn);
+                }
+            }
+            return result;
         }
 
         private static string RecordAudit(ServiceGroupRecord record)

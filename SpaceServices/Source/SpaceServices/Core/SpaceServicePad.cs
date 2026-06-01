@@ -18,7 +18,15 @@ namespace SpaceServices
         public override void SpawnSetup(Map map, bool respawningAfterLoad)
         {
             base.SpawnSetup(map, respawningAfterLoad);
+            map?.GetComponent<SpaceServicesMapComponent>()?.DirtyServicePadCache();
             ServicePadPrebuildModeUtility.ApplyPendingMode(this);
+        }
+
+        public override void DeSpawn(DestroyMode mode = DestroyMode.Vanish)
+        {
+            Map oldMap = Map;
+            base.DeSpawn(mode);
+            oldMap?.GetComponent<SpaceServicesMapComponent>()?.DirtyServicePadCache();
         }
 
         protected override void DrawAt(Vector3 drawLoc, bool flip = false)
@@ -713,9 +721,19 @@ namespace SpaceServices
             {
                 yield break;
             }
+            SpaceServicesMapComponent comp = map.GetComponent<SpaceServicesMapComponent>();
+            List<Thing> cachedPads = comp == null ? null : comp.CachedServicePadBuildings();
+            if (cachedPads != null)
+            {
+                foreach (Thing pad in cachedPads)
+                {
+                    yield return pad;
+                }
+                yield break;
+            }
             foreach (Building building in map.listerBuildings.allBuildingsColonist)
             {
-                if (building.TryGetComp<CompSpaceServicePad>() != null)
+                if (building != null && building.TryGetComp<CompSpaceServicePad>() != null)
                 {
                     yield return building;
                 }
@@ -728,17 +746,21 @@ namespace SpaceServices
             {
                 yield break;
             }
-            foreach (Thing building in AllServicePadBuildings(map)
-                .OrderBy(building =>
+            for (int rank = 0; rank <= 99; rank++)
+            {
+                bool yieldedAny = false;
+                foreach (Thing building in AllServicePadBuildings(map))
                 {
                     CompSpaceServicePad comp = building.TryGetComp<CompSpaceServicePad>();
-                    return comp == null ? 99 : comp.PriorityRank(use);
-                }))
-            {
-                CompSpaceServicePad comp = building.TryGetComp<CompSpaceServicePad>();
-                if (comp != null && comp.IsUsableFor(use))
+                    if (comp != null && comp.PriorityRank(use) == rank && comp.IsUsableFor(use))
+                    {
+                        yieldedAny = true;
+                        yield return building;
+                    }
+                }
+                if (rank >= 3 && !yieldedAny)
                 {
-                    yield return building;
+                    yield break;
                 }
             }
         }
@@ -762,21 +784,30 @@ namespace SpaceServices
 
         public static Thing TryFindRandomServicePad(Map map, ServiceUse use)
         {
-            List<Thing> pads = AllServicePads(map, use).ToList();
-            if (pads.Count == 0)
+            List<Thing> bestPads = new List<Thing>();
+            int bestRank = 100;
+            foreach (Thing pad in AllServicePadBuildings(map))
+            {
+                CompSpaceServicePad comp = pad.TryGetComp<CompSpaceServicePad>();
+                if (comp == null || !comp.IsUsableFor(use))
+                {
+                    continue;
+                }
+                int rank = comp.PriorityRank(use);
+                if (rank < bestRank)
+                {
+                    bestRank = rank;
+                    bestPads.Clear();
+                }
+                if (rank == bestRank)
+                {
+                    bestPads.Add(pad);
+                }
+            }
+            if (bestPads.Count == 0)
             {
                 return null;
             }
-            int bestRank = pads.Min(pad =>
-            {
-                CompSpaceServicePad comp = pad.TryGetComp<CompSpaceServicePad>();
-                return comp == null ? 99 : comp.PriorityRank(use);
-            });
-            List<Thing> bestPads = pads.Where(pad =>
-            {
-                CompSpaceServicePad comp = pad.TryGetComp<CompSpaceServicePad>();
-                return (comp == null ? 99 : comp.PriorityRank(use)) == bestRank;
-            }).ToList();
             return bestPads[Rand.Range(0, bestPads.Count)];
         }
 
@@ -798,14 +829,26 @@ namespace SpaceServices
             {
                 return TryFindRandomServicePad(map, use);
             }
-            return AllServicePads(map, use)
-                .OrderBy(pad =>
+            Thing best = null;
+            int bestRank = 100;
+            float bestDistance = float.MaxValue;
+            foreach (Thing pad in AllServicePadBuildings(map))
+            {
+                CompSpaceServicePad comp = pad.TryGetComp<CompSpaceServicePad>();
+                if (comp == null || !comp.IsUsableFor(use))
                 {
-                    CompSpaceServicePad comp = pad.TryGetComp<CompSpaceServicePad>();
-                    return comp == null ? 99 : comp.PriorityRank(use);
-                })
-                .ThenBy(pad => pad.Position.DistanceToSquared(origin))
-                .FirstOrDefault();
+                    continue;
+                }
+                int rank = comp.PriorityRank(use);
+                float distance = pad.Position.DistanceToSquared(origin);
+                if (rank < bestRank || (rank == bestRank && distance < bestDistance))
+                {
+                    best = pad;
+                    bestRank = rank;
+                    bestDistance = distance;
+                }
+            }
+            return best;
         }
 
         public static Thing TryReserveServicePad(Map map, ServiceUse use, string groupId)

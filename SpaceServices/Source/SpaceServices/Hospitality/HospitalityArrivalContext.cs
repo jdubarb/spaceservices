@@ -87,7 +87,7 @@ namespace SpaceServices
                 return;
             }
 
-            ServiceShuttleUtility.SpawnArrival(map, request.pad.Position, "hospitality", visual.id);
+            ServiceShuttleUtility.SpawnArrival(map, request.pad.Position, visual);
             SpaceServicesMapComponent comp = map.GetComponent<SpaceServicesMapComponent>();
             if (comp != null)
             {

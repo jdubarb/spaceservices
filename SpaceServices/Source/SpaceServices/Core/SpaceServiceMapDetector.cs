@@ -28,7 +28,15 @@ namespace SpaceServices
 
     public static class SpaceServiceMapDetector
     {
+        private static readonly Dictionary<int, CachedEligibility> EligibilityByMapId = new Dictionary<int, CachedEligibility>();
+        private const int EligibilityCacheTicks = 2500;
+
         public static SpaceServiceEligibility Evaluate(Map map)
+        {
+            return map == null ? EvaluateUncached(map) : Clone(CachedOrEvaluate(map));
+        }
+
+        private static SpaceServiceEligibility EvaluateUncached(Map map)
         {
             SpaceServiceEligibility result = new SpaceServiceEligibility();
             if (map == null)
@@ -95,7 +103,33 @@ namespace SpaceServices
 
         public static bool IsServiceEligible(Map map)
         {
-            return Evaluate(map).allowed;
+            return map != null && CachedOrEvaluate(map).allowed;
+        }
+
+        private static SpaceServiceEligibility CachedOrEvaluate(Map map)
+        {
+            int tick = Find.TickManager == null ? 0 : Find.TickManager.TicksGame;
+            CachedEligibility cached;
+            if (EligibilityByMapId.TryGetValue(map.uniqueID, out cached) && tick < cached.tick + EligibilityCacheTicks)
+            {
+                return cached.eligibility;
+            }
+            SpaceServiceEligibility evaluated = EvaluateUncached(map);
+            EligibilityByMapId[map.uniqueID] = new CachedEligibility { tick = tick, eligibility = evaluated };
+            return evaluated;
+        }
+
+        private static SpaceServiceEligibility Clone(SpaceServiceEligibility source)
+        {
+            SpaceServiceEligibility clone = new SpaceServiceEligibility();
+            if (source == null)
+            {
+                return clone;
+            }
+            clone.allowed = source.allowed;
+            clone.allowReasons.AddRange(source.allowReasons);
+            clone.blockReasons.AddRange(source.blockReasons);
+            return clone;
         }
 
         private static string DefNameFromNested(object root, params string[] path)
@@ -134,6 +168,12 @@ namespace SpaceServices
                 }
             }
             return false;
+        }
+
+        private sealed class CachedEligibility
+        {
+            public int tick;
+            public SpaceServiceEligibility eligibility;
         }
     }
 }

@@ -15,6 +15,11 @@ namespace SpaceServices
 {
     public static class Reflect
     {
+        private static readonly Dictionary<string, PropertyInfo> PropertyCache = new Dictionary<string, PropertyInfo>();
+        private static readonly Dictionary<string, FieldInfo> FieldCache = new Dictionary<string, FieldInfo>();
+        private static readonly HashSet<string> MissingProperties = new HashSet<string>();
+        private static readonly HashSet<string> MissingFields = new HashSet<string>();
+
         public static object GetMember(object obj, string name)
         {
             if (obj == null || string.IsNullOrEmpty(name))
@@ -24,12 +29,12 @@ namespace SpaceServices
             try
             {
                 Type type = obj.GetType();
-                PropertyInfo property = AccessTools.Property(type, name);
+                PropertyInfo property = CachedProperty(type, name);
                 if (property != null)
                 {
                     return property.GetValue(obj, null);
                 }
-                FieldInfo field = AccessTools.Field(type, name);
+                FieldInfo field = CachedField(type, name);
                 return field == null ? null : field.GetValue(obj);
             }
             catch (Exception ex)
@@ -80,13 +85,13 @@ namespace SpaceServices
             try
             {
                 Type type = obj.GetType();
-                PropertyInfo property = AccessTools.Property(type, name);
+                PropertyInfo property = CachedProperty(type, name);
                 if (property != null && property.CanWrite)
                 {
                     property.SetValue(obj, value, null);
                     return;
                 }
-                FieldInfo field = AccessTools.Field(type, name);
+                FieldInfo field = CachedField(type, name);
                 if (field != null)
                 {
                     field.SetValue(obj, value);
@@ -96,6 +101,59 @@ namespace SpaceServices
             {
                 ServiceDebugUtility.LogThrottled("reflect-set-" + obj.GetType().FullName + "." + name, "Reflection set failed for " + obj.GetType().FullName + "." + name + ": " + ex.GetType().Name + " " + ex.Message, GenDate.TicksPerHour);
             }
+        }
+
+        private static PropertyInfo CachedProperty(Type type, string name)
+        {
+            string key = CacheKey(type, name);
+            if (MissingProperties.Contains(key))
+            {
+                return null;
+            }
+            PropertyInfo property;
+            if (PropertyCache.TryGetValue(key, out property))
+            {
+                return property;
+            }
+            property = AccessTools.Property(type, name);
+            if (property == null)
+            {
+                MissingProperties.Add(key);
+            }
+            else
+            {
+                PropertyCache[key] = property;
+            }
+            return property;
+        }
+
+        private static FieldInfo CachedField(Type type, string name)
+        {
+            string key = CacheKey(type, name);
+            if (MissingFields.Contains(key))
+            {
+                return null;
+            }
+            FieldInfo field;
+            if (FieldCache.TryGetValue(key, out field))
+            {
+                return field;
+            }
+            field = AccessTools.Field(type, name);
+            if (field == null)
+            {
+                MissingFields.Add(key);
+            }
+            else
+            {
+                FieldCache[key] = field;
+            }
+            return field;
+        }
+
+        private static string CacheKey(Type type, string name)
+        {
+            return (type == null ? "" : type.FullName) + "." + name;
         }
     }
 }
