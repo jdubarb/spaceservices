@@ -21,6 +21,9 @@ namespace SpaceServices
         private const int PickupBoardingHardTimeoutTicks = 2500;
         private const float VacuumPadDistanceTolerance = 2.5f;
         private const int BlockedDepartureCacheTicks = 60;
+        private const int StableActivePawnValidationTicks = 2500;
+        private const int StableBedlessCheckTicks = 2500;
+        private const int StableLeaveStateCheckTicks = 250;
         private static readonly List<ServiceDepartureBlock> CachedDepartureBlocks = new List<ServiceDepartureBlock>();
         private static int cachedDepartureBlocksTick = -999999;
 
@@ -259,7 +262,15 @@ namespace SpaceServices
                         ServicePawnUtility.CleanupTerminalPawnReferences(map, terminalPawn);
                     }
                 }
-                record.pawns = ActiveTrackedPawns(map, record);
+                if (ShouldValidateActivePawns(record))
+                {
+                    record.pawns = ActiveTrackedPawns(map, record);
+                    record.nextActivePawnValidationTick = Find.TickManager.TicksGame + ActivePawnValidationInterval(record);
+                }
+                else
+                {
+                    record.pawns = RemoveTerminalAndDuplicatePawns(record.pawns);
+                }
                 if (!SamePawnSet(previouslyTrackedPawns, record.pawns))
                 {
                     ServiceDebugUtility.LogAudit("ActiveTrackedPawns updated " + RecordAudit(record) + " previous=" + PawnSummary(previouslyTrackedPawns) + " active=" + PawnSummary(record.pawns));
@@ -277,8 +288,10 @@ namespace SpaceServices
                 }
                 if (record.serviceKind == "hospitality" && record.state == "arrived" &&
                     SpaceServicesMod.Settings != null && SpaceServicesMod.Settings.hospitalityAutoDepartBedlessGuests &&
+                    ShouldCheckHospitalityBedless(record) &&
                     HospitalityBedUtility.TryFindBedlessServiceGuest(record, out Pawn bedlessGuest, out string bedlessReason))
                 {
+                    record.nextHospitalityBedlessCheckTick = Find.TickManager.TicksGame + StableBedlessCheckTicks;
                     if (record.hospitalityBedlessSinceTick <= 0)
                     {
                         record.hospitalityBedlessSinceTick = Find.TickManager.TicksGame;
@@ -297,7 +310,11 @@ namespace SpaceServices
                 }
                 else if (record.serviceKind == "hospitality")
                 {
-                    record.hospitalityBedlessSinceTick = 0;
+                    if (ShouldCheckHospitalityBedless(record))
+                    {
+                        record.hospitalityBedlessSinceTick = 0;
+                        record.nextHospitalityBedlessCheckTick = Find.TickManager.TicksGame + StableBedlessCheckTicks;
+                    }
                 }
                 if (record.state == "pickupInbound")
                 {
@@ -396,6 +413,7 @@ namespace SpaceServices
                 }
                 if (record.serviceKind == "hospitality" && record.state == "arrived" &&
                     Find.TickManager.TicksGame > record.arrivalTick + HospitalityDepartureDetectionGraceTicks &&
+                    ShouldCheckLeaveState(record) &&
                     record.pawns.Any(IsTryingToLeave))
                 {
                     BeginDeparture(map, record, "Hospitality group entered departure state");
@@ -419,6 +437,46 @@ namespace SpaceServices
                 SpaceServicesMod.Settings.debugLogging &&
                 Find.TickManager != null &&
                 Find.TickManager.TicksGame % 2500 == 0;
+        }
+
+        private static bool ShouldCheckHospitalityBedless(ServiceGroupRecord record)
+        {
+            return record == null ||
+                record.nextHospitalityBedlessCheckTick <= 0 ||
+                Find.TickManager == null ||
+                Find.TickManager.TicksGame >= record.nextHospitalityBedlessCheckTick;
+        }
+
+        private static bool ShouldCheckLeaveState(ServiceGroupRecord record)
+        {
+            if (record == null || Find.TickManager == null)
+            {
+                return true;
+            }
+            if (record.nextLeaveStateCheckTick > 0 && Find.TickManager.TicksGame < record.nextLeaveStateCheckTick)
+            {
+                return false;
+            }
+            record.nextLeaveStateCheckTick = Find.TickManager.TicksGame + StableLeaveStateCheckTicks;
+            return true;
+        }
+
+        private static bool ShouldValidateActivePawns(ServiceGroupRecord record)
+        {
+            if (record == null || Find.TickManager == null)
+            {
+                return true;
+            }
+            if (record.state != "arrived")
+            {
+                return true;
+            }
+            return record.nextActivePawnValidationTick <= 0 || Find.TickManager.TicksGame >= record.nextActivePawnValidationTick;
+        }
+
+        private static int ActivePawnValidationInterval(ServiceGroupRecord record)
+        {
+            return record != null && record.state == "arrived" ? StableActivePawnValidationTicks : NextTickInterval(null);
         }
 
         private static void GuardHospitalityGuestsFromVacuum(Map map, ServiceGroupRecord record)
@@ -516,18 +574,7 @@ namespace SpaceServices
 
         private static List<Pawn> ActiveTrackedPawns(Map map, ServiceGroupRecord record)
         {
-            List<Pawn> pawns = new List<Pawn>();
-            if (record != null && record.pawns != null)
-            {
-                HashSet<Pawn> seen = new HashSet<Pawn>();
-                foreach (Pawn pawn in record.pawns)
-                {
-                    if (pawn != null && !ServicePawnUtility.IsTerminalPawn(pawn) && seen.Add(pawn))
-                    {
-                        pawns.Add(pawn);
-                    }
-                }
-            }
+            List<Pawn> pawns = RemoveTerminalAndDuplicatePawns(record == null ? null : record.pawns);
             if (record == null || record.serviceKind != "hospital" || pawns.Count == 0)
             {
                 if (record != null && record.serviceKind == "hospitality")
@@ -557,6 +604,24 @@ namespace SpaceServices
                 if (!pawn.Spawned && !hospitalPatients.Contains(pawn))
                 {
                     pawns.RemoveAt(i);
+                }
+            }
+            return pawns;
+        }
+
+        private static List<Pawn> RemoveTerminalAndDuplicatePawns(List<Pawn> source)
+        {
+            List<Pawn> pawns = new List<Pawn>();
+            if (source == null)
+            {
+                return pawns;
+            }
+            HashSet<Pawn> seen = new HashSet<Pawn>();
+            foreach (Pawn pawn in source)
+            {
+                if (pawn != null && !ServicePawnUtility.IsTerminalPawn(pawn) && seen.Add(pawn))
+                {
+                    pawns.Add(pawn);
                 }
             }
             return pawns;

@@ -23,6 +23,9 @@ namespace SpaceServices
         public int departureRequestedTick;
         public int pickupShuttleTouchdownTick;
         public int hospitalityBedlessSinceTick;
+        public int nextActivePawnValidationTick;
+        public int nextHospitalityBedlessCheckTick;
+        public int nextLeaveStateCheckTick;
         public string pickupShuttleThingDefName;
         public string pickupShuttleVisualDefName;
         public bool hospitalityDeparturePrepared;
@@ -40,6 +43,9 @@ namespace SpaceServices
             Scribe_Values.Look(ref departureRequestedTick, "departureRequestedTick", 0);
             Scribe_Values.Look(ref pickupShuttleTouchdownTick, "pickupShuttleTouchdownTick", 0);
             Scribe_Values.Look(ref hospitalityBedlessSinceTick, "hospitalityBedlessSinceTick", 0);
+            Scribe_Values.Look(ref nextActivePawnValidationTick, "nextActivePawnValidationTick", 0);
+            Scribe_Values.Look(ref nextHospitalityBedlessCheckTick, "nextHospitalityBedlessCheckTick", 0);
+            Scribe_Values.Look(ref nextLeaveStateCheckTick, "nextLeaveStateCheckTick", 0);
             Scribe_Values.Look(ref pickupShuttleThingDefName, "pickupShuttleThingDefName");
             Scribe_Values.Look(ref pickupShuttleVisualDefName, "pickupShuttleVisualDefName");
             Scribe_Values.Look(ref hospitalityDeparturePrepared, "hospitalityDeparturePrepared", false);
