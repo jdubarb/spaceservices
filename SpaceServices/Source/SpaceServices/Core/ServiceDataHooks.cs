@@ -103,6 +103,57 @@ namespace SpaceServices
         }
     }
 
+    public sealed class SpaceServiceVacuumApparelSetDef : Def
+    {
+        public bool enabled = true;
+        public float weight = 1f;
+        public List<string> requiredPackageIds;
+        public List<string> adultApparelDefNames;
+        public List<string> childApparelDefNames;
+        public List<string> removalApparelDefNames;
+
+        public bool AppliesTo(Pawn pawn)
+        {
+            return enabled &&
+                weight > 0f &&
+                SpaceServiceDefFilters.RequiredPackagesLoaded(requiredPackageIds) &&
+                ResolvedApparelFor(pawn).Count > 0;
+        }
+
+        public List<ThingDef> ResolvedApparelFor(Pawn pawn)
+        {
+            List<string> names = pawn != null && pawn.DevelopmentalStage == DevelopmentalStage.Child && !childApparelDefNames.NullOrEmpty()
+                ? childApparelDefNames
+                : adultApparelDefNames;
+            return SpaceServiceDefFilters.ResolveThingDefs(names);
+        }
+
+        public IEnumerable<string> AllRemovalDefNames()
+        {
+            if (!adultApparelDefNames.NullOrEmpty())
+            {
+                foreach (string name in adultApparelDefNames)
+                {
+                    yield return name;
+                }
+            }
+            if (!childApparelDefNames.NullOrEmpty())
+            {
+                foreach (string name in childApparelDefNames)
+                {
+                    yield return name;
+                }
+            }
+            if (!removalApparelDefNames.NullOrEmpty())
+            {
+                foreach (string name in removalApparelDefNames)
+                {
+                    yield return name;
+                }
+            }
+        }
+    }
+
     public static class SpaceServiceDefFilters
     {
         public static bool MatchesServiceKind(List<string> serviceKinds, string serviceKind)
@@ -133,6 +184,28 @@ namespace SpaceServices
                 }
             }
             return true;
+        }
+
+        public static List<ThingDef> ResolveThingDefs(List<string> defNames)
+        {
+            List<ThingDef> defs = new List<ThingDef>();
+            if (defNames.NullOrEmpty())
+            {
+                return defs;
+            }
+            foreach (string defName in defNames)
+            {
+                if (string.IsNullOrEmpty(defName))
+                {
+                    continue;
+                }
+                ThingDef def = DefDatabase<ThingDef>.GetNamedSilentFail(defName);
+                if (def != null)
+                {
+                    defs.Add(def);
+                }
+            }
+            return defs;
         }
     }
 }

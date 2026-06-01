@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Defs>
+  <SpaceServices.SpaceServiceVacuumApparelSetDef>
+    <defName>JDB_OdysseyVacSuitSet</defName>
+    <label>Odyssey vacsuit set</label>
+    <weight>1</weight>
+    <adultApparelDefNames>
+      <li>Apparel_Vacsuit</li>
+      <li>Apparel_VacsuitHelmet</li>
+    </adultApparelDefNames>
+    <childApparelDefNames>
+      <li>Apparel_VacsuitChildren</li>
+      <li>Apparel_VacsuitHelmet</li>
+    </childApparelDefNames>
+  </SpaceServices.SpaceServiceVacuumApparelSetDef>
+</Defs>

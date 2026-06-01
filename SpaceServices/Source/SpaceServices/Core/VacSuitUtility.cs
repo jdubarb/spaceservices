@@ -20,6 +20,7 @@ namespace SpaceServices
         private static readonly HashSet<string> KnownVacSuitDefs = new HashSet<string>(AdultSuitDefs.Concat(ChildSuitDefs));
         private static readonly Dictionary<int, bool> sealedArrivalSuitRolls = new Dictionary<int, bool>();
         private static StatDef vacuumResistance;
+        private static HashSet<string> cachedRemovalDefNames;
 
         public static void SuitPawnsForVacuum(IEnumerable<Pawn> pawns)
         {
@@ -121,16 +122,49 @@ namespace SpaceServices
                 return;
             }
 
-            string[] defs = pawn.DevelopmentalStage == DevelopmentalStage.Child ? ChildSuitDefs : AdultSuitDefs;
-            for (int i = 0; i < defs.Length; i++)
+            List<ThingDef> defs = SelectApparelSetFor(pawn);
+            for (int i = 0; i < defs.Count; i++)
             {
                 TryWearIfNeeded(pawn, defs[i]);
             }
         }
 
-        private static void TryWearIfNeeded(Pawn pawn, string defName)
+        private static List<ThingDef> SelectApparelSetFor(Pawn pawn)
         {
-            ThingDef def = DefDatabase<ThingDef>.GetNamedSilentFail(defName);
+            // Modded vac gear is data-driven so patches can add apparel sets without C# changes.
+            List<SpaceServiceVacuumApparelSetDef> sets = DefDatabase<SpaceServiceVacuumApparelSetDef>.AllDefsListForReading
+                .Where(set => set != null && set.AppliesTo(pawn))
+                .ToList();
+            if (sets.Count == 0)
+            {
+                string[] fallback = pawn.DevelopmentalStage == DevelopmentalStage.Child ? ChildSuitDefs : AdultSuitDefs;
+                return SpaceServiceDefFilters.ResolveThingDefs(fallback.ToList());
+            }
+            SpaceServiceVacuumApparelSetDef selected = WeightedRandomSet(sets);
+            return selected == null ? new List<ThingDef>() : selected.ResolvedApparelFor(pawn);
+        }
+
+        private static SpaceServiceVacuumApparelSetDef WeightedRandomSet(List<SpaceServiceVacuumApparelSetDef> sets)
+        {
+            float total = sets.Sum(set => Mathf.Max(0f, set.weight));
+            if (total <= 0f)
+            {
+                return sets.FirstOrDefault();
+            }
+            float roll = Rand.Value * total;
+            foreach (SpaceServiceVacuumApparelSetDef set in sets)
+            {
+                roll -= Mathf.Max(0f, set.weight);
+                if (roll <= 0f)
+                {
+                    return set;
+                }
+            }
+            return sets.LastOrDefault();
+        }
+
+        private static void TryWearIfNeeded(Pawn pawn, ThingDef def)
+        {
             if (def == null)
             {
                 return;
@@ -139,7 +173,8 @@ namespace SpaceServices
             {
                 return;
             }
-            Apparel newApparel = ThingMaker.MakeThing(def) as Apparel;
+            ThingDef stuff = def.MadeFromStuff ? GenStuff.DefaultStuffFor(def) : null;
+            Apparel newApparel = ThingMaker.MakeThing(def, stuff) as Apparel;
             if (newApparel == null)
             {
                 return;
@@ -155,11 +190,37 @@ namespace SpaceServices
             }
             foreach (Apparel apparel in pawn.apparel.WornApparel.ToList())
             {
-                if (apparel != null && KnownVacSuitDefs.Contains(apparel.def.defName))
+                if (apparel != null && RemovalDefNames.Contains(apparel.def.defName))
                 {
                     pawn.apparel.Remove(apparel);
                     apparel.Destroy(DestroyMode.Vanish);
                 }
+            }
+        }
+
+        private static HashSet<string> RemovalDefNames
+        {
+            get
+            {
+                if (cachedRemovalDefNames == null)
+                {
+                    cachedRemovalDefNames = new HashSet<string>(KnownVacSuitDefs);
+                    foreach (SpaceServiceVacuumApparelSetDef set in DefDatabase<SpaceServiceVacuumApparelSetDef>.AllDefsListForReading)
+                    {
+                        if (set == null)
+                        {
+                            continue;
+                        }
+                        foreach (string defName in set.AllRemovalDefNames())
+                        {
+                            if (!string.IsNullOrEmpty(defName))
+                            {
+                                cachedRemovalDefNames.Add(defName);
+                            }
+                        }
+                    }
+                }
+                return cachedRemovalDefNames;
             }
         }
 
