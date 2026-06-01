@@ -222,7 +222,7 @@ namespace SpaceServices
             float bestDistance = float.MaxValue;
             foreach (Thing medPod in AllMedPods(map))
             {
-                if (!ValidServiceMedPod(validator, medPod, pawn))
+                if (!ValidServiceMedPod(validator, medPod, pawn, out _))
                 {
                     continue;
                 }
@@ -259,6 +259,127 @@ namespace SpaceServices
                 }
             }
             return false;
+        }
+
+        private static string MedPodRejectReason(Thing medPod, Pawn pawn)
+        {
+            Type restUtility = AccessTools.TypeByName("MedPod.MedPodRestUtility");
+            Type healthUtility = AccessTools.TypeByName("MedPod.MedPodHealthAIUtility");
+            MethodInfo validator = restUtility == null ? null : AccessTools.Method(restUtility, "IsValidMedPodFor");
+            if (validator != null && ValidServiceMedPod(validator, medPod, pawn, out object passingGuestStatus))
+            {
+                return "valid guestStatus=" + (passingGuestStatus ?? "null");
+            }
+
+            Building_Bed bed = medPod as Building_Bed;
+            CompPowerTrader power = medPod.TryGetComp<CompPowerTrader>();
+            if (medPod == null)
+            {
+                return "null";
+            }
+            if (power != null && !power.PowerOn)
+            {
+                return "power off";
+            }
+            if (medPod.IsForbidden(pawn))
+            {
+                return "forbidden";
+            }
+            if (!pawn.CanReserve(medPod))
+            {
+                return "cannot reserve";
+            }
+            if (!pawn.CanReach(medPod, PathEndMode.OnCell, Danger.Deadly))
+            {
+                return "cannot reach";
+            }
+            if (bed != null && !RestUtility.CanUseBedEver(pawn, bed.def))
+            {
+                return "CanUseBedEver false";
+            }
+            MethodInfo userType = restUtility == null ? null : AccessTools.Method(restUtility, "IsValidBedForUserType");
+            if (userType != null && !CallBool(userType, medPod, pawn))
+            {
+                return "invalid bed user type";
+            }
+            MethodInfo shouldSeek = healthUtility == null ? null : AccessTools.Method(healthUtility, "ShouldSeekMedPodRest");
+            if (shouldSeek != null && !CallBool(shouldSeek, pawn, medPod))
+            {
+                return "ShouldSeekMedPodRest false";
+            }
+            MethodInfo medicalCare = healthUtility == null ? null : AccessTools.Method(healthUtility, "HasAllowedMedicalCareCategory");
+            if (medicalCare != null && !CallBool(medicalCare, pawn))
+            {
+                return "medical care category disallows MedPod";
+            }
+            MethodInfo race = healthUtility == null ? null : AccessTools.Method(healthUtility, "IsValidRaceForMedPod");
+            if (race != null && !CallBool(race, pawn, Reflect.GetMember(medPod, "DisallowedRaces")))
+            {
+                return "race blocked";
+            }
+            MethodInfo xenotype = healthUtility == null ? null : AccessTools.Method(healthUtility, "IsValidXenotypeForMedPod");
+            if (xenotype != null && !CallBool(xenotype, pawn, Reflect.GetMember(medPod, "DisallowedXenotypes")))
+            {
+                return "xenotype blocked";
+            }
+            MethodInfo hediffs = healthUtility == null ? null : AccessTools.Method(healthUtility, "HasUsageBlockingHediffs");
+            if (hediffs != null && CallBool(hediffs, pawn, Reflect.GetMember(medPod, "UsageBlockingHediffs")))
+            {
+                return "usage-blocking hediff";
+            }
+            MethodInfo traits = healthUtility == null ? null : AccessTools.Method(healthUtility, "HasUsageBlockingTraits");
+            if (traits != null && CallBool(traits, pawn, Reflect.GetMember(medPod, "UsageBlockingTraits")))
+            {
+                return "usage-blocking trait";
+            }
+            if (Reflect.BoolMember(medPod, "Aborted", false))
+            {
+                return "aborted";
+            }
+            if (medPod.IsBurning())
+            {
+                return "burning";
+            }
+            if (medPod.IsBrokenDown())
+            {
+                return "broken down";
+            }
+            return "unknown MedPod validator rejection";
+        }
+
+        private static bool ValidServiceMedPod(MethodInfo validator, Thing medPod, Pawn pawn, out object passingGuestStatus)
+        {
+            passingGuestStatus = null;
+            foreach (object guestStatus in GuestStatusCandidates(pawn))
+            {
+                try
+                {
+                    object result = validator.Invoke(null, new[] { medPod, pawn, pawn, guestStatus });
+                    if (result is bool && (bool)result)
+                    {
+                        passingGuestStatus = guestStatus;
+                        return true;
+                    }
+                }
+                catch
+                {
+                    return false;
+                }
+            }
+            return false;
+        }
+
+        private static bool CallBool(MethodInfo method, params object[] args)
+        {
+            try
+            {
+                object result = method.Invoke(null, args);
+                return result is bool && (bool)result;
+            }
+            catch
+            {
+                return false;
+            }
         }
 
         private static IEnumerable<object> GuestStatusCandidates(Pawn pawn)
@@ -304,11 +425,13 @@ namespace SpaceServices
                 parts.Add(medPod.ThingID +
                     ": spawned=" + medPod.Spawned +
                     ", forbidden=" + medPod.IsForbidden(pawn) +
+                    ", reach=" + pawn.CanReach(medPod, PathEndMode.OnCell, Danger.Deadly) +
                     ", medical=" + (bed != null && bed.Medical) +
                     ", prisoner=" + (bed != null && bed.ForPrisoners) +
                     ", allowGuests=" + Reflect.BoolMember(medPod, "allowGuests", false) +
                     ", power=" + (power == null || power.PowerOn) +
-                    ", reserve=" + pawn.CanReserve(medPod));
+                    ", reserve=" + pawn.CanReserve(medPod) +
+                    ", reject=" + MedPodRejectReason(medPod, pawn));
             }
             return "medPods=[" + string.Join("; ", parts.ToArray()) + "]";
         }
