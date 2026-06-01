@@ -286,7 +286,7 @@ namespace SpaceServices
             {
                 if (def != null && def.AppliesTo(serviceKind))
                 {
-                    ShuttleVisual visual = FromNames(def.defName, def.weight, def.shipThingDefName, def.incomingSkyfallerDefName, def.leavingSkyfallerDefName, def.rotation, def.graphicData);
+                    ShuttleVisual visual = FromNames(def.defName, def.weight, def.shipThingDefName, def.incomingSkyfallerDefName, def.leavingSkyfallerDefName, def.rotation, def.graphicData, def.angleOffset);
                     if (visual != null && TryReserveVisualId(seen, visual.id, "def"))
                     {
                         visuals.Add(visual);
@@ -303,7 +303,7 @@ namespace SpaceServices
                 }
                 string shipDefName = !string.IsNullOrEmpty(extension.shipThingDefName) ? extension.shipThingDefName :
                     extension.graphicData == null ? thingDef.defName : "JDB_ServiceShuttlePayload";
-                ShuttleVisual visual = FromNames(thingDef.defName, extension.weight, shipDefName, extension.incomingSkyfallerDefName, extension.leavingSkyfallerDefName, extension.rotation, extension.graphicData);
+                ShuttleVisual visual = FromNames(thingDef.defName, extension.weight, shipDefName, extension.incomingSkyfallerDefName, extension.leavingSkyfallerDefName, extension.rotation, extension.graphicData, extension.angleOffset);
                 if (visual != null && TryReserveVisualId(seen, visual.id, "extension"))
                 {
                     visuals.Add(visual);
@@ -326,7 +326,7 @@ namespace SpaceServices
             return false;
         }
 
-        private static ShuttleVisual FromNames(string id, float weight, string shipThingDefName, string incomingSkyfallerDefName, string leavingSkyfallerDefName, Rot4 rotation, GraphicData graphicData)
+        private static ShuttleVisual FromNames(string id, float weight, string shipThingDefName, string incomingSkyfallerDefName, string leavingSkyfallerDefName, Rot4 rotation, GraphicData graphicData, float angleOffset)
         {
             if (weight <= 0f)
             {
@@ -364,7 +364,8 @@ namespace SpaceServices
                 shipThingDef = payload,
                 incomingSkyfallerDef = incoming,
                 leavingSkyfallerDef = leaving,
-                graphicData = graphicData
+                graphicData = graphicData,
+                angleOffset = angleOffset
             };
         }
 
@@ -377,8 +378,11 @@ namespace SpaceServices
                 "JDB_ServiceShuttleIncoming",
                 "JDB_ServiceShuttleLeaving",
                 Rot4.East,
-                null);
+                null,
+                0f);
         }
+
+        public float angleOffset;
     }
 
     public sealed class ServiceShuttlePayload : Thing
@@ -399,11 +403,29 @@ namespace SpaceServices
             base.ExposeData();
             Scribe_Values.Look(ref visualDefName, "visualDefName");
         }
+
+        protected override void DrawAt(Vector3 drawLoc, bool flip = false)
+        {
+            float angleOffset = ServiceShuttleGraphicUtility.AngleOffsetFor(visualDefName);
+            if (Mathf.Abs(angleOffset) < 0.001f)
+            {
+                base.DrawAt(drawLoc, flip);
+                return;
+            }
+            Graphic graphic = Graphic;
+            if (graphic == null)
+            {
+                base.DrawAt(drawLoc, flip);
+                return;
+            }
+            graphic.Draw(drawLoc, Rotation, this, angleOffset);
+        }
     }
 
     public sealed class ServiceShuttleSkyfaller : Skyfaller
     {
         public string visualDefName;
+        private Material cachedServiceShadowMaterial;
 
         public override Graphic Graphic
         {
@@ -422,6 +444,65 @@ namespace SpaceServices
         {
             base.ExposeData();
             Scribe_Values.Look(ref visualDefName, "visualDefName");
+        }
+
+        protected override void DrawAt(Vector3 drawLoc, bool flip = false)
+        {
+            float angleOffset = ServiceShuttleGraphicUtility.AngleOffsetFor(visualDefName);
+            if (Mathf.Abs(angleOffset) < 0.001f)
+            {
+                base.DrawAt(drawLoc, flip);
+                return;
+            }
+
+            // The base Skyfaller draw path cannot add a per-visual texture rotation, so this mirrors
+            // the vanilla curve handling and changes only the final graphic angle.
+            float pos = Traverse.Create(this).Property<float>("TimeInAnimation").Value;
+            float drawAngle = 0f;
+            if (def.skyfaller.rotateGraphicTowardsDirection)
+            {
+                drawAngle = angle;
+            }
+            if (def.skyfaller.angleCurve != null)
+            {
+                angle = def.skyfaller.angleCurve.Evaluate(pos);
+            }
+            if (def.skyfaller.rotationCurve != null)
+            {
+                drawAngle += def.skyfaller.rotationCurve.Evaluate(pos);
+            }
+            if (def.skyfaller.xPositionCurve != null)
+            {
+                drawLoc.x += def.skyfaller.xPositionCurve.Evaluate(pos);
+            }
+            if (def.skyfaller.zPositionCurve != null)
+            {
+                drawLoc.z += def.skyfaller.zPositionCurve.Evaluate(pos);
+            }
+
+            Graphic graphic = Graphic;
+            if (graphic != null)
+            {
+                graphic.Draw(drawLoc, Rotation, this, drawAngle + angleOffset);
+            }
+            Material shadow = ServiceShadowMaterial;
+            if (shadow != null)
+            {
+                drawLoc.z = GenThing.TrueCenter(this).z;
+                DrawDropSpotShadow(drawLoc, Rotation, shadow, def.skyfaller.shadowSize, ticksToImpact);
+            }
+        }
+
+        private Material ServiceShadowMaterial
+        {
+            get
+            {
+                if (cachedServiceShadowMaterial == null && !def.skyfaller.shadow.NullOrEmpty())
+                {
+                    cachedServiceShadowMaterial = MaterialPool.MatFrom(def.skyfaller.shadow, ShaderDatabase.Transparent);
+                }
+                return cachedServiceShadowMaterial;
+            }
         }
     }
 
@@ -454,6 +535,22 @@ namespace SpaceServices
                 ServiceDebugUtility.LogThrottled("bad-shuttle-graphic-" + visualDefName, "Failed to resolve shuttle visual graphic " + visualDefName + ": " + ex.Message, GenDate.TicksPerDay);
                 return null;
             }
+        }
+
+        public static float AngleOffsetFor(string visualDefName)
+        {
+            if (string.IsNullOrEmpty(visualDefName))
+            {
+                return 0f;
+            }
+            SpaceServiceShuttleVisualDef def = DefDatabase<SpaceServiceShuttleVisualDef>.GetNamedSilentFail(visualDefName);
+            if (def != null)
+            {
+                return def.angleOffset;
+            }
+            ThingDef thingDef = DefDatabase<ThingDef>.GetNamedSilentFail(visualDefName);
+            SpaceServiceShuttleVisualExtension extension = thingDef == null ? null : thingDef.GetModExtension<SpaceServiceShuttleVisualExtension>();
+            return extension == null ? 0f : extension.angleOffset;
         }
     }
 }
