@@ -152,7 +152,12 @@ namespace SpaceServices
             }
             // Graphic_Multi payloads are made off-map, so set the service pad facing explicitly.
             innerThing.Rotation = visual.rotation;
-            SkyfallerMaker.SpawnSkyfaller(skyfallerDef, innerThing, cell, map);
+            Skyfaller skyfaller = SkyfallerMaker.SpawnSkyfaller(skyfallerDef, innerThing, cell, map);
+            ServiceShuttleSkyfaller serviceSkyfaller = skyfaller as ServiceShuttleSkyfaller;
+            if (serviceSkyfaller != null)
+            {
+                serviceSkyfaller.visualDefName = visual.id;
+            }
         }
 
         public static void CleanupTouchdownShuttle(Map map, IntVec3 cell, string shuttleThingDefName)
@@ -385,6 +390,30 @@ namespace SpaceServices
             get
             {
                 Graphic graphic = ServiceShuttleGraphicUtility.GraphicFor(visualDefName);
+                return graphic ?? base.Graphic;
+            }
+        }
+
+        public override void ExposeData()
+        {
+            base.ExposeData();
+            Scribe_Values.Look(ref visualDefName, "visualDefName");
+        }
+    }
+
+    public sealed class ServiceShuttleSkyfaller : Skyfaller
+    {
+        public string visualDefName;
+
+        public override Graphic Graphic
+        {
+            get
+            {
+                Graphic graphic = ServiceShuttleGraphicUtility.GraphicFor(visualDefName);
+                if (graphic == null && innerContainer.Any && innerContainer[0] is ServiceShuttlePayload payload)
+                {
+                    graphic = ServiceShuttleGraphicUtility.GraphicFor(payload.visualDefName);
+                }
                 return graphic ?? base.Graphic;
             }
         }

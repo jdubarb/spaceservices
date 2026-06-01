@@ -21,7 +21,7 @@
   <ThingDef ParentName="ShuttleSkyfallerBase">
     <defName>JDB_ServiceShuttleIncoming</defName>
     <label>service shuttle (incoming)</label>
-    <thingClass>Skyfaller</thingClass>
+    <thingClass>SpaceServices.ServiceShuttleSkyfaller</thingClass>
     <rotatable>true</rotatable>
     <defaultPlacingRot>East</defaultPlacingRot>
     <graphicData>
@@ -69,7 +69,7 @@
   <ThingDef ParentName="ShuttleSkyfallerBase">
     <defName>JDB_ServiceShuttleLeaving</defName>
     <label>service shuttle (leaving)</label>
-    <thingClass>Skyfaller</thingClass>
+    <thingClass>SpaceServices.ServiceShuttleSkyfaller</thingClass>
     <rotatable>true</rotatable>
     <defaultPlacingRot>East</defaultPlacingRot>
     <graphicData>
