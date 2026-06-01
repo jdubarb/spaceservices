@@ -19,6 +19,7 @@ namespace SpaceServices
         {
             base.SpawnSetup(map, respawningAfterLoad);
             map?.GetComponent<SpaceServicesMapComponent>()?.DirtyServicePadCache();
+            ServicePadUtility.RequestLifecycleTickSoon(map, "service pad spawned");
             ServicePadPrebuildModeUtility.ApplyPendingMode(this);
         }
 
@@ -27,6 +28,7 @@ namespace SpaceServices
             Map oldMap = Map;
             base.DeSpawn(mode);
             oldMap?.GetComponent<SpaceServicesMapComponent>()?.DirtyServicePadCache();
+            ServicePadUtility.RequestLifecycleTickSoon(oldMap, "service pad despawned");
         }
 
         protected override void DrawAt(Vector3 drawLoc, bool flip = false)
@@ -346,6 +348,7 @@ namespace SpaceServices
             {
                 reservedForGroup = groupId;
                 reservedAtTick = Find.TickManager == null ? 0 : Find.TickManager.TicksGame;
+                WakeLifecycle("service pad reserved");
                 return true;
             }
             if (reservedForGroup == groupId)
@@ -353,6 +356,7 @@ namespace SpaceServices
                 if (reservedAtTick <= 0 && Find.TickManager != null)
                 {
                     reservedAtTick = Find.TickManager.TicksGame;
+                    WakeLifecycle("service pad reservation timestamp refreshed");
                 }
                 return true;
             }
@@ -365,13 +369,19 @@ namespace SpaceServices
             {
                 reservedForGroup = null;
                 reservedAtTick = 0;
+                WakeLifecycle("service pad reservation released");
             }
         }
 
         public void ForceRelease()
         {
+            bool hadReservation = !string.IsNullOrEmpty(reservedForGroup);
             reservedForGroup = null;
             reservedAtTick = 0;
+            if (hadReservation)
+            {
+                WakeLifecycle("service pad reservation force released");
+            }
         }
 
         public bool WatchReservation(List<ServiceGroupRecord> records)
@@ -458,7 +468,7 @@ namespace SpaceServices
             {
                 yield return gizmo;
             }
-            foreach (Gizmo gizmo in ModeCommands(() => activeMode, mode => activeMode = mode))
+            foreach (Gizmo gizmo in ModeCommands(() => activeMode, SetActiveMode))
             {
                 yield return gizmo;
             }
@@ -501,6 +511,22 @@ namespace SpaceServices
             Vector3 drawPos = baseDrawPos;
             drawPos.y = AltitudeLayer.FloorEmplacement.AltitudeFor() + 0.03f;
             Graphics.DrawMesh(MeshPool.GridPlane(OverlaySize), drawPos, Quaternion.identity, overlay, 0);
+        }
+
+        private void SetActiveMode(ServicePadMode mode)
+        {
+            if (activeMode == mode)
+            {
+                return;
+            }
+            activeMode = mode;
+            SyncLegacyModeFlags();
+            WakeLifecycle("service pad mode changed");
+        }
+
+        private void WakeLifecycle(string reason)
+        {
+            ServicePadUtility.RequestLifecycleTickSoon(parent == null ? null : parent.MapHeld ?? parent.Map, reason);
         }
 
         private Material CurrentOverlayMaterial()
@@ -738,6 +764,27 @@ namespace SpaceServices
                     yield return building;
                 }
             }
+        }
+
+        public static void RequestLifecycleTickSoon(Map map, string reason)
+        {
+            map?.GetComponent<SpaceServicesMapComponent>()?.RequestLifecycleTickSoon(reason);
+        }
+
+        public static bool CellTouchesServicePad(Map map, IntVec3 cell)
+        {
+            if (map == null || !cell.IsValid)
+            {
+                return false;
+            }
+            foreach (Thing pad in AllServicePadBuildings(map))
+            {
+                if (pad != null && !pad.Destroyed && pad.OccupiedRect().Contains(cell))
+                {
+                    return true;
+                }
+            }
+            return false;
         }
 
         public static IEnumerable<Thing> AllServicePads(Map map, ServiceUse use)
