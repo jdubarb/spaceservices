@@ -19,6 +19,7 @@ namespace SpaceServices
         private static readonly string[] ChildSuitDefs = { "Apparel_VacsuitChildren", "Apparel_VacsuitHelmet" };
         private static readonly Dictionary<int, bool> sealedArrivalSuitRolls = new Dictionary<int, bool>();
         private const string InjectedVacGearTag = "JDB_SpaceServices_AutoVacGear";
+        private const float AutoSetSelectionChance = 0.35f;
         private static StatDef vacuumResistance;
         private static List<VacuumApparelCandidate> cachedAutoCandidates;
 
@@ -175,6 +176,15 @@ namespace SpaceServices
                 return new List<VacuumApparelCandidate>();
             }
 
+            if (Rand.Chance(AutoSetSelectionChance))
+            {
+                List<VacuumApparelCandidate> taggedSet = SelectTaggedAutomaticSet(pool, needed);
+                if (taggedSet.Count > 0)
+                {
+                    return taggedSet;
+                }
+            }
+
             List<VacuumApparelCandidate> selected = new List<VacuumApparelCandidate>();
             float provided = 0f;
             for (int i = 0; i < 8 && provided + 0.001f < needed; i++)
@@ -201,6 +211,50 @@ namespace SpaceServices
                 : new List<VacuumApparelCandidate>();
         }
 
+        private static List<VacuumApparelCandidate> SelectTaggedAutomaticSet(List<VacuumApparelCandidate> pool, float needed)
+        {
+            List<VacuumApparelSetCandidate> sets = new List<VacuumApparelSetCandidate>();
+            foreach (IGrouping<string, VacuumApparelCandidate> group in pool
+                .SelectMany(candidate => candidate.setTags.Select(tag => new { tag, candidate }))
+                .GroupBy(item => item.tag, item => item.candidate))
+            {
+                List<VacuumApparelCandidate> set = BuildCompatibleSet(group.Distinct().ToList(), needed);
+                if (set.Count > 1)
+                {
+                    sets.Add(new VacuumApparelSetCandidate(group.Key, set));
+                }
+            }
+            if (sets.Count == 0)
+            {
+                return new List<VacuumApparelCandidate>();
+            }
+
+            VacuumApparelSetCandidate selected = WeightedRandomSetCandidate(sets);
+            return selected == null ? new List<VacuumApparelCandidate>() : selected.candidates;
+        }
+
+        private static List<VacuumApparelCandidate> BuildCompatibleSet(List<VacuumApparelCandidate> candidates, float needed)
+        {
+            List<VacuumApparelCandidate> selected = new List<VacuumApparelCandidate>();
+            float provided = 0f;
+            foreach (VacuumApparelCandidate candidate in candidates
+                .OrderByDescending(candidate => candidate.resistance)
+                .ThenBy(candidate => candidate.marketValue))
+            {
+                if (selected.Any(existing => candidate.ConflictsWith(existing)))
+                {
+                    continue;
+                }
+                selected.Add(candidate);
+                provided += candidate.resistance;
+                if (provided + 0.001f >= needed)
+                {
+                    return selected;
+                }
+            }
+            return new List<VacuumApparelCandidate>();
+        }
+
         private static VacuumApparelCandidate WeightedRandomCandidate(List<VacuumApparelCandidate> candidates)
         {
             float total = candidates.Sum(candidate => candidate.selectionWeight);
@@ -218,6 +272,25 @@ namespace SpaceServices
                 }
             }
             return candidates.LastOrDefault();
+        }
+
+        private static VacuumApparelSetCandidate WeightedRandomSetCandidate(List<VacuumApparelSetCandidate> sets)
+        {
+            float total = sets.Sum(set => set.selectionWeight);
+            if (total <= 0f)
+            {
+                return sets.FirstOrDefault();
+            }
+            float roll = Rand.Value * total;
+            foreach (VacuumApparelSetCandidate set in sets)
+            {
+                roll -= set.selectionWeight;
+                if (roll <= 0f)
+                {
+                    return set;
+                }
+            }
+            return sets.LastOrDefault();
         }
 
         private static SpaceServiceVacuumApparelSetDef WeightedRandomSet(List<SpaceServiceVacuumApparelSetDef> sets)
@@ -372,7 +445,9 @@ namespace SpaceServices
         {
             public ThingDef def;
             public float resistance;
+            public float marketValue;
             public float selectionWeight;
+            public List<string> setTags = new List<string>();
             private DevelopmentalStage developmentalStageFilter;
             private HashSet<string> layers = new HashSet<string>();
             private HashSet<string> bodyPartGroups = new HashSet<string>();
@@ -406,6 +481,7 @@ namespace SpaceServices
                 {
                     def = def,
                     resistance = Mathf.Clamp01(resistance),
+                    marketValue = marketValue,
                     developmentalStageFilter = def.apparel.developmentalStageFilter,
                     // Cheap, practical safety gear should be much more common than expensive powered armor.
                     selectionWeight = Mathf.Clamp(resistance / marketValue, 0.0001f, 1f)
@@ -418,6 +494,7 @@ namespace SpaceServices
                 {
                     candidate.bodyPartGroups = new HashSet<string>(def.apparel.bodyPartGroups.Select(group => group.defName));
                 }
+                candidate.setTags = SetTagsFor(def);
                 return candidate;
             }
 
@@ -452,6 +529,41 @@ namespace SpaceServices
                 return defName.Contains("warcasket") ||
                     label.Contains("warcasket") ||
                     packageId.Contains("vfe.pirates");
+            }
+
+            private static List<string> SetTagsFor(ThingDef def)
+            {
+                if (def == null || def.apparel == null || def.apparel.tags.NullOrEmpty())
+                {
+                    return new List<string>();
+                }
+                return def.apparel.tags
+                    .Where(tag => !string.IsNullOrEmpty(tag) && LooksLikeSetTag(tag))
+                    .Distinct()
+                    .ToList();
+            }
+
+            private static bool LooksLikeSetTag(string tag)
+            {
+                string lowered = tag.ToLowerInvariant();
+                return lowered.Contains("vac") || tag.Contains("_");
+            }
+        }
+
+        private sealed class VacuumApparelSetCandidate
+        {
+            public string tag;
+            public List<VacuumApparelCandidate> candidates;
+            public float selectionWeight;
+
+            public VacuumApparelSetCandidate(string tag, List<VacuumApparelCandidate> candidates)
+            {
+                this.tag = tag;
+                this.candidates = candidates;
+                float totalValue = Mathf.Max(1f, candidates.Sum(candidate => candidate.marketValue));
+                float totalResistance = candidates.Sum(candidate => candidate.resistance);
+                // Keep set rarity aligned with piece rarity: expensive matching armor sets stay uncommon.
+                selectionWeight = Mathf.Clamp(totalResistance / totalValue, 0.0001f, 1f);
             }
         }
     }
