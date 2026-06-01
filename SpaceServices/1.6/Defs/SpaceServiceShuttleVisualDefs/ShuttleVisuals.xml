@@ -176,8 +176,27 @@
       <shaderType>CutoutComplex</shaderType>
       <drawSize>(7,5)</drawSize>
     </graphicData>
+    <angleOffset>-90</angleOffset>
     <requiredPackageIds>
       <li>OskarPotocki.VFE.Deserters</li>
+    </requiredPackageIds>
+  </SpaceServices.SpaceServiceShuttleVisualDef>
+
+  <SpaceServices.SpaceServiceShuttleVisualDef>
+    <defName>JDB_Visual_ImperialShuttle</defName>
+    <label>imperial shuttle</label>
+    <weight>1</weight>
+    <shipThingDefName>JDB_ServiceShuttlePayload</shipThingDefName>
+    <incomingSkyfallerDefName>JDB_ServiceShuttleIncoming</incomingSkyfallerDefName>
+    <leavingSkyfallerDefName>JDB_ServiceShuttleLeaving</leavingSkyfallerDefName>
+    <graphicData>
+      <graphicClass>Graphic_Single</graphicClass>
+      <texPath>Shuttle/ImperialShuttle/ImperialShuttle</texPath>
+      <shaderType>CutoutComplex</shaderType>
+      <drawSize>(7,5)</drawSize>
+    </graphicData>
+    <requiredPackageIds>
+      <li>OskarPotocki.VFE.Empire</li>
     </requiredPackageIds>
   </SpaceServices.SpaceServiceShuttleVisualDef>
 
