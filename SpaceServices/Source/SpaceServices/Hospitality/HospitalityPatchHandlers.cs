@@ -234,6 +234,7 @@ namespace SpaceServices
             }
             foreach (Pawn pawn in lord.ownedPawns.ToList())
             {
+                // LordToil_VisitPoint.Leave is Hospitality's clearest "visit is over" signal.
                 ServiceLifecycleUtility.RequestDepartureForPawn(pawn, "Hospitality visit ended");
             }
         }

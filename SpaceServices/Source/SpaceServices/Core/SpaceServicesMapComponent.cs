@@ -95,6 +95,19 @@ namespace SpaceServices
             }
         }
 
+        public void RequestLifecycleTickSoon(string reason)
+        {
+            if (Find.TickManager == null)
+            {
+                nextLifecycleTick = 0;
+                return;
+            }
+            // Transition hooks call this when Hospital or Hospitality already told us something changed.
+            // The periodic lifecycle tick remains as a watchdog for states we do not patch directly.
+            nextLifecycleTick = Math.Min(nextLifecycleTick, Find.TickManager.TicksGame);
+            ServiceDebugUtility.LogVerbose(ServiceLogIntegration.Core, "Lifecycle tick requested: " + (reason ?? "unspecified"));
+        }
+
         private void RunStaleReferenceCleanup()
         {
             if (staleReferenceCleanupDone && staleReferenceCleanupVersion >= StaleReferenceCleanupVersion)
@@ -367,7 +380,7 @@ namespace SpaceServices
             }
 
             ServiceDebugUtility.LogThrottled("hospitality-service-scheduler-" + reason, "Hospitality service visit not scheduled: " + reason, GenDate.TicksPerHour);
-            ScheduleNextHospitalityServiceVisit(HospitalitySchedulerBlockedRetryTicks);
+            ScheduleNextHospitalityServiceVisit(reason == "shared service traffic slot cooling down" ? GenDate.TicksPerHour : HospitalitySchedulerBlockedRetryTicks);
         }
 
         private bool TryScheduleNaturalHospitalityVisit(out string reason)
@@ -406,6 +419,11 @@ namespace SpaceServices
             if (!TryFindHospitalityFaction(out Faction faction))
             {
                 reason = "no friendly humanlike guest faction";
+                return false;
+            }
+            if (!ServiceIncidentUtility.TryConsumeSharedTrafficSlot(map, "fallback Hospitality visitor scheduler"))
+            {
+                reason = "shared service traffic slot cooling down";
                 return false;
             }
 

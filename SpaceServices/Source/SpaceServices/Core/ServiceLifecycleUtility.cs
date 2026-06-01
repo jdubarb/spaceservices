@@ -21,9 +21,9 @@ namespace SpaceServices
         private const int PickupBoardingHardTimeoutTicks = 2500;
         private const float VacuumPadDistanceTolerance = 2.5f;
         private const int BlockedDepartureCacheTicks = 60;
-        private const int StableActivePawnValidationTicks = 2500;
+        private const int StableActivePawnValidationTicks = 10000;
         private const int StableBedlessCheckTicks = 2500;
-        private const int StableLeaveStateCheckTicks = 250;
+        private const int StableLeaveStateCheckTicks = 2500;
         private static readonly List<ServiceDepartureBlock> CachedDepartureBlocks = new List<ServiceDepartureBlock>();
         private static int cachedDepartureBlocksTick = -999999;
 
@@ -79,6 +79,7 @@ namespace SpaceServices
                 {
                     existing.arrivalPad = arrivalPad;
                 }
+                MarkRecordDirty(map, existing, "merged arriving service pawns");
                 return;
             }
 
@@ -106,6 +107,7 @@ namespace SpaceServices
             comp.serviceGroups.Add(record);
             ServiceDebugUtility.Log("Registered " + kind + " service group " + record.id + " pawns=" + list.Count + " padReserved=" + (record.reservedPad != null) + " arrivalPad=" + (arrivalPad != null));
             ServiceDebugUtility.LogAudit("RegisterPawns new " + RecordAudit(record) + " pawns=" + PawnSummary(list) + " arrivalPad=" + ServiceDebugUtility.ThingAuditSummary(arrivalPad));
+            MarkRecordDirty(map, record, "registered arriving service pawns");
         }
 
         public static bool ReleaseGroup(Map map, string groupId, string reason)
@@ -125,6 +127,7 @@ namespace SpaceServices
                 return false;
             }
             BeginDeparture(map, record, reason);
+            MarkRecordDirty(map, record, "group release requested");
             ServiceDebugUtility.Log("Released service group " + groupId + ": " + reason);
             return true;
         }
@@ -203,8 +206,35 @@ namespace SpaceServices
             else
             {
                 ServiceDebugUtility.LogAudit("Released pawn from active service group " + RecordAudit(record) + " pawn=" + ServiceDebugUtility.PawnAuditSummary(pawn) + " reason=" + (reason ?? "none"));
+                MarkRecordDirty(map, record, "service pawn released");
             }
             return true;
+        }
+
+        public static bool MarkPawnDirty(Pawn pawn, string reason)
+        {
+            Map map;
+            ServiceGroupRecord record;
+            if (!TryFindRecordForPawn(pawn, out map, out record))
+            {
+                return false;
+            }
+            MarkRecordDirty(map, record, reason);
+            return true;
+        }
+
+        public static void MarkRecordDirty(Map map, ServiceGroupRecord record, string reason)
+        {
+            if (map == null || record == null || record.state == "completed")
+            {
+                return;
+            }
+            // Event hooks zero the throttles so the next lifecycle pass revalidates immediately.
+            // Stable records still fall back to slower watchdog checks if no hook fires.
+            record.nextActivePawnValidationTick = 0;
+            record.nextHospitalityBedlessCheckTick = 0;
+            record.nextLeaveStateCheckTick = 0;
+            map.GetComponent<SpaceServicesMapComponent>()?.RequestLifecycleTickSoon(reason);
         }
 
         private static bool TryFindRecordForPawn(Pawn pawn, out Map map, out ServiceGroupRecord record)
@@ -649,6 +679,7 @@ namespace SpaceServices
                 return;
             }
             ServiceDebugUtility.LogAudit("BeginDeparture enter " + RecordAudit(record) + " reason=" + (reason ?? "none") + " pawns=" + PawnSummary(record.pawns));
+            MarkRecordDirty(map, record, "departure started");
             if (record.serviceKind == "hospital")
             {
                 BeginHospitalDeparture(map, record, reason);
@@ -805,6 +836,7 @@ namespace SpaceServices
             record.pickupShuttleThingDefName = visual.shipThingDef.defName;
             record.pickupShuttleVisualDefName = visual.id;
             ServiceShuttleUtility.SpawnArrival(record.reservedPad.Map, record.reservedPad.Position, visual);
+            MarkRecordDirty(record.reservedPad.Map, record, "pickup shuttle inbound");
             ServiceDebugUtility.Log("Pickup shuttle inbound for " + record.serviceKind + " service group " + record.id + ": " + reason);
             ServiceDebugUtility.LogAudit("BeginPickupShuttle " + RecordAudit(record) + " touchdownTick=" + record.pickupShuttleTouchdownTick + " ship=" + record.pickupShuttleThingDefName + " visual=" + record.pickupShuttleVisualDefName + " reason=" + (reason ?? "none"));
         }

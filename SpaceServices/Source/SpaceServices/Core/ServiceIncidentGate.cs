@@ -43,6 +43,8 @@ namespace SpaceServices
     public static class ServiceIncidentUtility
     {
         private static readonly Dictionary<string, float> TrafficRateProgress = new Dictionary<string, float>();
+        private static readonly Dictionary<int, int> LastServiceArrivalTickByMap = new Dictionary<int, int>();
+        private const int SharedServiceArrivalCadenceTicks = 2500;
 
         private static readonly HashSet<string> HospitalIncidents = new HashSet<string>
         {
@@ -97,8 +99,14 @@ namespace SpaceServices
             {
                 return false;
             }
+            if (!SharedTrafficCadenceReady(map))
+            {
+                ServiceDebugUtility.LogVerbose(ServiceLogIntegration.Core, "Service traffic blocked by shared one-hour cadence: " + (incidentDefName ?? "unknown"));
+                return false;
+            }
             if (rate >= 1f)
             {
+                MarkSharedTrafficUsed(map);
                 return true;
             }
 
@@ -109,6 +117,7 @@ namespace SpaceServices
             if (progress >= 1f)
             {
                 TrafficRateProgress[key] = progress - 1f;
+                MarkSharedTrafficUsed(map);
                 return true;
             }
             TrafficRateProgress[key] = progress;
@@ -142,9 +151,45 @@ namespace SpaceServices
             return TrafficRateFor(incidentDefName).ToString("0.00") + "x";
         }
 
+        public static bool TryConsumeSharedTrafficSlot(Map map, string reason)
+        {
+            if (IsDebugIncidentExecution())
+            {
+                return true;
+            }
+            if (!SharedTrafficCadenceReady(map))
+            {
+                ServiceDebugUtility.LogVerbose(ServiceLogIntegration.Core, "Service traffic slot unavailable: " + (reason ?? "unspecified"));
+                return false;
+            }
+            MarkSharedTrafficUsed(map);
+            return true;
+        }
+
         private static string TrafficRateKey(string incidentDefName, Map map)
         {
             return (map == null ? -1 : map.uniqueID) + ":" + (incidentDefName ?? "");
+        }
+
+        private static bool SharedTrafficCadenceReady(Map map)
+        {
+            if (map == null || Find.TickManager == null)
+            {
+                return true;
+            }
+            int lastTick;
+            return !LastServiceArrivalTickByMap.TryGetValue(map.uniqueID, out lastTick) ||
+                Find.TickManager.TicksGame - lastTick >= SharedServiceArrivalCadenceTicks;
+        }
+
+        private static void MarkSharedTrafficUsed(Map map)
+        {
+            if (map == null || Find.TickManager == null)
+            {
+                return;
+            }
+            // Hospital patients, mass casualties, and Hospitality groups share one air-traffic slot.
+            LastServiceArrivalTickByMap[map.uniqueID] = Find.TickManager.TicksGame;
         }
 
         public static bool IsDebugIncidentExecution()
