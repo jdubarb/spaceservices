@@ -74,6 +74,8 @@ namespace SpaceServices
 
             Section(listing, "JDB_SpaceServices_Settings_SectionCompatibility");
             Checkbox(listing, "JDB_SpaceServices_Settings_SealedNoSuit", ref Settings.allowSealedNoSuitArrivals);
+
+            Section(listing, "JDB_SpaceServices_Settings_SectionExperimental");
             Checkbox(listing, "JDB_SpaceServices_Settings_MedPodBridge", ref Settings.medPodServiceBridge);
             Checkbox(listing, "JDB_SpaceServices_Settings_SuppressMassCasualtyPreDropEffects", ref Settings.suppressMassCasualtyPreDropEffects);
             listing.End();
