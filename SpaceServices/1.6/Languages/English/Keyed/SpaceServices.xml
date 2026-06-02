@@ -34,7 +34,7 @@
   <JDB_SpaceServices_Settings_HospitalityFallbackInterval>Fallback visit interval: {0} days</JDB_SpaceServices_Settings_HospitalityFallbackInterval>
   <JDB_SpaceServices_Settings_HospitalityFallbackIntervalDesc>Base interval for fallback Hospitality visits when traffic-rate override is disabled. Snaps to 0.25 day steps.</JDB_SpaceServices_Settings_HospitalityFallbackIntervalDesc>
   <JDB_SpaceServices_Settings_TrafficRateOverride>Override service traffic rates</JDB_SpaceServices_Settings_TrafficRateOverride>
-  <JDB_SpaceServices_Settings_TrafficRateOverrideDesc>Use deterministic service-rate limits instead of the raw incident cadence. At 0.25x, every fourth eligible attempt is allowed.</JDB_SpaceServices_Settings_TrafficRateOverrideDesc>
+  <JDB_SpaceServices_Settings_TrafficRateOverrideDesc>Use deterministic service-rate limits instead of the raw incident cadence. For example, at 0.25x, every fourth eligible attempt is allowed. Hospital and Hospitality also share a one-hour arrival spacing.</JDB_SpaceServices_Settings_TrafficRateOverrideDesc>
   <JDB_SpaceServices_Settings_HospitalPatientTrafficRate>Hospital patient traffic: {0}x</JDB_SpaceServices_Settings_HospitalPatientTrafficRate>
   <JDB_SpaceServices_Settings_HospitalPatientTrafficRateDesc>Deterministic rate for normal Hospital patient arrivals. 0.00 blocks new arrivals; existing patients can still leave.</JDB_SpaceServices_Settings_HospitalPatientTrafficRateDesc>
   <JDB_SpaceServices_Settings_HospitalMassCasualtyTrafficRate>Hospital mass casualty traffic: {0}x</JDB_SpaceServices_Settings_HospitalMassCasualtyTrafficRate>

@@ -39,7 +39,10 @@ namespace SpaceServices
 
             DrawOverview(listing, map);
             DrawNativePanelButtons(listing);
-            DrawDebugControls(listing, map);
+            if (DebugSettings.godMode)
+            {
+                DrawDebugControls(listing, map);
+            }
 
             listing.End();
             Widgets.EndScrollView();

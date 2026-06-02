@@ -188,7 +188,7 @@ namespace SpaceServices
             {
                 return;
             }
-            // Hospital patients, mass casualties, and Hospitality groups share one air-traffic slot.
+            // Hospital patients, mass casualties, and Hospitality groups share one service arrival slot.
             LastServiceArrivalTickByMap[map.uniqueID] = Find.TickManager.TicksGame;
         }
 

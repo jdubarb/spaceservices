@@ -124,6 +124,7 @@
     </graphicData>
     <requiredPackageIds>
       <li>toshtaru.Odyssey.Transport.Shuttle</li>
+      <li>Ludeon.Rimworld.Biotech</li>
     </requiredPackageIds>
   </SpaceServices.SpaceServiceShuttleVisualDef>
 

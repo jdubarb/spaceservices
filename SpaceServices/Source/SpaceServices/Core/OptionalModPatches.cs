@@ -22,7 +22,7 @@ namespace SpaceServices
             MedPodPatches.Install(harmony);
         }
 
-        public static void PatchIfExists(Harmony harmony, MethodInfo method, Type handlerType, string prefix = null, string postfix = null)
+        public static void PatchIfExists(Harmony harmony, MethodInfo method, Type handlerType, string prefix = null, string postfix = null, string finalizer = null)
         {
             if (method == null)
             {
@@ -32,7 +32,8 @@ namespace SpaceServices
             {
                 HarmonyMethod pre = prefix == null ? null : new HarmonyMethod(handlerType, prefix);
                 HarmonyMethod post = postfix == null ? null : new HarmonyMethod(handlerType, postfix);
-                harmony.Patch(method, pre, post, null);
+                HarmonyMethod final = finalizer == null ? null : new HarmonyMethod(handlerType, finalizer);
+                harmony.Patch(method, pre, post, null, final);
             }
             catch (Exception ex)
             {

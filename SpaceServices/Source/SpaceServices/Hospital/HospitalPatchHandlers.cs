@@ -127,6 +127,17 @@ namespace SpaceServices
             }
         }
 
+        public static void HospitalSpawnPatientFinalizer(Exception __exception)
+        {
+            if (__exception == null)
+            {
+                return;
+            }
+            // If Hospital throws while spawning, postfix cleanup will not run.
+            HospitalMassCasualtyVisualContext.Pop();
+            HospitalLandingRedirectContext.Pop();
+        }
+
         public static bool HospitalDropPodAtPrefix(ref IntVec3 c, Map map, ActiveTransporterInfo info, Faction faction)
         {
             if (map == null || !SpaceServiceMapDetector.IsServiceEligible(map))
@@ -227,9 +238,25 @@ namespace SpaceServices
             }
         }
 
+        public static void HospitalPatientArrivesTryExecuteFinalizer(Exception __exception)
+        {
+            if (__exception != null)
+            {
+                HospitalArrivalIncidentContext.Pop();
+            }
+        }
+
         public static void HospitalMassCasualtyTryExecutePostfix()
         {
             HospitalArrivalIncidentContext.Pop();
+        }
+
+        public static void HospitalMassCasualtyTryExecuteFinalizer(Exception __exception)
+        {
+            if (__exception != null)
+            {
+                HospitalArrivalIncidentContext.Pop();
+            }
         }
 
         private static bool IsMassCasualtyIncident(object worker, string incidentDefName)

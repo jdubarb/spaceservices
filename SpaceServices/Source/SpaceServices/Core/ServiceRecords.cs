@@ -26,6 +26,7 @@ namespace SpaceServices
         public int nextActivePawnValidationTick;
         public int nextHospitalityBedlessCheckTick;
         public int nextLeaveStateCheckTick;
+        public int lastHospitalityTransitTick;
         public string pickupShuttleThingDefName;
         public string pickupShuttleVisualDefName;
         public bool hospitalityDeparturePrepared;

@@ -41,16 +41,16 @@ namespace SpaceServices
             Type patientArrival = AccessTools.TypeByName("Hospital.IncidentWorker_PatientArrives");
             if (patientArrival != null)
             {
-                OptionalModPatches.PatchIfExists(harmony, AccessTools.Method(patientArrival, "TryExecuteWorker"), typeof(HospitalPatchHandlers), prefix: nameof(HospitalPatchHandlers.HospitalPatientArrivesTryExecutePrefix), postfix: nameof(HospitalPatchHandlers.HospitalPatientArrivesTryExecutePostfix));
-                OptionalModPatches.PatchIfExists(harmony, AccessTools.Method(patientArrival, "SpawnPatient"), typeof(HospitalPatchHandlers), prefix: nameof(HospitalPatchHandlers.HospitalSpawnPatientPrefix), postfix: nameof(HospitalPatchHandlers.HospitalSpawnPatientPostfix));
+                OptionalModPatches.PatchIfExists(harmony, AccessTools.Method(patientArrival, "TryExecuteWorker"), typeof(HospitalPatchHandlers), prefix: nameof(HospitalPatchHandlers.HospitalPatientArrivesTryExecutePrefix), postfix: nameof(HospitalPatchHandlers.HospitalPatientArrivesTryExecutePostfix), finalizer: nameof(HospitalPatchHandlers.HospitalPatientArrivesTryExecuteFinalizer));
+                OptionalModPatches.PatchIfExists(harmony, AccessTools.Method(patientArrival, "SpawnPatient"), typeof(HospitalPatchHandlers), prefix: nameof(HospitalPatchHandlers.HospitalSpawnPatientPrefix), postfix: nameof(HospitalPatchHandlers.HospitalSpawnPatientPostfix), finalizer: nameof(HospitalPatchHandlers.HospitalSpawnPatientFinalizer));
             }
             Type massCasualty = AccessTools.TypeByName("Hospital.IncidentWorker_MassCasualtyEvent");
             if (massCasualty != null)
             {
-                OptionalModPatches.PatchIfExists(harmony, AccessTools.Method(massCasualty, "TryExecuteWorker"), typeof(HospitalPatchHandlers), prefix: nameof(HospitalPatchHandlers.HospitalPatientArrivesTryExecutePrefix), postfix: nameof(HospitalPatchHandlers.HospitalMassCasualtyTryExecutePostfix));
+                OptionalModPatches.PatchIfExists(harmony, AccessTools.Method(massCasualty, "TryExecuteWorker"), typeof(HospitalPatchHandlers), prefix: nameof(HospitalPatchHandlers.HospitalPatientArrivesTryExecutePrefix), postfix: nameof(HospitalPatchHandlers.HospitalMassCasualtyTryExecutePostfix), finalizer: nameof(HospitalPatchHandlers.HospitalMassCasualtyTryExecuteFinalizer));
                 foreach (MethodInfo method in massCasualty.GetMethods(AccessTools.all).Where(m => m.Name == "SpawnPatient"))
                 {
-                    OptionalModPatches.PatchIfExists(harmony, method, typeof(HospitalPatchHandlers), prefix: nameof(HospitalPatchHandlers.HospitalSpawnPatientPrefix), postfix: nameof(HospitalPatchHandlers.HospitalSpawnPatientPostfix));
+                    OptionalModPatches.PatchIfExists(harmony, method, typeof(HospitalPatchHandlers), prefix: nameof(HospitalPatchHandlers.HospitalSpawnPatientPrefix), postfix: nameof(HospitalPatchHandlers.HospitalSpawnPatientPostfix), finalizer: nameof(HospitalPatchHandlers.HospitalSpawnPatientFinalizer));
                 }
             }
             Type hospitalComponent = AccessTools.TypeByName("Hospital.HospitalMapComponent");

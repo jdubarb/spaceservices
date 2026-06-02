@@ -88,6 +88,19 @@ namespace SpaceServices
             }
         }
 
+        public static void VisitorGroupTryExecuteFinalizer(IncidentParms parms, Exception __exception)
+        {
+            if (__exception == null)
+            {
+                return;
+            }
+            Map map = parms == null ? null : parms.target as Map;
+            if (map != null && SpaceServiceMapDetector.IsServiceEligible(map))
+            {
+                HospitalityArrivalContext.Pop();
+            }
+        }
+
         public static bool AskForSafetyPrefix(IncidentParms parms, Action allow)
         {
             Map map = parms == null ? null : parms.target as Map;
@@ -118,6 +131,14 @@ namespace SpaceServices
             if (map != null && SpaceServiceMapDetector.IsServiceEligible(map))
             {
                 HospitalityArrivalContext.FinalizeArrival(map);
+                HospitalityArrivalContext.Pop();
+            }
+        }
+
+        public static void SpawnGroupFinalizer(Map map, Exception __exception)
+        {
+            if (__exception != null && map != null && SpaceServiceMapDetector.IsServiceEligible(map))
+            {
                 HospitalityArrivalContext.Pop();
             }
         }

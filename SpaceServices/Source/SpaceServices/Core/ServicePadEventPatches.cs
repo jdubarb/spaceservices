@@ -27,6 +27,7 @@ namespace SpaceServices
             Thing parent = __instance == null ? null : __instance.parent;
             if (parent != null && parent.TryGetComp<CompSpaceServicePad>() != null)
             {
+                ServiceEnvironmentUtility.ClearPadVacuumCache(parent);
                 ServicePadUtility.RequestLifecycleTickSoon(parent.MapHeld ?? parent.Map, "service pad power signal");
             }
         }
@@ -40,6 +41,7 @@ namespace SpaceServices
             if (ServicePadUtility.CellTouchesServicePad(map, c))
             {
                 // Roof access is a pad-level safety gate, so wake departures only when a pad tile changed.
+                ServiceEnvironmentUtility.ClearPadVacuumCache(map);
                 ServicePadUtility.RequestLifecycleTickSoon(map, "service pad roof changed");
             }
         }

@@ -186,7 +186,7 @@ namespace SpaceServices
             }
 
             int removed = 0;
-            foreach (Pawn pawn in PawnsToClean(map))
+            foreach (Pawn pawn in MapPawnsToClean(map))
             {
                 if (pawn == null || pawn.needs == null || pawn.needs.mood == null || pawn.needs.mood.thoughts == null || pawn.needs.mood.thoughts.memories == null)
                 {
@@ -213,7 +213,19 @@ namespace SpaceServices
 
         private static int CleanupBrokenDirectRelations(Map map)
         {
-            return ServicePawnUtility.CleanupBrokenDirectRelations(map);
+            if (map == null)
+            {
+                return 0;
+            }
+
+            // Keep save-load cleanup scoped to this map and active service records.
+            // Broad world-pawn cleanup can interact badly with unrelated mod pawns.
+            int removed = 0;
+            foreach (Pawn pawn in MapPawnsToClean(map).Concat(ServiceRecordPawns(map)).Distinct())
+            {
+                removed += ServicePawnUtility.CleanupInvalidDirectRelations(pawn);
+            }
+            return removed;
         }
 
         private static IEnumerable<Pawn> PawnsToClean(Map map)
@@ -241,6 +253,55 @@ namespace SpaceServices
                 if (pawn != null)
                 {
                     pawns.Add(pawn);
+                }
+            }
+            return pawns;
+        }
+
+        private static IEnumerable<Pawn> MapPawnsToClean(Map map)
+        {
+            HashSet<Pawn> pawns = new HashSet<Pawn>();
+            if (map == null || map.mapPawns == null)
+            {
+                return pawns;
+            }
+            foreach (Pawn pawn in map.mapPawns.AllPawnsSpawned)
+            {
+                if (pawn != null)
+                {
+                    pawns.Add(pawn);
+                }
+            }
+            foreach (Pawn pawn in map.mapPawns.AllPawnsUnspawned)
+            {
+                if (pawn != null)
+                {
+                    pawns.Add(pawn);
+                }
+            }
+            return pawns;
+        }
+
+        private static IEnumerable<Pawn> ServiceRecordPawns(Map map)
+        {
+            HashSet<Pawn> pawns = new HashSet<Pawn>();
+            SpaceServicesMapComponent comp = map == null ? null : map.GetComponent<SpaceServicesMapComponent>();
+            if (comp == null || comp.serviceGroups == null)
+            {
+                return pawns;
+            }
+            foreach (ServiceGroupRecord record in comp.serviceGroups)
+            {
+                if (record == null || record.pawns == null)
+                {
+                    continue;
+                }
+                foreach (Pawn pawn in record.pawns)
+                {
+                    if (pawn != null)
+                    {
+                        pawns.Add(pawn);
+                    }
                 }
             }
             return pawns;
@@ -295,7 +356,7 @@ namespace SpaceServices
         private static int CleanupUnspawnedPawnRuntimeLords(Map map)
         {
             int removed = 0;
-            foreach (Pawn pawn in PawnsToClean(map))
+            foreach (Pawn pawn in ServiceRecordPawns(map))
             {
                 if (pawn == null || pawn.Destroyed || pawn.Spawned || pawn.MapHeld != null)
                 {

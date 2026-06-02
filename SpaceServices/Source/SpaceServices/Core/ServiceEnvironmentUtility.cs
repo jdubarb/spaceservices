@@ -16,6 +16,8 @@ namespace SpaceServices
     public static class ServiceEnvironmentUtility
     {
         private const float Epsilon = 0.001f;
+        private const int PadVacuumCacheTicks = 120;
+        private static readonly Dictionary<int, CachedPadVacuum> PadVacuumCache = new Dictionary<int, CachedPadVacuum>();
         private static readonly HashSet<string> KnownFlyThroughRoofs = new HashSet<string>
         {
             "SMR_VacBarrierRoof",
@@ -50,12 +52,45 @@ namespace SpaceServices
             {
                 return 0f;
             }
+            int key = pad.thingIDNumber;
+            int ticksGame = Find.TickManager == null ? 0 : Find.TickManager.TicksGame;
+            CachedPadVacuum cached;
+            if (PadVacuumCache.TryGetValue(key, out cached) && cached.map == map && ticksGame <= cached.expiresTick)
+            {
+                return cached.maxVacuum;
+            }
             float maxVacuum = 0f;
             foreach (IntVec3 cell in pad.OccupiedRect().Cells)
             {
                 maxVacuum = Mathf.Max(maxVacuum, GetVacuum(cell, map));
             }
+            PadVacuumCache[key] = new CachedPadVacuum
+            {
+                map = map,
+                expiresTick = ticksGame + PadVacuumCacheTicks,
+                maxVacuum = maxVacuum
+            };
             return maxVacuum;
+        }
+
+        public static void ClearPadVacuumCache(Thing pad)
+        {
+            if (pad != null)
+            {
+                PadVacuumCache.Remove(pad.thingIDNumber);
+            }
+        }
+
+        public static void ClearPadVacuumCache(Map map)
+        {
+            if (map == null)
+            {
+                return;
+            }
+            foreach (int key in PadVacuumCache.Where(pair => pair.Value != null && pair.Value.map == map).Select(pair => pair.Key).ToList())
+            {
+                PadVacuumCache.Remove(key);
+            }
         }
 
         public static bool IsRoofAccessible(Thing pad, out string reason)
@@ -238,6 +273,13 @@ namespace SpaceServices
                 return "no roof";
             }
             return string.IsNullOrEmpty(roof.label) ? roof.defName : roof.label;
+        }
+
+        private sealed class CachedPadVacuum
+        {
+            public Map map;
+            public int expiresTick;
+            public float maxVacuum;
         }
     }
 }

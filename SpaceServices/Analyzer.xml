@@ -72,10 +72,15 @@
       <li>SpaceServices.ServiceLifecycleUtility:GuardHospitalityGuestsFromVacuum</li>
       <li>SpaceServices.ServiceLifecycleUtility:FindHospitalitySafeCell</li>
       <li>SpaceServices.ServiceLifecycleUtility:FindHospitalityGuestAreaSafeCell</li>
+      <li>SpaceServices.ServiceLifecycleUtility:CachedHospitalityAreaSafeCells</li>
+      <li>SpaceServices.ServiceLifecycleUtility:BestCachedSafeReachableCell</li>
       <li>SpaceServices.ServiceLifecycleUtility:HospitalityGuestArea</li>
       <li>SpaceServices.ServiceLifecycleUtility:HospitalityPawnGuestArea</li>
       <li>SpaceServices.ServiceLifecycleUtility:HospitalityDefaultGuestArea</li>
       <li>SpaceServices.ServiceLifecycleUtility:BestSafeReachableCell</li>
+      <li>SpaceServices.ServiceLifecycleUtility:JobTargetsUnsafeVacuum</li>
+      <li>SpaceServices.ServiceLifecycleUtility:TargetCellUnsafeForPawn</li>
+      <li>SpaceServices.ServiceLifecycleUtility:PawnCurrentJobTargetsUnsafeVacuum</li>
       <li>SpaceServices.ServiceLifecycleUtility:IsHospitalitySafeCellCandidate</li>
       <li>SpaceServices.ServiceLifecycleUtility:AddSafeCellCandidate</li>
       <li>SpaceServices.ServiceLifecycleUtility:ActiveTrackedPawns</li>

@@ -20,7 +20,7 @@ namespace SpaceServices
         private const int PickupBoardingHardTimeoutTicks = 2500;
         private const int HospitalityArrivalVacuumGearGuardTicks = 2500;
         private const int HospitalityVacuumTransitGuardTicks = 2500;
-        private const int HospitalityVacuumProtectionTickInterval = 250;
+        private const int HospitalityVacuumProtectionTickInterval = 600;
         private const float HospitalitySafeCellSearchRadius = 12f;
         private const float HospitalityAreaSafeCellSearchRadius = 16f;
         private const int HospitalitySafeCellReachabilityChecks = 6;
@@ -30,8 +30,10 @@ namespace SpaceServices
         private const int StableActivePawnValidationTicks = 10000;
         private const int StableBedlessCheckTicks = 2500;
         private const int StableLeaveStateCheckTicks = 2500;
+        private const int HospitalitySafeCellCacheTicks = 120;
         private static readonly List<ServiceDepartureBlock> CachedDepartureBlocks = new List<ServiceDepartureBlock>();
         private static int cachedDepartureBlocksTick = -999999;
+        private static readonly Dictionary<string, CachedHospitalitySafeCells> HospitalitySafeCellCache = new Dictionary<string, CachedHospitalitySafeCells>();
 
         public static int NextTickInterval(List<ServiceGroupRecord> records)
         {
@@ -77,20 +79,26 @@ namespace SpaceServices
             if (existing != null)
             {
                 ServiceDebugUtility.LogAudit("RegisterPawns merged kind=" + kind + " existing=" + existing.id + " incoming=" + PawnSummary(list) + " arrivalPad=" + ServiceDebugUtility.ThingAuditSummary(arrivalPad));
+                bool changed = false;
                 foreach (Pawn pawn in list)
                 {
                     if (!existing.pawns.Contains(pawn))
                     {
                         existing.pawns.Add(pawn);
+                        changed = true;
                     }
                 }
                 existing.timeoutTick = Math.Max(existing.timeoutTick, Find.TickManager.TicksGame + GenDate.TicksPerDay * 3);
                 if (existing.arrivalPad == null && arrivalPad != null && !arrivalPad.Destroyed)
                 {
                     existing.arrivalPad = arrivalPad;
+                    changed = true;
                 }
-                EnsureHospitalityVacuumProtection(map, existing, "arrival merge");
-                ForceHospitalityVacuumTransit(map, existing, "arrival merge");
+                if (changed || existing.serviceKind != "hospitality" || existing.lastHospitalityTransitTick != Find.TickManager.TicksGame)
+                {
+                    EnsureHospitalityVacuumProtection(map, existing, "arrival merge");
+                    ForceHospitalityVacuumTransit(map, existing, "arrival merge");
+                }
                 MarkRecordDirty(map, existing, "merged arriving service pawns");
                 return;
             }
@@ -640,6 +648,12 @@ namespace SpaceServices
             {
                 return;
             }
+            int ticksGame = Find.TickManager == null ? 0 : Find.TickManager.TicksGame;
+            if (ticksGame > 0 && record.lastHospitalityTransitTick == ticksGame)
+            {
+                return;
+            }
+            record.lastHospitalityTransitTick = ticksGame;
             Thing pad = record.arrivalPad ?? record.reservedPad;
             foreach (Pawn pawn in record.pawns)
             {
@@ -797,7 +811,9 @@ namespace SpaceServices
             }
             if (pad != null && pad.Spawned)
             {
-                IntVec3 nearPad = BestSafeReachableCell(AreaCells(GenRadial.RadialCellsAround(pad.Position, HospitalityAreaSafeCellSearchRadius, true), area, map), map, pawn, pad.Position, requireAtmosphere);
+                IntVec3 nearPad = requireAtmosphere
+                    ? BestCachedSafeReachableCell(CachedHospitalityAreaSafeCells(map, pad, area, requireAtmosphere), map, pawn, pad.Position)
+                    : BestSafeReachableCell(AreaCells(GenRadial.RadialCellsAround(pad.Position, HospitalityAreaSafeCellSearchRadius, true), area, map), map, pawn, pad.Position, requireAtmosphere);
                 if (nearPad.IsValid)
                 {
                     return nearPad;
@@ -856,6 +872,40 @@ namespace SpaceServices
             return null;
         }
 
+        private static List<IntVec3> CachedHospitalityAreaSafeCells(Map map, Thing pad, Area area, bool requireAtmosphere)
+        {
+            string key = HospitalitySafeCellCacheKey(map, pad, area, requireAtmosphere);
+            int ticksGame = Find.TickManager == null ? 0 : Find.TickManager.TicksGame;
+            CachedHospitalitySafeCells cached;
+            if (HospitalitySafeCellCache.TryGetValue(key, out cached) && ticksGame <= cached.expiresTick)
+            {
+                return cached.cells;
+            }
+
+            List<IntVec3> cells = new List<IntVec3>();
+            foreach (IntVec3 cell in AreaCells(GenRadial.RadialCellsAround(pad.Position, HospitalityAreaSafeCellSearchRadius, true), area, map))
+            {
+                if (IsHospitalitySafeCellCandidate(cell, map, null, requireAtmosphere, 0f))
+                {
+                    AddSafeCellCandidate(cells, cell, pad.Position);
+                }
+            }
+            HospitalitySafeCellCache[key] = new CachedHospitalitySafeCells
+            {
+                expiresTick = ticksGame + HospitalitySafeCellCacheTicks,
+                cells = cells
+            };
+            return cells;
+        }
+
+        private static string HospitalitySafeCellCacheKey(Map map, Thing pad, Area area, bool requireAtmosphere)
+        {
+            return (map == null ? 0 : map.uniqueID) + "|" +
+                (pad == null ? 0 : pad.thingIDNumber) + "|" +
+                (area == null ? -1 : area.ID) + "|" +
+                (requireAtmosphere ? "atm" : "safe");
+        }
+
         private static IntVec3 BestSafeReachableCell(IEnumerable<IntVec3> cells, Map map, Pawn pawn, IntVec3 origin, bool requireAtmosphere)
         {
             if (map == null || pawn == null)
@@ -886,9 +936,30 @@ namespace SpaceServices
             return IntVec3.Invalid;
         }
 
+        private static IntVec3 BestCachedSafeReachableCell(List<IntVec3> candidates, Map map, Pawn pawn, IntVec3 origin)
+        {
+            if (candidates == null || candidates.Count == 0 || map == null || pawn == null)
+            {
+                return IntVec3.Invalid;
+            }
+            foreach (IntVec3 cell in candidates.OrderBy(cell => cell.DistanceToSquared(origin)).Take(HospitalitySafeCellReachabilityChecks))
+            {
+                if (!cell.InBounds(map) || !cell.Standable(map) || (cell.GetFirstPawn(map) != null && cell != pawn.Position))
+                {
+                    continue;
+                }
+                if (cell == pawn.Position || pawn.CanReach(cell, PathEndMode.OnCell, Danger.Deadly))
+                {
+                    return cell;
+                }
+            }
+            return IntVec3.Invalid;
+        }
+
         private static bool IsHospitalitySafeCellCandidate(IntVec3 cell, Map map, Pawn pawn, bool requireAtmosphere, float resistance)
         {
-            if (!cell.InBounds(map) || !cell.Standable(map) || (cell.GetFirstPawn(map) != null && cell != pawn.Position))
+            Pawn occupyingPawn = cell.GetFirstPawn(map);
+            if (!cell.InBounds(map) || !cell.Standable(map) || (occupyingPawn != null && (pawn == null || cell != pawn.Position)))
             {
                 return false;
             }
@@ -1302,6 +1373,12 @@ namespace SpaceServices
         private static bool IsVacuumPad(Thing pad)
         {
             return pad != null && ServiceEnvironmentUtility.GetMaxVacuum(pad) > 0.05f;
+        }
+
+        private sealed class CachedHospitalitySafeCells
+        {
+            public int expiresTick;
+            public List<IntVec3> cells = new List<IntVec3>();
         }
 
         private static bool PadCanSafelyServe(Thing pad, ServiceUse use, IEnumerable<Pawn> pawns, string groupId, bool bypassGuestArea)

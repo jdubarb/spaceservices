@@ -159,9 +159,16 @@ namespace SpaceServices
             {
                 return;
             }
-            staleReferenceCleanupDone = true;
-            staleReferenceCleanupVersion = StaleReferenceCleanupVersion;
-            StaleReferenceCleanupUtility.CleanupAfterLoad(map);
+            try
+            {
+                StaleReferenceCleanupUtility.CleanupAfterLoad(map);
+                staleReferenceCleanupDone = true;
+                staleReferenceCleanupVersion = StaleReferenceCleanupVersion;
+            }
+            catch (Exception ex)
+            {
+                ServiceDebugUtility.LogWarning(ServiceLogIntegration.Core, "Stale reference cleanup failed and will retry later: " + ex.GetType().Name + " " + ex.Message);
+            }
         }
 
         private void ReleaseTransientArrivalReservations()

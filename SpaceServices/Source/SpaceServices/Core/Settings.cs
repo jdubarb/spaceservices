@@ -61,7 +61,7 @@ namespace SpaceServices
             Checkbox(listing, "JDB_SpaceServices_Settings_TrafficRateOverride", ref Settings.trafficRateOverride);
             if (Settings.trafficRateOverride)
             {
-                // Rates are deterministic accumulators, not chance rolls. At 0.25x, every fourth eligible attempt passes.
+                // Rates are deterministic accumulators, not chance rolls. All service arrivals also share one spacing gate.
                 Settings.hospitalPatientTrafficRate = RateSlider(listing, "JDB_SpaceServices_Settings_HospitalPatientTrafficRate", Settings.hospitalPatientTrafficRate);
                 Settings.hospitalMassCasualtyTrafficRate = RateSlider(listing, "JDB_SpaceServices_Settings_HospitalMassCasualtyTrafficRate", Settings.hospitalMassCasualtyTrafficRate);
                 Settings.hospitalityVisitorTrafficRate = RateSlider(listing, "JDB_SpaceServices_Settings_HospitalityVisitorTrafficRate", Settings.hospitalityVisitorTrafficRate);

@@ -86,7 +86,7 @@ namespace SpaceServices
             Scribe_Values.Look(ref legacyAllowEmergency, "allowEmergency", true);
             Scribe_Values.Look(ref requireVacSafeRoof, "requireVacSafeRoof", false);
             Scribe_Values.Look(ref preferShuttle, "preferShuttle", true);
-            Scribe_Values.Look(ref requirePower, "requirePower", false);
+            Scribe_Values.Look(ref requirePower, "requirePower", true);
             Scribe_Values.Look(ref reservedForGroup, "reservedForGroup");
             Scribe_Values.Look(ref reservedAtTick, "reservedAtTick", 0);
 
