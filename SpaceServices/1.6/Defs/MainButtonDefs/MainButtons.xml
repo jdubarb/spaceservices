@@ -3,7 +3,7 @@
   <MainButtonDef>
     <defName>JDB_SpaceServicesMain</defName>
     <label>services</label>
-    <description>Review Space Services traffic, patients, guests, and debug controls.</description>
+    <description>Review Space Services traffic, patients, guests, service pads, and native service panels.</description>
     <tabWindowClass>SpaceServices.MainTabWindow_SpaceServices</tabWindowClass>
     <order>53</order>
     <iconPath>UI/Buttons/MainButtons/SpaceServices</iconPath>
