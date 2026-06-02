@@ -209,6 +209,11 @@ namespace SpaceServices
             {
                 return false;
             }
+            Thing pad = ServicePadUtility.ServicePadAtCell(map, cell);
+            if (pad != null)
+            {
+                return GetMaxVacuum(pad) <= Epsilon;
+            }
             return GetVacuum(cell, map) <= Epsilon;
         }
 

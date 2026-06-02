@@ -265,6 +265,11 @@ namespace SpaceServices
             return visuals[visuals.Count - 1];
         }
 
+        public static void ClearCache()
+        {
+            VisualsByKind.Clear();
+        }
+
         private static List<ShuttleVisual> AvailableVisuals(string serviceKind)
         {
             string key = (serviceKind ?? "").Trim();
@@ -284,7 +289,7 @@ namespace SpaceServices
             HashSet<string> seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
             foreach (SpaceServiceShuttleVisualDef def in DefDatabase<SpaceServiceShuttleVisualDef>.AllDefsListForReading)
             {
-                if (def != null && def.AppliesTo(serviceKind))
+                if (def != null && VisualSourceAllowed(def.requiredPackageIds) && def.AppliesTo(serviceKind))
                 {
                     ShuttleVisual visual = FromNames(def.defName, def.weight, def.shipThingDefName, def.incomingSkyfallerDefName, def.leavingSkyfallerDefName, def.rotation, def.graphicData, def.angleOffset);
                     if (visual != null && TryReserveVisualId(seen, visual.id, "def"))
@@ -297,7 +302,7 @@ namespace SpaceServices
             foreach (ThingDef thingDef in DefDatabase<ThingDef>.AllDefsListForReading)
             {
                 SpaceServiceShuttleVisualExtension extension = thingDef.GetModExtension<SpaceServiceShuttleVisualExtension>();
-                if (extension == null || !extension.AppliesTo(serviceKind))
+                if (extension == null || !VisualSourceAllowed(extension.requiredPackageIds) || !extension.AppliesTo(serviceKind))
                 {
                     continue;
                 }
@@ -310,6 +315,21 @@ namespace SpaceServices
                 }
             }
             return visuals;
+        }
+
+        private static bool VisualSourceAllowed(List<string> requiredPackageIds)
+        {
+            if (SpaceServicesMod.Settings == null || SpaceServicesMod.Settings.allowModdedShuttleVisuals || requiredPackageIds.NullOrEmpty())
+            {
+                return true;
+            }
+            return requiredPackageIds.All(IsLudeonPackage);
+        }
+
+        private static bool IsLudeonPackage(string packageId)
+        {
+            return !string.IsNullOrEmpty(packageId) &&
+                packageId.StartsWith("Ludeon.RimWorld", StringComparison.OrdinalIgnoreCase);
         }
 
         private static bool TryReserveVisualId(HashSet<string> seen, string id, string source)

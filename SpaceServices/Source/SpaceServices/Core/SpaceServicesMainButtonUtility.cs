@@ -169,6 +169,11 @@ namespace SpaceServices
                 // Entry/menu roots are not created yet; the draw-prefix refresh will run once play UI exists.
                 return null;
             }
+            catch (InvalidCastException)
+            {
+                // Main menu and some settings-framework paths can expose an entry root that cannot be cast to play UI roots yet.
+                return null;
+            }
         }
 
         private static void InvokeNoArgRefreshMethods(object root)

@@ -820,18 +820,23 @@ namespace SpaceServices
 
         public static bool CellTouchesServicePad(Map map, IntVec3 cell)
         {
+            return ServicePadAtCell(map, cell) != null;
+        }
+
+        public static Thing ServicePadAtCell(Map map, IntVec3 cell)
+        {
             if (map == null || !cell.IsValid)
             {
-                return false;
+                return null;
             }
             foreach (Thing pad in AllServicePadBuildings(map))
             {
                 if (pad != null && !pad.Destroyed && pad.OccupiedRect().Contains(cell))
                 {
-                    return true;
+                    return pad;
                 }
             }
-            return false;
+            return null;
         }
 
         public static IEnumerable<Thing> AllServicePads(Map map, ServiceUse use)

@@ -547,7 +547,11 @@ namespace SpaceServices
             {
                 return true;
             }
-            // Do not strip naturally-generated apparel just because it has vacuum stats.
+            if (AdultSuitDefs.Contains(apparel.def.defName) || ChildSuitDefs.Contains(apparel.def.defName))
+            {
+                return true;
+            }
+            // Do not strip naturally-generated modded apparel just because it has vacuum stats.
             // That can delete a pawn's only shell/middle layer and create outfit conflicts.
             return false;
         }

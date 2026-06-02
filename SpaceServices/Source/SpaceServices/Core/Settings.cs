@@ -74,6 +74,8 @@ namespace SpaceServices
 
             Section(listing, "JDB_SpaceServices_Settings_SectionCompatibility");
             Checkbox(listing, "JDB_SpaceServices_Settings_SealedNoSuit", ref Settings.allowSealedNoSuitArrivals);
+            bool moddedVisualsBefore = Settings.allowModdedShuttleVisuals;
+            Checkbox(listing, "JDB_SpaceServices_Settings_ModdedShuttleVisuals", ref Settings.allowModdedShuttleVisuals);
 
             Section(listing, "JDB_SpaceServices_Settings_SectionExperimental");
             Checkbox(listing, "JDB_SpaceServices_Settings_MedPodBridge", ref Settings.medPodServiceBridge);
@@ -81,6 +83,10 @@ namespace SpaceServices
             listing.End();
             Widgets.EndScrollView();
             Settings.Write();
+            if (moddedVisualsBefore != Settings.allowModdedShuttleVisuals)
+            {
+                ShuttleVisual.ClearCache();
+            }
             SpaceServicesMainButtonUtility.ApplyServiceTabVisibility();
         }
 
@@ -131,7 +137,8 @@ namespace SpaceServices
         public float hospitalPatientTrafficRate = 0.25f;
         public float hospitalMassCasualtyTrafficRate = 0.25f;
         public float hospitalityVisitorTrafficRate = 0.25f;
-        public bool allowSealedNoSuitArrivals = false;
+        public bool allowSealedNoSuitArrivals = true;
+        public bool allowModdedShuttleVisuals = true;
         public bool medPodServiceBridge = false;
         public bool suppressMassCasualtyPreDropEffects = false;
 
@@ -167,7 +174,8 @@ namespace SpaceServices
             hospitalPatientTrafficRate = QuantizeRate(hospitalPatientTrafficRate);
             hospitalMassCasualtyTrafficRate = QuantizeRate(hospitalMassCasualtyTrafficRate);
             hospitalityVisitorTrafficRate = QuantizeRate(hospitalityVisitorTrafficRate);
-            Scribe_Values.Look(ref allowSealedNoSuitArrivals, "allowSealedNoSuitArrivals", false);
+            Scribe_Values.Look(ref allowSealedNoSuitArrivals, "allowSealedNoSuitArrivals", true);
+            Scribe_Values.Look(ref allowModdedShuttleVisuals, "allowModdedShuttleVisuals", true);
             Scribe_Values.Look(ref medPodServiceBridge, "medPodServiceBridge", false);
             Scribe_Values.Look(ref suppressMassCasualtyPreDropEffects, "suppressMassCasualtyPreDropEffects", false);
         }
