@@ -13,18 +13,58 @@ using Verse.AI.Group;
 
 namespace SpaceServices
 {
+    public static class ServiceTabVisibilityPatches
+    {
+        public static void Install(Harmony harmony)
+        {
+            MethodInfo drawMethod = AccessTools.Method(typeof(MainButtonsRoot), "MainButtonsOnGUI");
+            if (drawMethod == null)
+            {
+                ServiceDebugUtility.LogWarning(ServiceLogIntegration.Core, "Could not patch main button visibility; MainButtonsOnGUI was not found.");
+                return;
+            }
+            harmony.Patch(drawMethod, prefix: new HarmonyMethod(typeof(ServiceTabVisibilityPatches), nameof(MainButtonsOnGuiPrefix)));
+        }
+
+        public static void MainButtonsOnGuiPrefix()
+        {
+            SpaceServicesMainButtonUtility.ApplyServiceTabVisibility(false);
+        }
+    }
+
     public static class SpaceServicesMainButtonUtility
     {
+        private static readonly HashSet<string> ReplacedServiceTabDefNames = new HashSet<string>
+        {
+            "Patients",
+            "Guests"
+        };
+
+        private static readonly HashSet<string> ReplacedServiceTabWindowNames = new HashSet<string>
+        {
+            "Hospital.MainTabWindow_Hospital",
+            "Hospitality.MainTab.MainTabWindow_Hospitality"
+        };
+
         public static void HideReplacedServiceTabs()
         {
             ApplyServiceTabVisibility();
         }
 
-        public static void ApplyServiceTabVisibility()
+        public static void ApplyServiceTabVisibility(bool refreshCache = true)
         {
             bool showExternal = SpaceServicesMod.Settings != null && !SpaceServicesMod.Settings.replaceExternalServiceTabs;
-            SetMainButtonVisible("Patients", showExternal);
-            SetMainButtonVisible("Guests", showExternal);
+            foreach (MainButtonDef def in DefDatabase<MainButtonDef>.AllDefsListForReading)
+            {
+                if (IsReplacedServiceTab(def))
+                {
+                    SetMainButtonVisible(def, showExternal);
+                }
+            }
+            if (refreshCache)
+            {
+                RefreshMainButtonCache(showExternal);
+            }
         }
 
         public static bool OpenNativeTab(string defName)
@@ -82,19 +122,99 @@ namespace SpaceServices
             return true;
         }
 
-        private static void SetMainButtonVisible(string defName, bool visible)
+        private static bool IsReplacedServiceTab(MainButtonDef def)
         {
-            MainButtonDef def = DefDatabase<MainButtonDef>.GetNamedSilentFail(defName);
             if (def == null)
             {
-                return;
+                return false;
             }
+            if (ReplacedServiceTabDefNames.Contains(def.defName))
+            {
+                return true;
+            }
+            string tabWindowClassName = def.tabWindowClass == null ? null : def.tabWindowClass.FullName;
+            return tabWindowClassName != null && ReplacedServiceTabWindowNames.Contains(tabWindowClassName);
+        }
+
+        private static void SetMainButtonVisible(MainButtonDef def, bool visible)
+        {
             FieldInfo field = AccessTools.Field(typeof(MainButtonDef), "buttonVisible");
             if (field == null)
             {
                 return;
             }
             field.SetValue(def, visible);
+        }
+
+        private static void RefreshMainButtonCache(bool showExternal)
+        {
+            object buttonsRoot = Find.MainButtonsRoot;
+            InvokeNoArgRefreshMethods(buttonsRoot);
+            InvokeNoArgRefreshMethods(Find.MainTabsRoot);
+            if (!showExternal)
+            {
+                PruneCachedButtonLists(buttonsRoot);
+            }
+        }
+
+        private static void InvokeNoArgRefreshMethods(object root)
+        {
+            if (root == null)
+            {
+                return;
+            }
+            foreach (string methodName in new[] { "SetButtonsDirty", "SetDirty", "Recache", "Reinit" })
+            {
+                MethodInfo method = AccessTools.Method(root.GetType(), methodName);
+                if (method != null && method.GetParameters().Length == 0)
+                {
+                    try
+                    {
+                        method.Invoke(root, null);
+                    }
+                    catch
+                    {
+                        // Some refresh hooks are version-specific; ignore the ones that are present but not usable.
+                    }
+                }
+            }
+        }
+
+        private static void PruneCachedButtonLists(object buttonsRoot)
+        {
+            if (buttonsRoot == null)
+            {
+                return;
+            }
+            foreach (FieldInfo field in buttonsRoot.GetType().GetFields(BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic))
+            {
+                if (!typeof(IList).IsAssignableFrom(field.FieldType))
+                {
+                    continue;
+                }
+                if (!(field.GetValue(buttonsRoot) is IList list))
+                {
+                    continue;
+                }
+                if (list.IsReadOnly || list.IsFixedSize)
+                {
+                    continue;
+                }
+                for (int i = list.Count - 1; i >= 0; i--)
+                {
+                    if (list[i] is MainButtonDef def && IsReplacedServiceTab(def))
+                    {
+                        try
+                        {
+                            list.RemoveAt(i);
+                        }
+                        catch
+                        {
+                            break;
+                        }
+                    }
+                }
+            }
         }
     }
 }

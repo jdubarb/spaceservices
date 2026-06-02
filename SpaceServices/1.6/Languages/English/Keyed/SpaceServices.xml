@@ -45,6 +45,8 @@
   <JDB_SpaceServices_Settings_SealedNoSuitDesc>Allow arrivals without forced vacsuits when the selected service pad is in a safe sealed environment.</JDB_SpaceServices_Settings_SealedNoSuitDesc>
   <JDB_SpaceServices_Settings_MedPodBridge>MedPod service-pawn bridge</JDB_SpaceServices_Settings_MedPodBridge>
   <JDB_SpaceServices_Settings_MedPodBridgeDesc>Experimental and TPS-heavy. Lets MedPod accept active Hospital patients and Hospitality guests on service maps even when their hidden medical-care level is below MedPod's normal threshold. Occupied MedPods can heavily reduce TPS; this is not recommended for normal colony or service use unless you accept that cost.</JDB_SpaceServices_Settings_MedPodBridgeDesc>
+  <JDB_SpaceServices_Settings_SuppressMassCasualtyPreDropEffects>Suppress mass casualty pre-drop effects</JDB_SpaceServices_Settings_SuppressMassCasualtyPreDropEffects>
+  <JDB_SpaceServices_Settings_SuppressMassCasualtyPreDropEffectsDesc>Experimental. Hides Hospital's early wound filth and mote effects while mass-casualty pawns are being packed into drop pods, before the pods visibly land.</JDB_SpaceServices_Settings_SuppressMassCasualtyPreDropEffectsDesc>
 
   <JDB_SpaceServices_Gizmo_ModeHospitalOnly>Hospital only</JDB_SpaceServices_Gizmo_ModeHospitalOnly>
   <JDB_SpaceServices_Gizmo_ModeHospitalOnlyDesc>Use this pad only for Hospital patient arrivals and departures.</JDB_SpaceServices_Gizmo_ModeHospitalOnlyDesc>

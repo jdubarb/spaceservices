@@ -81,9 +81,11 @@ namespace SpaceServices
             Map map = OptionalPatchUtility.FindMap(__args);
             if (map == null || !SpaceServiceMapDetector.IsServiceEligible(map))
             {
+                HospitalMassCasualtyVisualContext.Push(false);
                 HospitalLandingRedirectContext.Push(null, IntVec3.Invalid, null);
                 return;
             }
+            HospitalMassCasualtyVisualContext.Push(HospitalArrivalIncidentContext.IsMassCasualty(map));
 
             IntVec3 cell;
             if (!HospitalLandingRedirectContext.TryGetForcedCell(map, out cell) &&
@@ -120,6 +122,7 @@ namespace SpaceServices
             }
             finally
             {
+                HospitalMassCasualtyVisualContext.Pop();
                 HospitalLandingRedirectContext.Pop();
             }
         }

@@ -25,6 +25,8 @@ namespace SpaceServices
         {
             Harmony.PatchAll(Assembly.GetExecutingAssembly());
             ServicePadEventPatches.Install(Harmony);
+            ServiceTabVisibilityPatches.Install(Harmony);
+            HospitalMassCasualtyVisualPatches.Install(Harmony);
             OptionalModPatches.Install(Harmony);
             LongEventHandler.ExecuteWhenFinished(ArchitectMenuPatch.InjectArchitectDesignators);
             LongEventHandler.ExecuteWhenFinished(SpaceServicesMainButtonUtility.HideReplacedServiceTabs);

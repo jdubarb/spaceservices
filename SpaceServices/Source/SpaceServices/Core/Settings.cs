@@ -75,6 +75,7 @@ namespace SpaceServices
             Section(listing, "JDB_SpaceServices_Settings_SectionCompatibility");
             Checkbox(listing, "JDB_SpaceServices_Settings_SealedNoSuit", ref Settings.allowSealedNoSuitArrivals);
             Checkbox(listing, "JDB_SpaceServices_Settings_MedPodBridge", ref Settings.medPodServiceBridge);
+            Checkbox(listing, "JDB_SpaceServices_Settings_SuppressMassCasualtyPreDropEffects", ref Settings.suppressMassCasualtyPreDropEffects);
             listing.End();
             Widgets.EndScrollView();
             Settings.Write();
@@ -130,6 +131,7 @@ namespace SpaceServices
         public float hospitalityVisitorTrafficRate = 0.25f;
         public bool allowSealedNoSuitArrivals = false;
         public bool medPodServiceBridge = false;
+        public bool suppressMassCasualtyPreDropEffects = false;
 
         public override void ExposeData()
         {
@@ -165,6 +167,7 @@ namespace SpaceServices
             hospitalityVisitorTrafficRate = QuantizeRate(hospitalityVisitorTrafficRate);
             Scribe_Values.Look(ref allowSealedNoSuitArrivals, "allowSealedNoSuitArrivals", false);
             Scribe_Values.Look(ref medPodServiceBridge, "medPodServiceBridge", false);
+            Scribe_Values.Look(ref suppressMassCasualtyPreDropEffects, "suppressMassCasualtyPreDropEffects", false);
         }
 
         public static float QuantizeRate(float value)
