@@ -20,6 +20,7 @@ namespace SpaceServices
         private const int PickupBoardingHardTimeoutTicks = 2500;
         private const int HospitalityArrivalVacuumGearGuardTicks = 2500;
         private const int HospitalityVacuumTransitGuardTicks = 2500;
+        private const int HospitalityVacuumProtectionTickInterval = 250;
         private const float VacuumPadDistanceTolerance = 2.5f;
         private const int BlockedDepartureCacheTicks = 60;
         private const int StableActivePawnValidationTicks = 10000;
@@ -32,7 +33,7 @@ namespace SpaceServices
         {
             if (records != null && records.Any(HospitalityVacuumProtectionActive))
             {
-                return 1;
+                return HospitalityVacuumProtectionTickInterval;
             }
             if (records != null && records.Any(record => record != null && (record.state == "pickupInbound" || record.state == "boardingPickup" || record.state == "departing")))
             {
@@ -369,7 +370,10 @@ namespace SpaceServices
                 if (HospitalityVacuumProtectionActive(record))
                 {
                     EnsureHospitalityVacuumProtection(map, record, "active service");
-                    ForceHospitalityVacuumTransit(map, record, "active service");
+                    if (HospitalityArrivalTransitGuardActive(record))
+                    {
+                        ForceHospitalityVacuumTransit(map, record, "active service");
+                    }
                 }
                 if (record.serviceKind == "hospitality" && record.state == "arrived" && SpaceServicesMod.Settings != null && SpaceServicesMod.Settings.hospitalityVacuumGuard)
                 {
@@ -901,18 +905,18 @@ namespace SpaceServices
                     return;
                 }
             }
+            if (record.state != "departing")
+            {
+                record.state = "departing";
+                record.departureRequestedTick = Find.TickManager.TicksGame;
+                ServiceDebugUtility.Log("Routing " + record.serviceKind + " service group " + record.id + " to departure pad: " + reason);
+            }
             EnsureHospitalityDeparturePrepared(record);
             if (ReadyForExtraction(record))
             {
                 ServiceDebugUtility.LogAudit("BeginDeparture ready for immediate pickup " + RecordAudit(record));
                 BeginPickupShuttle(record, reason);
                 return;
-            }
-            if (record.state != "departing")
-            {
-                record.state = "departing";
-                record.departureRequestedTick = Find.TickManager.TicksGame;
-                ServiceDebugUtility.Log("Routing " + record.serviceKind + " service group " + record.id + " to departure pad: " + reason);
             }
             GuideDepartingPawnsToPad(record);
         }
