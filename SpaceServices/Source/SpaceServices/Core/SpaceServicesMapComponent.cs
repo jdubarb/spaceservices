@@ -112,7 +112,7 @@ namespace SpaceServices
                 return;
             }
             hospitalityGuestAreaTipShown = true;
-            Messages.Message("JDB_SpaceServices_Message_HospitalityGuestAreaTip".Translate(), pad, MessageTypeDefOf.NeutralEvent, false);
+            Find.WindowStack.Add(new Dialog_MessageBox("JDB_SpaceServices_Message_HospitalityGuestAreaTip".Translate(), "OK".Translate()));
         }
 
         public override void MapComponentTick()
