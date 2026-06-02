@@ -144,6 +144,12 @@ namespace SpaceServices
                 return;
             }
 
+            // Hospitality can move our safety helmet into inventory after arrival; re-wear that exact item before creating replacements.
+            if (TryRewearInjectedVacuumGear(pawn, targetVacuum))
+            {
+                return;
+            }
+
             List<VacuumApparelCandidate> autoCandidates = SelectAutomaticApparel(pawn, targetVacuum);
             if (autoCandidates.Count > 0)
             {
@@ -163,6 +169,42 @@ namespace SpaceServices
             {
                 TryWearIfNeeded(pawn, defs[i], true);
             }
+        }
+
+        private static bool TryRewearInjectedVacuumGear(Pawn pawn, float targetVacuum)
+        {
+            if (pawn == null || pawn.apparel == null || pawn.inventory == null || pawn.inventory.innerContainer == null)
+            {
+                return false;
+            }
+            List<Apparel> injectedVacGear = pawn.inventory.innerContainer
+                .OfType<Apparel>()
+                .Where(apparel => apparel != null && HasInjectedVacGearTag(apparel) && VacuumResistanceFromDef(apparel.def) > 0.001f)
+                .OrderByDescending(apparel => VacuumResistanceFromDef(apparel.def))
+                .ToList();
+            if (injectedVacGear.Count == 0)
+            {
+                return false;
+            }
+            foreach (Apparel apparel in injectedVacGear)
+            {
+                if (apparel == null || apparel.Destroyed || apparel.def == null || pawn.apparel.WornApparel.Any(worn => worn != null && worn == apparel))
+                {
+                    continue;
+                }
+                if (!pawn.inventory.innerContainer.Remove(apparel))
+                {
+                    continue;
+                }
+                RemoveApparelConflictingWith(pawn, apparel);
+                pawn.apparel.Wear(apparel, false, true);
+                ServiceDebugUtility.LogVerbose(ServiceLogIntegration.Core, "Re-wore injected vacuum apparel from inventory for " + pawn.LabelShortCap + ": " + apparel.def.defName);
+                if (VacuumResistance(pawn) + 0.001f >= targetVacuum)
+                {
+                    return true;
+                }
+            }
+            return VacuumResistance(pawn) + 0.001f >= targetVacuum;
         }
 
         private static List<ThingDef> SelectXmlApparelSetFor(Pawn pawn)
@@ -432,6 +474,29 @@ namespace SpaceServices
             {
                 apparel.questTags.Add(InjectedVacGearTag);
             }
+        }
+
+        private static bool HasInjectedVacGearTag(Apparel apparel)
+        {
+            return apparel != null && apparel.questTags != null && apparel.questTags.Contains(InjectedVacGearTag);
+        }
+
+        private static float VacuumResistanceFromDef(ThingDef def)
+        {
+            StatDef stat = VacuumResistanceDef;
+            if (def == null || stat == null || def.equippedStatOffsets.NullOrEmpty())
+            {
+                return 0f;
+            }
+            float resistance = 0f;
+            foreach (StatModifier modifier in def.equippedStatOffsets)
+            {
+                if (modifier != null && modifier.stat == stat)
+                {
+                    resistance += modifier.value;
+                }
+            }
+            return resistance;
         }
 
         private static bool ShouldRemoveOnSealedArrival(Apparel apparel)
