@@ -293,6 +293,11 @@ namespace SpaceServices
                 ServiceDebugUtility.LogAudit("ScheduleHospitalityIncident rejected danger=" + dangerReason);
                 return false;
             }
+            if (ServiceDangerUtility.ArrivalTrafficBlocked(map, "hospitality", out string trafficReason))
+            {
+                ServiceDebugUtility.LogAudit("ScheduleHospitalityIncident rejected traffic hazard=" + trafficReason);
+                return false;
+            }
             string reservationId = "hospitality-arrival-" + Find.UniqueIDsManager.GetNextThingID();
             CompSpaceServicePad comp = pad.TryGetComp<CompSpaceServicePad>();
             if (comp == null || !comp.TryReserve(reservationId))

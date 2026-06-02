@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Defs>
+
+  <!-- VEE's space battle can still run on space maps; service shuttles should wait until orbital fire and debris stop. -->
+  <SpaceServices.SpaceServiceHazardRuleDef>
+    <defName>JDB_SpaceServices_VEE_SpaceBattle_ShuttleHazard</defName>
+    <label>VEE space battle shuttle hazard</label>
+    <requiredPackageIds>
+      <li>VanillaExpanded.VEE</li>
+    </requiredPackageIds>
+    <gameConditionDefNames>
+      <li>SpaceBattle</li>
+    </gameConditionDefNames>
+    <serviceKinds>
+      <li>hospital</li>
+      <li>hospitality</li>
+    </serviceKinds>
+    <blockArrivals>true</blockArrivals>
+    <delayDepartures>true</delayDepartures>
+    <reason>space battle in orbit</reason>
+  </SpaceServices.SpaceServiceHazardRuleDef>
+
+  <!-- The VEE space-map compatibility patch prevents Psychic Rain, but this keeps service traffic sane if it still appears. -->
+  <SpaceServices.SpaceServiceHazardRuleDef>
+    <defName>JDB_SpaceServices_VEE_PsychicRain_GuestHazard</defName>
+    <label>VEE psychic rain guest shuttle hazard</label>
+    <requiredPackageIds>
+      <li>VanillaExpanded.VEE</li>
+    </requiredPackageIds>
+    <gameConditionDefNames>
+      <li>PsychicRain</li>
+    </gameConditionDefNames>
+    <serviceKinds>
+      <li>hospitality</li>
+    </serviceKinds>
+    <blockArrivals>true</blockArrivals>
+    <delayDepartures>true</delayDepartures>
+    <reason>psychic rain unsafe for visitors</reason>
+  </SpaceServices.SpaceServiceHazardRuleDef>
+
+</Defs>

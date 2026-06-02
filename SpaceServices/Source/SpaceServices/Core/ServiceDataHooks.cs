@@ -153,12 +153,19 @@ namespace SpaceServices
                 {
                     continue;
                 }
-                if (!ModsConfig.IsActive(packageId))
+                if (!ModsConfig.IsActive(packageId) && !RunningModPackageActive(packageId))
                 {
                     return false;
                 }
             }
             return true;
+        }
+
+        private static bool RunningModPackageActive(string packageId)
+        {
+            return LoadedModManager.RunningModsListForReading.Any(mod =>
+                mod != null &&
+                string.Equals(mod.PackageId, packageId, StringComparison.OrdinalIgnoreCase));
         }
 
         public static List<ThingDef> ResolveThingDefs(List<string> defNames)

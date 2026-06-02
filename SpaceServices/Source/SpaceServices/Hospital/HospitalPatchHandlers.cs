@@ -166,6 +166,12 @@ namespace SpaceServices
                 ServiceDebugUtility.LogAudit("Hospital mass casualty using normal drop pod landing at " + c);
                 return true;
             }
+            if (ServiceDangerUtility.ArrivalTrafficBlocked(map, "hospital", out string trafficReason))
+            {
+                // Late safety check for hazards that start after the incident was accepted but before the visual shuttle is swapped in.
+                ServiceDebugUtility.LogThrottled(ServiceLogIntegration.Hospital, "hospital-shuttle-late-hazard-" + trafficReason, "Hospital arrival shuttle suppressed by traffic hazard: " + trafficReason, GenDate.TicksPerHour);
+                return true;
+            }
             HospitalArrivalIncidentContext.ArrivalVisualFlags(map, out bool showArrival, out bool showDeparture);
             if (HospitalLandingRedirectContext.TryGetActiveCell(map, out IntVec3 activeCell) && activeCell.IsValid && ServiceShuttleUtility.TryReplaceDropPodWithArrivalShuttle(c, map, info, faction, showArrival, showDeparture))
             {
