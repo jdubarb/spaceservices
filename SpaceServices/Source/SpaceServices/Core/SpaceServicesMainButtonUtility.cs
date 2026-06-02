@@ -148,12 +148,26 @@ namespace SpaceServices
 
         private static void RefreshMainButtonCache(bool showExternal)
         {
-            object buttonsRoot = Find.MainButtonsRoot;
+            object buttonsRoot = TryGetUiRoot(() => Find.MainButtonsRoot);
+            object tabsRoot = TryGetUiRoot(() => Find.MainTabsRoot);
             InvokeNoArgRefreshMethods(buttonsRoot);
-            InvokeNoArgRefreshMethods(Find.MainTabsRoot);
+            InvokeNoArgRefreshMethods(tabsRoot);
             if (!showExternal)
             {
                 PruneCachedButtonLists(buttonsRoot);
+            }
+        }
+
+        private static object TryGetUiRoot(Func<object> getter)
+        {
+            try
+            {
+                return getter();
+            }
+            catch (NullReferenceException)
+            {
+                // Entry/menu roots are not created yet; the draw-prefix refresh will run once play UI exists.
+                return null;
             }
         }
 
