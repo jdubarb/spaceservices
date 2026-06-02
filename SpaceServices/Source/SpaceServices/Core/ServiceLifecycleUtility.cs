@@ -311,6 +311,20 @@ namespace SpaceServices
             return true;
         }
 
+        public static bool ShouldProtectHospitalityVacuumApparel(Apparel apparel)
+        {
+            if (apparel == null || !VacSuitUtility.IsInjectedVacGear(apparel) || VacSuitUtility.InternalVacGearRemovalAllowed)
+            {
+                return false;
+            }
+            Pawn wearer = apparel.Wearer;
+            if (wearer == null)
+            {
+                return false;
+            }
+            return ShouldSuppressHospitalityVacuumApparelJob(wearer, null);
+        }
+
         public static void Tick(Map map, List<ServiceGroupRecord> records)
         {
             if (map == null || records == null || records.Count == 0)

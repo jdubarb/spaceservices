@@ -23,6 +23,20 @@ namespace SpaceServices
         public const float PracticalVacuumSuitTarget = 0.9f;
         private static StatDef vacuumResistance;
         private static List<VacuumApparelCandidate> cachedAutoCandidates;
+        private static int internalVacGearRemovalDepth;
+
+        public static bool InternalVacGearRemovalAllowed
+        {
+            get
+            {
+                return internalVacGearRemovalDepth > 0;
+            }
+        }
+
+        public static bool IsInjectedVacGear(Apparel apparel)
+        {
+            return HasInjectedVacGearTag(apparel);
+        }
 
         public static void SuitPawnsForVacuum(IEnumerable<Pawn> pawns)
         {
@@ -439,8 +453,11 @@ namespace SpaceServices
                     continue;
                 }
                 // Limit outfit disruption to the exact layer/body conflict caused by the safety gear.
-                pawn.apparel.Remove(worn);
-                worn.Destroy(DestroyMode.Vanish);
+                WithInternalVacGearRemoval(() =>
+                {
+                    pawn.apparel.Remove(worn);
+                    worn.Destroy(DestroyMode.Vanish);
+                });
             }
         }
 
@@ -454,9 +471,29 @@ namespace SpaceServices
             {
                 if (apparel != null && ShouldRemoveOnSealedArrival(apparel))
                 {
-                    pawn.apparel.Remove(apparel);
-                    apparel.Destroy(DestroyMode.Vanish);
+                    WithInternalVacGearRemoval(() =>
+                    {
+                        pawn.apparel.Remove(apparel);
+                        apparel.Destroy(DestroyMode.Vanish);
+                    });
                 }
+            }
+        }
+
+        private static void WithInternalVacGearRemoval(Action action)
+        {
+            if (action == null)
+            {
+                return;
+            }
+            internalVacGearRemovalDepth++;
+            try
+            {
+                action();
+            }
+            finally
+            {
+                internalVacGearRemovalDepth--;
             }
         }
 
