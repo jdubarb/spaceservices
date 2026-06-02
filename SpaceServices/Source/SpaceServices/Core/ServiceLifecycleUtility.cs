@@ -5,7 +5,6 @@ using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
-using System.Text;
 using UnityEngine;
 using Verse;
 using Verse.AI;
@@ -27,7 +26,6 @@ namespace SpaceServices
         private const int StableBedlessCheckTicks = 2500;
         private const int StableLeaveStateCheckTicks = 2500;
         private static readonly List<ServiceDepartureBlock> CachedDepartureBlocks = new List<ServiceDepartureBlock>();
-        private static readonly Dictionary<int, string> HospitalityInventorySnapshots = new Dictionary<int, string>();
         private static int cachedDepartureBlocksTick = -999999;
 
         public static int NextTickInterval(List<ServiceGroupRecord> records)
@@ -368,10 +366,6 @@ namespace SpaceServices
                     records.RemoveAt(i);
                     continue;
                 }
-                if (record.serviceKind == "hospitality")
-                {
-                    TraceHospitalityRecord(map, record, "lifecycle");
-                }
                 if (HospitalityVacuumProtectionActive(record))
                 {
                     EnsureHospitalityVacuumProtection(map, record, "active service");
@@ -618,7 +612,6 @@ namespace SpaceServices
                 {
                     continue;
                 }
-                TraceHospitalityInventory(effectiveMap, record, pawn, reason ?? "vacuum protection");
                 if (VacSuitUtility.VacuumResistance(pawn) + 0.001f >= VacSuitUtility.PracticalVacuumSuitTarget)
                 {
                     continue;
@@ -630,7 +623,6 @@ namespace SpaceServices
                 // Hospitality can re-apply guest outfits after spawn; restore service-provided vacuum protection before exposure.
                 VacSuitUtility.EnsurePracticalVacuumProtection(pawn);
                 ServiceDebugUtility.LogThrottled(ServiceLogIntegration.Hospitality, "hospitality-vac-gear-" + pawn.thingIDNumber, "Restored Hospitality guest vacuum gear (" + (reason ?? "service") + "): " + ServiceDebugUtility.PawnAuditSummary(pawn), GenDate.TicksPerHour);
-                TraceHospitalityInventory(effectiveMap, record, pawn, (reason ?? "vacuum protection") + " after suit");
             }
         }
 
@@ -675,74 +667,8 @@ namespace SpaceServices
                     pawn.jobs.EndCurrentJob(JobCondition.Incompletable);
                 }
                 pawn.jobs.TryTakeOrderedJob(job, JobTag.Misc);
-                TraceHospitalityInventory(map, record, pawn, (reason ?? "service") + " forced transit");
                 ServiceDebugUtility.LogThrottled(ServiceLogIntegration.Hospitality, "hospitality-vac-transit-" + pawn.thingIDNumber, "Forced Hospitality guest vacuum transit (" + (reason ?? "service") + "): " + ServiceDebugUtility.PawnAuditSummary(pawn) + " -> " + safeCell, GenDate.TicksPerHour);
             }
-        }
-
-        private static void TraceHospitalityInventory(Map map, ServiceGroupRecord record, Pawn pawn, string reason)
-        {
-            if (pawn == null || !ServiceDebugUtility.VerboseLogging(ServiceLogIntegration.Hospitality))
-            {
-                return;
-            }
-            string snapshot = HospitalityInventorySnapshot(map, record, pawn);
-            if (HospitalityInventorySnapshots.TryGetValue(pawn.thingIDNumber, out string previous) && previous == snapshot)
-            {
-                return;
-            }
-            HospitalityInventorySnapshots[pawn.thingIDNumber] = snapshot;
-            Verse.Log.Message("[Space Services] [hospitality trace] Hospitality gear trace (" + (reason ?? "unknown") + "): " + ServiceDebugUtility.PawnAuditSummary(pawn) + " " + snapshot);
-        }
-
-        private static void TraceHospitalityRecord(Map map, ServiceGroupRecord record, string reason)
-        {
-            if (record == null || record.pawns == null)
-            {
-                return;
-            }
-            Map effectiveMap = map ?? record.reservedPad?.Map ?? record.arrivalPad?.Map ?? record.pawns.FirstOrDefault(pawn => pawn != null && pawn.Spawned)?.Map;
-            foreach (Pawn pawn in record.pawns)
-            {
-                if (pawn != null && !pawn.Destroyed && pawn.Spawned)
-                {
-                    TraceHospitalityInventory(effectiveMap, record, pawn, reason);
-                }
-            }
-        }
-
-        private static string HospitalityInventorySnapshot(Map map, ServiceGroupRecord record, Pawn pawn)
-        {
-            StringBuilder builder = new StringBuilder();
-            builder.Append("record=");
-            builder.Append(record == null ? "null" : record.id + "/" + record.state);
-            builder.Append(" job=");
-            builder.Append(pawn == null || pawn.CurJob == null ? "null" : pawn.CurJob.def.defName);
-            builder.Append(" vac=");
-            builder.Append(VacSuitUtility.VacuumResistance(pawn).ToStringPercent());
-            if (map != null && pawn != null && pawn.Spawned)
-            {
-                builder.Append(" cellVac=");
-                builder.Append(ServiceEnvironmentUtility.GetVacuum(pawn.Position, map).ToStringPercent());
-            }
-            builder.Append(" worn=[");
-            builder.Append(ApparelSnapshot(pawn == null || pawn.apparel == null ? null : pawn.apparel.WornApparel));
-            builder.Append("] invApparel=[");
-            builder.Append(ApparelSnapshot(pawn == null || pawn.inventory == null || pawn.inventory.innerContainer == null ? null : pawn.inventory.innerContainer.OfType<Apparel>()));
-            builder.Append("]");
-            return builder.ToString();
-        }
-
-        private static string ApparelSnapshot(IEnumerable<Apparel> apparel)
-        {
-            if (apparel == null)
-            {
-                return "";
-            }
-            return string.Join(", ", apparel
-                .Where(item => item != null && item.def != null)
-                .Select(item => item.def.defName + "#" + item.thingIDNumber + " hp=" + item.HitPoints + "/" + item.MaxHitPoints + " tags=" + (item.questTags == null || item.questTags.Count == 0 ? "-" : string.Join("|", item.questTags.ToArray())))
-                .ToArray());
         }
 
         private static bool HospitalityPawnNeedsVacuumGear(Map map, ServiceGroupRecord record, Pawn pawn)
