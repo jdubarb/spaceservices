@@ -16,6 +16,7 @@ namespace SpaceServices
     public static class HospitalityPatchHandlers
     {
         private static readonly HashSet<Pawn> NativeGuestLeaveAllowed = new HashSet<Pawn>();
+        private static MethodInfo setNextOptimizeTickMethod;
 
         public static bool VisitorGroupTryExecutePrefix(object __instance, IncidentParms parms, ref bool __result)
         {
@@ -192,6 +193,39 @@ namespace SpaceServices
             }
             ServiceDebugUtility.LogAudit("Hospitality GuestUtility.Leave passed through unmanaged: " + HospitalityBedUtility.GuestDebugSummary(pawn));
             return true;
+        }
+
+        public static bool OptimizeApparelGuestPrefix(object __instance, Pawn pawn, ref Job __result)
+        {
+            if (!ServiceLifecycleUtility.ShouldSuppressHospitalityVacuumApparelJob(pawn, null))
+            {
+                return true;
+            }
+
+            __result = null;
+            SetNextOptimizeTick(__instance, pawn);
+            ServiceDebugUtility.LogAudit(ServiceLogIntegration.Hospitality, "Suppressed Hospitality guest apparel optimization during vacuum transit: " + ServiceDebugUtility.PawnAuditSummary(pawn));
+            return false;
+        }
+
+        private static void SetNextOptimizeTick(object jobGiver, Pawn pawn)
+        {
+            if (jobGiver == null || pawn == null)
+            {
+                return;
+            }
+            try
+            {
+                if (setNextOptimizeTickMethod == null)
+                {
+                    setNextOptimizeTickMethod = AccessTools.Method(typeof(JobGiver_OptimizeApparel), "SetNextOptimizeTick", new[] { typeof(Pawn) });
+                }
+                setNextOptimizeTickMethod?.Invoke(jobGiver, new object[] { pawn });
+            }
+            catch (Exception ex)
+            {
+                ServiceDebugUtility.LogThrottled(ServiceLogIntegration.Hospitality, "hospitality-set-next-optimize-" + pawn.thingIDNumber, "Could not throttle suppressed guest apparel optimization: " + ex.GetType().Name + " " + ex.Message, GenDate.TicksPerHour);
+            }
         }
 
         public static bool TryRunNativeGuestLeave(Pawn pawn)

@@ -280,6 +280,37 @@ namespace SpaceServices
             return false;
         }
 
+        public static bool ShouldSuppressHospitalityVacuumApparelJob(Pawn pawn, Job candidateJob)
+        {
+            Map map;
+            ServiceGroupRecord record;
+            if (!TryFindRecordForPawn(pawn, out map, out record))
+            {
+                return false;
+            }
+            if (record == null ||
+                record.serviceKind != "hospitality" ||
+                !HospitalityVacuumProtectionActive(record) ||
+                ServicePawnUtility.IsPlayerOwnedPawn(pawn) ||
+                ServicePawnUtility.IsTerminalPawn(pawn) ||
+                map == null)
+            {
+                return false;
+            }
+
+            bool pawnIsExposed = pawn.Spawned && ServiceEnvironmentUtility.GetVacuum(pawn.Position, map) > 0.001f;
+            bool jobTargetsVacuum = JobTargetsUnsafeVacuum(candidateJob, pawn, map);
+            bool transitWindow = HospitalityArrivalTransitGuardActive(record);
+            bool departureWindow = record.state == "departing" || record.state == "pickupInbound" || record.state == "boardingPickup";
+            if (!pawnIsExposed && !jobTargetsVacuum && !transitWindow && !departureWindow)
+            {
+                return false;
+            }
+
+            MarkRecordDirty(map, record, "suppressed Hospitality apparel job during vacuum transit");
+            return true;
+        }
+
         public static void Tick(Map map, List<ServiceGroupRecord> records)
         {
             if (map == null || records == null || records.Count == 0)
@@ -637,7 +668,7 @@ namespace SpaceServices
 
         private static void TraceHospitalityInventory(Map map, ServiceGroupRecord record, Pawn pawn, string reason)
         {
-            if (pawn == null)
+            if (pawn == null || !ServiceDebugUtility.VerboseLogging(ServiceLogIntegration.Hospitality))
             {
                 return;
             }
@@ -762,6 +793,11 @@ namespace SpaceServices
         private static bool PawnCurrentJobTargetsUnsafeVacuum(Pawn pawn, Map map)
         {
             Job job = pawn == null ? null : pawn.CurJob;
+            return JobTargetsUnsafeVacuum(job, pawn, map);
+        }
+
+        private static bool JobTargetsUnsafeVacuum(Job job, Pawn pawn, Map map)
+        {
             if (job == null || map == null)
             {
                 return false;
