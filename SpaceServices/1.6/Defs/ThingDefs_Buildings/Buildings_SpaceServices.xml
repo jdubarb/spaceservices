@@ -22,6 +22,9 @@
     <canOverlapZones>true</canOverlapZones>
     <designationCategory>JDB_SpaceServices</designationCategory>
     <uiOrder>100</uiOrder>
+    <placeWorkers>
+      <li>PlaceWorker_InvalidOverSubstructure</li>
+    </placeWorkers>
     <statBases>
       <WorkToBuild>800</WorkToBuild>
       <MaxHitPoints>100</MaxHitPoints>

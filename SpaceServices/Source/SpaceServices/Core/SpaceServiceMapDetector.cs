@@ -49,7 +49,7 @@ namespace SpaceServices
             string parentDef = Reflect.DefName(parent);
             string parentType = parent == null ? "" : parent.GetType().FullName ?? "";
 
-            if (parentDef == "Gravship" || parentType.EndsWith(".Gravship", StringComparison.Ordinal) || parentType == "RimWorld.Gravship")
+            if (IsActualGravshipParent(parentDef, parentType))
             {
                 result.blockReasons.Add("actual gravship parent");
             }
@@ -156,6 +156,15 @@ namespace SpaceServices
                 }
             }
             return false;
+        }
+
+        private static bool IsActualGravshipParent(string parentDef, string parentType)
+        {
+            // Only block the real Odyssey gravship parent. Some stationary space mods
+            // use "Gravship" in type names even though their maps are not vehicles.
+            return parentDef == "Gravship" ||
+                parentType == "RimWorld.Planet.Gravship" ||
+                parentType == "RimWorld.Gravship";
         }
 
         private static bool TypeOrBaseNameContains(object obj, string name)
