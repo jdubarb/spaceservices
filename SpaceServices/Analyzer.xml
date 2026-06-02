@@ -8,11 +8,125 @@
       <li>SpaceServices.ServiceEnvironmentUtility</li>
       <li>SpaceServices.ServiceDangerUtility</li>
       <li>SpaceServices.ServiceShuttleUtility</li>
+      <li>SpaceServices.ShuttleVisual</li>
+      <li>SpaceServices.ServiceShuttleGraphicUtility</li>
+      <li>SpaceServices.VacSuitUtility</li>
+      <li>SpaceServices.SpaceServiceVacuumApparelSetDef</li>
+      <li>SpaceServices.ServiceWearJobReservationPatch</li>
+      <li>SpaceServices.ServiceApparelRemovePatch</li>
+      <li>SpaceServices.ServiceApparelTryDropPatch</li>
+      <li>SpaceServices.DepartureUtility</li>
       <li>SpaceServices.HospitalIncidentGate</li>
       <li>SpaceServices.HospitalityIncidentGate</li>
+      <li>SpaceServices.HospitalityBedUtility</li>
       <li>SpaceServices.HospitalPatchHandlers</li>
       <li>SpaceServices.HospitalityPatchHandlers</li>
+      <li>SpaceServices.ScheduledHospitalityIncident</li>
       <li>SpaceServices.Alert_SpaceServicesDepartureBlocked</li>
     </Types>
+    <Methods>
+      <li>SpaceServices.SpaceServicesMapComponent:MapComponentTick</li>
+      <li>SpaceServices.SpaceServicesMapComponent:RequestLifecycleTickSoon</li>
+      <li>SpaceServices.SpaceServicesMapComponent:CachedServicePadBuildings</li>
+      <li>SpaceServices.SpaceServicesMapComponent:ScheduleShuttleArrival</li>
+      <li>SpaceServices.SpaceServicesMapComponent:ScheduleHospitalityIncident</li>
+      <li>SpaceServices.SpaceServicesMapComponent:TickPendingHospitalityIncidents</li>
+      <li>SpaceServices.SpaceServicesMapComponent:TickNaturalHospitalityScheduler</li>
+      <li>SpaceServices.SpaceServicesMapComponent:TryScheduleNaturalHospitalityVisit</li>
+      <li>SpaceServices.SpaceServicesMapComponent:ReleaseArrivalReservation</li>
+      <li>SpaceServices.ScheduledHospitalityIncident:EnsureRuntime</li>
+      <li>SpaceServices.ServiceShuttleUtility:TickPendingArrivals</li>
+      <li>SpaceServices.ServiceShuttleUtility:SpawnContents</li>
+      <li>SpaceServices.ServiceShuttleUtility:SpawnSkyfaller</li>
+      <li>SpaceServices.ServiceShuttleUtility:CleanupTouchdownShuttle</li>
+      <li>SpaceServices.ServiceShuttleUtility:CleanupServiceShuttlePayloadsNear</li>
+      <li>SpaceServices.ServiceShuttleUtility:CleanupShuttleThingsNear</li>
+      <li>SpaceServices.ServiceShuttleUtility:FindSpawnCell</li>
+      <li>SpaceServices.ShuttleVisual:AvailableVisuals</li>
+      <li>SpaceServices.ShuttleVisual:BuildAvailableVisuals</li>
+      <li>SpaceServices.ServiceShuttleGraphicUtility:GraphicFor</li>
+      <li>SpaceServices.HospitalityPatchHandlers:VisitorGroupTryExecutePrefix</li>
+      <li>SpaceServices.HospitalityPatchHandlers:VisitorGroupTryExecutePostfix</li>
+      <li>SpaceServices.HospitalityPatchHandlers:AskForSafetyPrefix</li>
+      <li>SpaceServices.HospitalityPatchHandlers:SpawnGroupPrefix</li>
+      <li>SpaceServices.HospitalityPatchHandlers:SpawnGroupPostfix</li>
+      <li>SpaceServices.HospitalityPatchHandlers:SpawnVisitorPrefix</li>
+      <li>SpaceServices.HospitalityPatchHandlers:SpawnVisitorPostfix</li>
+      <li>SpaceServices.HospitalityPatchHandlers:CreateLordPostfix</li>
+      <li>SpaceServices.HospitalityPatchHandlers:GuestLeavePrefix</li>
+      <li>SpaceServices.HospitalityPatchHandlers:OptimizeApparelGuestPrefix</li>
+      <li>SpaceServices.HospitalityIncidentGate:EstimatedBedDemand</li>
+      <li>SpaceServices.HospitalityBedUtility:Report</li>
+      <li>SpaceServices.HospitalityBedUtility:PrepareGuestsForServiceDeparture</li>
+      <li>SpaceServices.HospitalityBedUtility:GuestBeds</li>
+      <li>SpaceServices.ServiceLifecycleUtility:NextTickInterval</li>
+      <li>SpaceServices.ServiceLifecycleUtility:RequestDepartureForPawn</li>
+      <li>SpaceServices.ServiceLifecycleUtility:MarkRecordDirty</li>
+      <li>SpaceServices.ServiceLifecycleUtility:TryFindRecordForPawn</li>
+      <li>SpaceServices.ServiceLifecycleUtility:ShouldSuppressHospitalityVacuumApparelJob</li>
+      <li>SpaceServices.ServiceLifecycleUtility:ShouldProtectHospitalityVacuumApparel</li>
+      <li>SpaceServices.ServiceLifecycleUtility:Tick</li>
+      <li>SpaceServices.ServiceLifecycleUtility:EnsureHospitalityVacuumProtection</li>
+      <li>SpaceServices.ServiceLifecycleUtility:ForceHospitalityVacuumTransit</li>
+      <li>SpaceServices.ServiceLifecycleUtility:HospitalityPawnNeedsVacuumGear</li>
+      <li>SpaceServices.ServiceLifecycleUtility:GuardHospitalityGuestsFromVacuum</li>
+      <li>SpaceServices.ServiceLifecycleUtility:FindHospitalitySafeCell</li>
+      <li>SpaceServices.ServiceLifecycleUtility:BestSafeReachableCell</li>
+      <li>SpaceServices.ServiceLifecycleUtility:ActiveTrackedPawns</li>
+      <li>SpaceServices.ServiceLifecycleUtility:BeginDeparture</li>
+      <li>SpaceServices.ServiceLifecycleUtility:EnsureHospitalityDeparturePrepared</li>
+      <li>SpaceServices.ServiceLifecycleUtility:TryReserveBestDeparturePad</li>
+      <li>SpaceServices.ServiceLifecycleUtility:OrderedDeparturePads</li>
+      <li>SpaceServices.ServiceLifecycleUtility:DeparturePadScore</li>
+      <li>SpaceServices.ServiceLifecycleUtility:PadCanSafelyServeDeparture</li>
+      <li>SpaceServices.ServiceLifecycleUtility:ReadyForExtraction</li>
+      <li>SpaceServices.ServiceLifecycleUtility:HospitalityReadyForPickupCall</li>
+      <li>SpaceServices.ServiceLifecycleUtility:GuideDepartingPawnsToPad</li>
+      <li>SpaceServices.ServiceLifecycleUtility:GuideBoardingPawnsToShuttle</li>
+      <li>SpaceServices.ServiceLifecycleUtility:PadReachableForPawns</li>
+      <li>SpaceServices.ServiceLifecycleUtility:BestReachableCell</li>
+      <li>SpaceServices.ServiceLifecycleUtility:BlockedDepartures</li>
+      <li>SpaceServices.ServiceLifecycleUtility:BuildBlockedDepartures</li>
+      <li>SpaceServices.ServiceLifecycleUtility:ReservedPadCanServe</li>
+      <li>SpaceServices.VacSuitUtility:SuitPawnsForEnvironment</li>
+      <li>SpaceServices.VacSuitUtility:SuitPawnForEnvironment</li>
+      <li>SpaceServices.VacSuitUtility:VacuumResistance</li>
+      <li>SpaceServices.VacSuitUtility:EnsurePracticalVacuumProtection</li>
+      <li>SpaceServices.VacSuitUtility:TryRewearInjectedVacuumGear</li>
+      <li>SpaceServices.VacSuitUtility:SelectXmlApparelSetFor</li>
+      <li>SpaceServices.VacSuitUtility:SelectAutomaticApparel</li>
+      <li>SpaceServices.VacSuitUtility:SelectTaggedAutomaticSet</li>
+      <li>SpaceServices.VacSuitUtility:BuildCompatibleSet</li>
+      <li>SpaceServices.VacSuitUtility:WeightedRandomCandidate</li>
+      <li>SpaceServices.VacSuitUtility:WeightedRandomSetCandidate</li>
+      <li>SpaceServices.VacSuitUtility:WeightedRandomSet</li>
+      <li>SpaceServices.VacSuitUtility:TryWearIfNeeded</li>
+      <li>SpaceServices.VacSuitUtility:TakeInventoryApparel</li>
+      <li>SpaceServices.VacSuitUtility:RemoveApparelConflictingWith</li>
+      <li>SpaceServices.VacSuitUtility:VacuumResistanceFromDef</li>
+      <li>SpaceServices.VacSuitUtility:BuildAutoCandidates</li>
+      <li>SpaceServices.VacSuitUtility:get_AutoCandidates</li>
+      <li>SpaceServices.VacSuitUtility:get_VacuumResistanceDef</li>
+      <li>SpaceServices.VacSuitUtility+VacuumApparelCandidate:TryCreate</li>
+      <li>SpaceServices.VacSuitUtility+VacuumApparelCandidate:CanWear</li>
+      <li>SpaceServices.VacSuitUtility+VacuumApparelCandidate:ConflictsWith</li>
+      <li>SpaceServices.VacSuitUtility+VacuumApparelCandidate:IsBlacklisted</li>
+      <li>SpaceServices.VacSuitUtility+VacuumApparelCandidate:SetTagsFor</li>
+      <li>SpaceServices.VacSuitUtility+VacuumApparelCandidate:LooksLikeSetTag</li>
+      <li>SpaceServices.SpaceServiceVacuumApparelSetDef:ResolvedApparelFor</li>
+      <li>SpaceServices.ServiceWearJobReservationPatch:Prefix</li>
+      <li>SpaceServices.ServiceApparelRemovePatch:Prefix</li>
+      <li>SpaceServices.ServiceApparelTryDropPatch:Prefix</li>
+      <li>SpaceServices.ServiceEnvironmentUtility:GetVacuum</li>
+      <li>SpaceServices.ServiceEnvironmentUtility:GetMaxVacuum</li>
+      <li>SpaceServices.ServiceEnvironmentUtility:IsRoofAccessible</li>
+      <li>SpaceServices.ServiceEnvironmentUtility:IsSafeForPawn</li>
+      <li>SpaceServices.ServiceEnvironmentUtility:IsPadSafeForPawns</li>
+      <li>SpaceServices.DepartureUtility:CompleteDeparture</li>
+      <li>SpaceServices.DepartureUtility:TryAutoExtract</li>
+      <li>SpaceServices.DepartureUtility:TryExitSpawnedPawn</li>
+      <li>SpaceServices.DepartureUtility:CleanupDepartingPawnReferences</li>
+      <li>SpaceServices.DepartureUtility:CleanupLordReferences</li>
+    </Methods>
   </SpaceServices>
 </Analyzer>
