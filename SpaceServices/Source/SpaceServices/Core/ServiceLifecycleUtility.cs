@@ -608,7 +608,11 @@ namespace SpaceServices
                 {
                     continue;
                 }
-                IntVec3 safeCell = FindHospitalitySafeCell(map, pad, pawn);
+                // During arrival, "safe because they are wearing a suit" is not enough.
+                // Hospitality can re-apply guest outfits if we let them idle on the pad,
+                // so move them to real atmosphere before normal guest AI takes over.
+                bool requireAtmosphere = HospitalityArrivalTransitGuardActive(record);
+                IntVec3 safeCell = FindHospitalitySafeCell(map, pad, pawn, requireAtmosphere);
                 if (!safeCell.IsValid || safeCell == pawn.Position)
                 {
                     continue;
@@ -744,7 +748,7 @@ namespace SpaceServices
                 {
                     continue;
                 }
-                IntVec3 safeCell = FindHospitalitySafeCell(map, record.reservedPad, pawn);
+                IntVec3 safeCell = FindHospitalitySafeCell(map, record.reservedPad, pawn, false);
                 if (!safeCell.IsValid || safeCell == pawn.Position)
                 {
                     continue;
@@ -776,26 +780,26 @@ namespace SpaceServices
             return !ServiceEnvironmentUtility.IsSafeForPawn(pawn, map, target.Cell);
         }
 
-        private static IntVec3 FindHospitalitySafeCell(Map map, Thing pad, Pawn pawn)
+        private static IntVec3 FindHospitalitySafeCell(Map map, Thing pad, Pawn pawn, bool requireAtmosphere)
         {
             if (pad != null && pad.Spawned)
             {
-                IntVec3 nearPad = BestSafeReachableCell(GenRadial.RadialCellsAround(pad.Position, 12f, true), map, pawn, pad.Position);
+                IntVec3 nearPad = BestSafeReachableCell(GenRadial.RadialCellsAround(pad.Position, 12f, true), map, pawn, pad.Position, requireAtmosphere);
                 if (nearPad.IsValid)
                 {
                     return nearPad;
                 }
             }
-            IntVec3 nearPawn = BestSafeReachableCell(GenRadial.RadialCellsAround(pawn.Position, 12f, true), map, pawn, pawn.Position);
+            IntVec3 nearPawn = BestSafeReachableCell(GenRadial.RadialCellsAround(pawn.Position, 12f, true), map, pawn, pawn.Position, requireAtmosphere);
             if (nearPawn.IsValid)
             {
                 return nearPawn;
             }
             Room room = pad != null && pad.Spawned ? pad.Position.GetRoom(map) : null;
-            return room == null ? IntVec3.Invalid : BestSafeReachableCell(room.Cells, map, pawn, pad.Position);
+            return room == null ? IntVec3.Invalid : BestSafeReachableCell(room.Cells, map, pawn, pad.Position, requireAtmosphere);
         }
 
-        private static IntVec3 BestSafeReachableCell(IEnumerable<IntVec3> cells, Map map, Pawn pawn, IntVec3 origin)
+        private static IntVec3 BestSafeReachableCell(IEnumerable<IntVec3> cells, Map map, Pawn pawn, IntVec3 origin, bool requireAtmosphere)
         {
             IntVec3 best = IntVec3.Invalid;
             int bestDistance = int.MaxValue;
@@ -806,6 +810,10 @@ namespace SpaceServices
                     (cell.GetFirstPawn(map) != null && cell != pawn.Position) ||
                     !ServiceEnvironmentUtility.IsSafeForPawn(pawn, map, cell) ||
                     !pawn.CanReach(cell, PathEndMode.OnCell, Danger.Deadly))
+                {
+                    continue;
+                }
+                if (requireAtmosphere && ServiceEnvironmentUtility.GetVacuum(cell, map) > 0.001f)
                 {
                     continue;
                 }
