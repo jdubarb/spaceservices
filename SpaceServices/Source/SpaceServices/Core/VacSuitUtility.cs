@@ -20,7 +20,8 @@ namespace SpaceServices
         private static readonly Dictionary<int, bool> sealedArrivalSuitRolls = new Dictionary<int, bool>();
         private const string InjectedVacGearTag = "JDB_SpaceServices_AutoVacGear";
         private const float AutoSetSelectionChance = 0.35f;
-        public const float PracticalVacuumSuitTarget = 0.9f;
+        // Odyssey still applies vacuum harm below full resistance, so service transit treats 100% as the practical safety floor.
+        public const float PracticalVacuumSuitTarget = 1f;
         private static StatDef vacuumResistance;
         private static List<VacuumApparelCandidate> cachedAutoCandidates;
         private static int internalVacGearRemovalDepth;
