@@ -18,7 +18,9 @@ namespace SpaceServices
         public override void SpawnSetup(Map map, bool respawningAfterLoad)
         {
             base.SpawnSetup(map, respawningAfterLoad);
-            map?.GetComponent<SpaceServicesMapComponent>()?.DirtyServicePadCache();
+            SpaceServicesMapComponent comp = map?.GetComponent<SpaceServicesMapComponent>();
+            comp?.DirtyServicePadCache();
+            comp?.NotifyServicePadPlaced(this, respawningAfterLoad);
             ServicePadUtility.RequestLifecycleTickSoon(map, "service pad spawned");
             ServicePadPrebuildModeUtility.ApplyPendingMode(this);
         }

@@ -30,6 +30,7 @@ namespace SpaceServices
         private bool staleReferenceCleanupDone;
         private int staleReferenceCleanupVersion;
         public bool debugForceHospitalityDanger;
+        private bool hospitalityGuestAreaTipShown;
         private int debugLimitSemanticsVersion;
         public int debugHospitalPatientLimit = -1;
         public int debugHospitalityGroupLimit = -1;
@@ -62,6 +63,7 @@ namespace SpaceServices
             Scribe_Values.Look(ref staleReferenceCleanupVersion, "staleReferenceCleanupVersion", 0);
             Scribe_Values.Look(ref nextHospitalityServiceVisitTick, "nextHospitalityServiceVisitTick", 0);
             Scribe_Values.Look(ref debugForceHospitalityDanger, "debugForceHospitalityDanger", false);
+            Scribe_Values.Look(ref hospitalityGuestAreaTipShown, "hospitalityGuestAreaTipShown", false);
             if (Scribe.mode == LoadSaveMode.Saving)
             {
                 debugLimitSemanticsVersion = 1;
@@ -97,6 +99,20 @@ namespace SpaceServices
             {
                 pendingHospitalityIncidents = new List<ScheduledHospitalityIncident>();
             }
+        }
+
+        public void NotifyServicePadPlaced(Thing pad, bool respawningAfterLoad)
+        {
+            if (respawningAfterLoad || hospitalityGuestAreaTipShown || pad == null || map == null)
+            {
+                return;
+            }
+            if (AccessTools.TypeByName("Hospitality.Hospitality_MapComponent") == null)
+            {
+                return;
+            }
+            hospitalityGuestAreaTipShown = true;
+            Messages.Message("JDB_SpaceServices_Message_HospitalityGuestAreaTip".Translate(), pad, MessageTypeDefOf.NeutralEvent, false);
         }
 
         public override void MapComponentTick()

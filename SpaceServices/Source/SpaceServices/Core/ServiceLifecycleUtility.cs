@@ -21,6 +21,10 @@ namespace SpaceServices
         private const int HospitalityArrivalVacuumGearGuardTicks = 2500;
         private const int HospitalityVacuumTransitGuardTicks = 2500;
         private const int HospitalityVacuumProtectionTickInterval = 250;
+        private const float HospitalitySafeCellSearchRadius = 12f;
+        private const float HospitalityAreaSafeCellSearchRadius = 16f;
+        private const int HospitalitySafeCellReachabilityChecks = 6;
+        private const float VacuumEpsilon = 0.001f;
         private const float VacuumPadDistanceTolerance = 2.5f;
         private const int BlockedDepartureCacheTicks = 60;
         private const int StableActivePawnValidationTicks = 10000;
@@ -643,7 +647,7 @@ namespace SpaceServices
                 {
                     continue;
                 }
-                bool unsafeNow = ServiceEnvironmentUtility.GetVacuum(pawn.Position, map) > 0.001f;
+                bool unsafeNow = ServiceEnvironmentUtility.GetVacuum(pawn.Position, map) > VacuumEpsilon;
                 bool unsafeDestination = PawnCurrentJobTargetsUnsafeVacuum(pawn, map);
                 if (!unsafeNow && !unsafeDestination)
                 {
@@ -689,7 +693,7 @@ namespace SpaceServices
             {
                 return false;
             }
-            if (pawn.Position.IsValid && ServiceEnvironmentUtility.GetVacuum(pawn.Position, map) > 0.001f)
+            if (pawn.Position.IsValid && ServiceEnvironmentUtility.GetVacuum(pawn.Position, map) > VacuumEpsilon)
             {
                 return true;
             }
@@ -702,7 +706,7 @@ namespace SpaceServices
                 pad.Spawned &&
                 pad.Map == map &&
                 pawn.Position.DistanceToSquared(pad.Position) <= 144 &&
-                ServiceEnvironmentUtility.GetMaxVacuum(pad) > 0.001f;
+                ServiceEnvironmentUtility.GetMaxVacuum(pad) > VacuumEpsilon;
         }
 
         private static void GuardHospitalityGuestsFromVacuum(Map map, ServiceGroupRecord record)
@@ -762,15 +766,20 @@ namespace SpaceServices
 
         private static IntVec3 FindHospitalitySafeCell(Map map, Thing pad, Pawn pawn, bool requireAtmosphere)
         {
+            IntVec3 guestAreaCell = FindHospitalityGuestAreaSafeCell(map, pad, pawn, requireAtmosphere);
+            if (guestAreaCell.IsValid)
+            {
+                return guestAreaCell;
+            }
             if (pad != null && pad.Spawned)
             {
-                IntVec3 nearPad = BestSafeReachableCell(GenRadial.RadialCellsAround(pad.Position, 12f, true), map, pawn, pad.Position, requireAtmosphere);
+                IntVec3 nearPad = BestSafeReachableCell(GenRadial.RadialCellsAround(pad.Position, HospitalitySafeCellSearchRadius, true), map, pawn, pad.Position, requireAtmosphere);
                 if (nearPad.IsValid)
                 {
                     return nearPad;
                 }
             }
-            IntVec3 nearPawn = BestSafeReachableCell(GenRadial.RadialCellsAround(pawn.Position, 12f, true), map, pawn, pawn.Position, requireAtmosphere);
+            IntVec3 nearPawn = BestSafeReachableCell(GenRadial.RadialCellsAround(pawn.Position, HospitalitySafeCellSearchRadius, true), map, pawn, pawn.Position, requireAtmosphere);
             if (nearPawn.IsValid)
             {
                 return nearPawn;
@@ -779,32 +788,139 @@ namespace SpaceServices
             return room == null ? IntVec3.Invalid : BestSafeReachableCell(room.Cells, map, pawn, pad.Position, requireAtmosphere);
         }
 
-        private static IntVec3 BestSafeReachableCell(IEnumerable<IntVec3> cells, Map map, Pawn pawn, IntVec3 origin, bool requireAtmosphere)
+        private static IntVec3 FindHospitalityGuestAreaSafeCell(Map map, Thing pad, Pawn pawn, bool requireAtmosphere)
         {
-            IntVec3 best = IntVec3.Invalid;
-            int bestDistance = int.MaxValue;
-            foreach (IntVec3 cell in cells ?? Enumerable.Empty<IntVec3>())
+            Area area = HospitalityGuestArea(map, pawn);
+            if (area == null || area.Map != map || area.TrueCount == 0)
             {
-                if (!cell.InBounds(map) ||
-                    !cell.Standable(map) ||
-                    (cell.GetFirstPawn(map) != null && cell != pawn.Position) ||
-                    !ServiceEnvironmentUtility.IsSafeForPawn(pawn, map, cell) ||
-                    !pawn.CanReach(cell, PathEndMode.OnCell, Danger.Deadly))
+                return IntVec3.Invalid;
+            }
+            if (pad != null && pad.Spawned)
+            {
+                IntVec3 nearPad = BestSafeReachableCell(AreaCells(GenRadial.RadialCellsAround(pad.Position, HospitalityAreaSafeCellSearchRadius, true), area, map), map, pawn, pad.Position, requireAtmosphere);
+                if (nearPad.IsValid)
                 {
-                    continue;
-                }
-                if (requireAtmosphere && ServiceEnvironmentUtility.GetVacuum(cell, map) > 0.001f)
-                {
-                    continue;
-                }
-                int distance = cell.DistanceToSquared(origin);
-                if (distance < bestDistance)
-                {
-                    best = cell;
-                    bestDistance = distance;
+                    return nearPad;
                 }
             }
-            return best;
+            return BestSafeReachableCell(AreaCells(GenRadial.RadialCellsAround(pawn.Position, HospitalityAreaSafeCellSearchRadius, true), area, map), map, pawn, pawn.Position, requireAtmosphere);
+        }
+
+        private static IEnumerable<IntVec3> AreaCells(IEnumerable<IntVec3> cells, Area area, Map map)
+        {
+            foreach (IntVec3 cell in cells ?? Enumerable.Empty<IntVec3>())
+            {
+                if (cell.IsValid && cell.InBounds(map) && area[cell])
+                {
+                    yield return cell;
+                }
+            }
+        }
+
+        private static Area HospitalityGuestArea(Map map, Pawn pawn)
+        {
+            Area area = HospitalityPawnGuestArea(pawn);
+            if (area != null && area.Map == map && area.TrueCount > 0)
+            {
+                return area;
+            }
+            return HospitalityDefaultGuestArea(map);
+        }
+
+        private static Area HospitalityPawnGuestArea(Pawn pawn)
+        {
+            if (pawn == null || pawn.AllComps == null)
+            {
+                return null;
+            }
+            foreach (ThingComp comp in pawn.AllComps)
+            {
+                if (comp != null && comp.GetType().FullName == "Hospitality.CompGuest")
+                {
+                    return Reflect.GetMember(comp, "GuestArea") as Area;
+                }
+            }
+            return null;
+        }
+
+        private static Area HospitalityDefaultGuestArea(Map map)
+        {
+            IEnumerable components = map == null ? null : Reflect.GetMember(map, "components") as IEnumerable;
+            foreach (object component in components ?? Enumerable.Empty<object>())
+            {
+                if (component != null && component.GetType().FullName == "Hospitality.Hospitality_MapComponent")
+                {
+                    return Reflect.GetMember(component, "defaultAreaRestriction") as Area;
+                }
+            }
+            return null;
+        }
+
+        private static IntVec3 BestSafeReachableCell(IEnumerable<IntVec3> cells, Map map, Pawn pawn, IntVec3 origin, bool requireAtmosphere)
+        {
+            if (map == null || pawn == null)
+            {
+                return IntVec3.Invalid;
+            }
+
+            // Pathfinding is the expensive part of the arrival vacuum guard.
+            // Shortlist cheap safe cells first, then run reachability on only the best few.
+            List<IntVec3> candidates = new List<IntVec3>(HospitalitySafeCellReachabilityChecks);
+            float resistance = requireAtmosphere ? 0f : VacSuitUtility.VacuumResistance(pawn);
+            foreach (IntVec3 cell in cells ?? Enumerable.Empty<IntVec3>())
+            {
+                if (!IsHospitalitySafeCellCandidate(cell, map, pawn, requireAtmosphere, resistance))
+                {
+                    continue;
+                }
+                AddSafeCellCandidate(candidates, cell, origin);
+            }
+
+            foreach (IntVec3 cell in candidates)
+            {
+                if (cell == pawn.Position || pawn.CanReach(cell, PathEndMode.OnCell, Danger.Deadly))
+                {
+                    return cell;
+                }
+            }
+            return IntVec3.Invalid;
+        }
+
+        private static bool IsHospitalitySafeCellCandidate(IntVec3 cell, Map map, Pawn pawn, bool requireAtmosphere, float resistance)
+        {
+            if (!cell.InBounds(map) || !cell.Standable(map) || (cell.GetFirstPawn(map) != null && cell != pawn.Position))
+            {
+                return false;
+            }
+            float vacuum = ServiceEnvironmentUtility.GetVacuum(cell, map);
+            if (requireAtmosphere)
+            {
+                return vacuum <= VacuumEpsilon;
+            }
+            return resistance + VacuumEpsilon >= vacuum;
+        }
+
+        private static void AddSafeCellCandidate(List<IntVec3> candidates, IntVec3 cell, IntVec3 origin)
+        {
+            int distance = cell.DistanceToSquared(origin);
+            int insertAt = candidates.Count;
+            for (int i = 0; i < candidates.Count; i++)
+            {
+                if (distance < candidates[i].DistanceToSquared(origin))
+                {
+                    insertAt = i;
+                    break;
+                }
+            }
+            if (insertAt >= HospitalitySafeCellReachabilityChecks && candidates.Count >= HospitalitySafeCellReachabilityChecks)
+            {
+                return;
+            }
+            candidates.Insert(insertAt, cell);
+            if (candidates.Count > HospitalitySafeCellReachabilityChecks)
+            {
+                candidates.RemoveAt(HospitalitySafeCellReachabilityChecks);
+            }
         }
 
         private static List<Pawn> ActiveTrackedPawns(Map map, ServiceGroupRecord record)

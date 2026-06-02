@@ -49,6 +49,8 @@
   <JDB_SpaceServices_Settings_SuppressMassCasualtyPreDropEffects>Suppress mass casualty pre-drop effects</JDB_SpaceServices_Settings_SuppressMassCasualtyPreDropEffects>
   <JDB_SpaceServices_Settings_SuppressMassCasualtyPreDropEffectsDesc>Experimental. Hides Hospital's early wound filth and mote effects while mass-casualty pawns are being packed into drop pods, before the pods visibly land.</JDB_SpaceServices_Settings_SuppressMassCasualtyPreDropEffectsDesc>
 
+  <JDB_SpaceServices_Message_HospitalityGuestAreaTip>Space Services: for Hospitality guests in space, set Hospitality's map settings accommodation/visitor area to a sealed, safe guest area near your service pad.</JDB_SpaceServices_Message_HospitalityGuestAreaTip>
+
   <JDB_SpaceServices_Gizmo_ModeHospitalOnly>Hospital only</JDB_SpaceServices_Gizmo_ModeHospitalOnly>
   <JDB_SpaceServices_Gizmo_ModeHospitalOnlyDesc>Use this pad only for Hospital patient arrivals and departures.</JDB_SpaceServices_Gizmo_ModeHospitalOnlyDesc>
   <JDB_SpaceServices_Gizmo_ModeHospitalityOnly>Hospitality only</JDB_SpaceServices_Gizmo_ModeHospitalityOnly>
