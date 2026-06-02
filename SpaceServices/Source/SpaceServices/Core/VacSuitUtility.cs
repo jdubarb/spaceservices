@@ -136,7 +136,11 @@ namespace SpaceServices
                 {
                     TryWearIfNeeded(pawn, autoCandidates[i].def, true);
                 }
-                return;
+                if (VacuumResistance(pawn) + 0.001f >= targetVacuum)
+                {
+                    return;
+                }
+                ServiceDebugUtility.LogVerbose(ServiceLogIntegration.Core, "Automatic vacuum apparel did not reach target for " + pawn.LabelShortCap + "; falling back to explicit vacsuit set.");
             }
 
             List<ThingDef> defs = SelectXmlApparelSetFor(pawn);
@@ -323,6 +327,17 @@ namespace SpaceServices
             {
                 return;
             }
+            Apparel inventoryApparel = TakeInventoryApparel(pawn, def);
+            if (inventoryApparel != null)
+            {
+                if (markInjected)
+                {
+                    MarkInjectedVacGear(inventoryApparel);
+                }
+                RemoveApparelConflictingWith(pawn, inventoryApparel);
+                pawn.apparel.Wear(inventoryApparel, false, true);
+                return;
+            }
             ThingDef stuff = def.MadeFromStuff ? GenStuff.DefaultStuffFor(def) : null;
             Apparel newApparel = ThingMaker.MakeThing(def, stuff) as Apparel;
             if (newApparel == null)
@@ -335,6 +350,23 @@ namespace SpaceServices
             }
             RemoveApparelConflictingWith(pawn, newApparel);
             pawn.apparel.Wear(newApparel, false, true);
+        }
+
+        private static Apparel TakeInventoryApparel(Pawn pawn, ThingDef def)
+        {
+            if (pawn == null || pawn.inventory == null || pawn.inventory.innerContainer == null || def == null)
+            {
+                return null;
+            }
+            Apparel apparel = pawn.inventory.innerContainer
+                .OfType<Apparel>()
+                .FirstOrDefault(item => item != null && item.def == def);
+            if (apparel == null)
+            {
+                return null;
+            }
+            pawn.inventory.innerContainer.Remove(apparel);
+            return apparel;
         }
 
         private static void RemoveApparelConflictingWith(Pawn pawn, Apparel newApparel)
