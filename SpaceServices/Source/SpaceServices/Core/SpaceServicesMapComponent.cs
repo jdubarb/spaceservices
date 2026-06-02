@@ -499,7 +499,7 @@ namespace SpaceServices
             }
 
             ServiceShuttleUtility.SpawnArrival(map, pad.Position, visual);
-            Messages.Message("Space Services: visitors inbound", pad, MessageTypeDefOf.NeutralEvent, false);
+            Messages.Message("Space Services: visitors inbound", pad, MessageTypeDefOf.SilentInput, false);
             ServiceDebugUtility.Log("Queued service hospitality visitors from " + faction.Name + " at " + pad.Position);
             return true;
         }

@@ -53,7 +53,8 @@ namespace SpaceServices
                 }
                 ReleaseReservation(record);
                 ServiceDebugUtility.LogAudit("CompleteDeparture finished id=" + record.id + " state=" + record.state);
-                Messages.Message("Space Services: service group departed", MessageTypeDefOf.NeutralEvent, false);
+                MessageTypeDef departureMessageType = record.serviceKind == "hospitality" ? MessageTypeDefOf.SilentInput : MessageTypeDefOf.NeutralEvent;
+                Messages.Message("Space Services: service group departed", departureMessageType, false);
             }
             return completed;
         }

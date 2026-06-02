@@ -63,7 +63,7 @@ namespace SpaceServices
                 {
                     ServiceDebugUtility.LogAudit("Hospitality VisitorGroup scheduled shuttle arrival pad=" + ServiceDebugUtility.ThingAuditSummary(pad) + " visual=" + (visual.shipThingDef == null ? "none" : visual.shipThingDef.defName));
                     ServiceShuttleUtility.SpawnArrival(map, pad.Position, visual);
-                    Messages.Message("Space Services: visitors inbound", pad, MessageTypeDefOf.NeutralEvent, false);
+                    Messages.Message("Space Services: visitors inbound", pad, MessageTypeDefOf.SilentInput, false);
                     __result = true;
                     return false;
                 }
