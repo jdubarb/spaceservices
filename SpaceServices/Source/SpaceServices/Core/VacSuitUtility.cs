@@ -132,6 +132,11 @@ namespace SpaceServices
             SuitPawnForVacuum(pawn, 1f);
         }
 
+        public static void EnsurePracticalVacuumProtection(Pawn pawn)
+        {
+            SuitPawnForVacuum(pawn, PracticalVacuumSuitTarget);
+        }
+
         private static void SuitPawnForVacuum(Pawn pawn, float targetVacuum)
         {
             if (pawn == null || pawn.apparel == null || pawn.RaceProps == null || !pawn.RaceProps.Humanlike)

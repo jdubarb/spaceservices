@@ -19,6 +19,8 @@ namespace SpaceServices
         private const int HospitalityDepartureHardTimeoutTicks = 7500;
         private const int HospitalityBedlessDepartureGraceTicks = 2500 * 16;
         private const int PickupBoardingHardTimeoutTicks = 2500;
+        private const int HospitalityArrivalVacuumGearGuardTicks = 2500;
+        private const int HospitalityVacuumTransitGuardTicks = 2500;
         private const float VacuumPadDistanceTolerance = 2.5f;
         private const int BlockedDepartureCacheTicks = 60;
         private const int StableActivePawnValidationTicks = 10000;
@@ -30,6 +32,10 @@ namespace SpaceServices
         public static int NextTickInterval(List<ServiceGroupRecord> records)
         {
             if (records != null && records.Any(record => record != null && (record.state == "pickupInbound" || record.state == "boardingPickup" || record.state == "departing")))
+            {
+                return 30;
+            }
+            if (records != null && records.Any(HospitalityArrivalVacuumProtectionActive))
             {
                 return 30;
             }
@@ -79,6 +85,8 @@ namespace SpaceServices
                 {
                     existing.arrivalPad = arrivalPad;
                 }
+                EnsureHospitalityVacuumProtection(map, existing, "arrival merge");
+                ForceHospitalityVacuumTransit(map, existing, "arrival merge");
                 MarkRecordDirty(map, existing, "merged arriving service pawns");
                 return;
             }
@@ -107,6 +115,8 @@ namespace SpaceServices
             comp.serviceGroups.Add(record);
             ServiceDebugUtility.Log("Registered " + kind + " service group " + record.id + " pawns=" + list.Count + " padReserved=" + (record.reservedPad != null) + " arrivalPad=" + (arrivalPad != null));
             ServiceDebugUtility.LogAudit("RegisterPawns new " + RecordAudit(record) + " pawns=" + PawnSummary(list) + " arrivalPad=" + ServiceDebugUtility.ThingAuditSummary(arrivalPad));
+            EnsureHospitalityVacuumProtection(map, record, "arrival");
+            ForceHospitalityVacuumTransit(map, record, "arrival");
             MarkRecordDirty(map, record, "registered arriving service pawns");
         }
 
@@ -312,6 +322,11 @@ namespace SpaceServices
                     records.RemoveAt(i);
                     continue;
                 }
+                if (HospitalityVacuumProtectionActive(record))
+                {
+                    EnsureHospitalityVacuumProtection(map, record, "active service");
+                    ForceHospitalityVacuumTransit(map, record, "active service");
+                }
                 if (record.serviceKind == "hospitality" && record.state == "arrived" && SpaceServicesMod.Settings != null && SpaceServicesMod.Settings.hospitalityVacuumGuard)
                 {
                     GuardHospitalityGuestsFromVacuum(map, record);
@@ -507,6 +522,131 @@ namespace SpaceServices
         private static int ActivePawnValidationInterval(ServiceGroupRecord record)
         {
             return record != null && record.state == "arrived" ? StableActivePawnValidationTicks : NextTickInterval(null);
+        }
+
+        private static bool HospitalityArrivalVacuumProtectionActive(ServiceGroupRecord record)
+        {
+            return record != null &&
+                record.serviceKind == "hospitality" &&
+                record.state == "arrived" &&
+                Find.TickManager != null &&
+                Find.TickManager.TicksGame <= record.arrivalTick + HospitalityArrivalVacuumGearGuardTicks;
+        }
+
+        private static bool HospitalityArrivalTransitGuardActive(ServiceGroupRecord record)
+        {
+            return record != null &&
+                record.serviceKind == "hospitality" &&
+                record.state == "arrived" &&
+                Find.TickManager != null &&
+                Find.TickManager.TicksGame <= record.arrivalTick + HospitalityVacuumTransitGuardTicks;
+        }
+
+        private static bool HospitalityVacuumProtectionActive(ServiceGroupRecord record)
+        {
+            if (record == null || record.serviceKind != "hospitality")
+            {
+                return false;
+            }
+            if (HospitalityArrivalVacuumProtectionActive(record) || HospitalityArrivalTransitGuardActive(record))
+            {
+                return true;
+            }
+            return record.state == "departing" || record.state == "pickupInbound" || record.state == "boardingPickup";
+        }
+
+        private static void EnsureHospitalityVacuumProtection(Map map, ServiceGroupRecord record, string reason)
+        {
+            if (record == null || record.serviceKind != "hospitality" || record.pawns == null)
+            {
+                return;
+            }
+            Map effectiveMap = map ?? record.reservedPad?.Map ?? record.arrivalPad?.Map ?? record.pawns.FirstOrDefault(pawn => pawn != null && pawn.Spawned)?.Map;
+            foreach (Pawn pawn in record.pawns)
+            {
+                if (pawn == null || pawn.Destroyed || pawn.Dead || !pawn.Spawned || ServicePawnUtility.IsPlayerOwnedPawn(pawn))
+                {
+                    continue;
+                }
+                if (VacSuitUtility.VacuumResistance(pawn) + 0.001f >= VacSuitUtility.PracticalVacuumSuitTarget)
+                {
+                    continue;
+                }
+                if (!HospitalityPawnNeedsVacuumGear(effectiveMap, record, pawn))
+                {
+                    continue;
+                }
+                // Hospitality can re-apply guest outfits after spawn; restore service-provided vacuum protection before exposure.
+                VacSuitUtility.EnsurePracticalVacuumProtection(pawn);
+                ServiceDebugUtility.LogThrottled(ServiceLogIntegration.Hospitality, "hospitality-vac-gear-" + pawn.thingIDNumber, "Restored Hospitality guest vacuum gear (" + (reason ?? "service") + "): " + ServiceDebugUtility.PawnAuditSummary(pawn), GenDate.TicksPerHour);
+            }
+        }
+
+        private static void ForceHospitalityVacuumTransit(Map map, ServiceGroupRecord record, string reason)
+        {
+            if (map == null || record == null || record.serviceKind != "hospitality" || record.pawns == null)
+            {
+                return;
+            }
+            Thing pad = record.arrivalPad ?? record.reservedPad;
+            foreach (Pawn pawn in record.pawns)
+            {
+                if (pawn == null || pawn.Destroyed || pawn.Dead || !pawn.Spawned || pawn.Downed || ServicePawnUtility.IsPlayerOwnedPawn(pawn))
+                {
+                    continue;
+                }
+                bool unsafeNow = ServiceEnvironmentUtility.GetVacuum(pawn.Position, map) > 0.001f;
+                bool unsafeDestination = PawnCurrentJobTargetsUnsafeVacuum(pawn, map);
+                if (!unsafeNow && !unsafeDestination)
+                {
+                    continue;
+                }
+                IntVec3 safeCell = FindHospitalitySafeCell(map, pad, pawn);
+                if (!safeCell.IsValid || safeCell == pawn.Position)
+                {
+                    continue;
+                }
+                Job current = pawn.CurJob;
+                if (current != null && current.def == JobDefOf.Goto && current.targetA.IsValid && current.targetA.Cell == safeCell)
+                {
+                    continue;
+                }
+                // Own the brief exposed walk so Hospitality outfit jobs cannot make guests stop to change helmets in vacuum.
+                Job job = JobMaker.MakeJob(JobDefOf.Goto, safeCell);
+                job.locomotionUrgency = LocomotionUrgency.Sprint;
+                pawn.jobs.TryTakeOrderedJob(job, JobTag.Misc);
+                ServiceDebugUtility.LogThrottled(ServiceLogIntegration.Hospitality, "hospitality-vac-transit-" + pawn.thingIDNumber, "Forced Hospitality guest vacuum transit (" + (reason ?? "service") + "): " + ServiceDebugUtility.PawnAuditSummary(pawn) + " -> " + safeCell, GenDate.TicksPerHour);
+            }
+        }
+
+        private static bool HospitalityPawnNeedsVacuumGear(Map map, ServiceGroupRecord record, Pawn pawn)
+        {
+            if (record == null || pawn == null)
+            {
+                return false;
+            }
+            if (record.state == "departing" || record.state == "pickupInbound" || record.state == "boardingPickup")
+            {
+                return true;
+            }
+            if (map == null)
+            {
+                return false;
+            }
+            if (pawn.Position.IsValid && ServiceEnvironmentUtility.GetVacuum(pawn.Position, map) > 0.001f)
+            {
+                return true;
+            }
+            if (PawnCurrentJobTargetsUnsafeVacuum(pawn, map))
+            {
+                return true;
+            }
+            Thing pad = record.arrivalPad ?? record.reservedPad;
+            return pad != null &&
+                pad.Spawned &&
+                pad.Map == map &&
+                pawn.Position.DistanceToSquared(pad.Position) <= 144 &&
+                ServiceEnvironmentUtility.GetMaxVacuum(pad) > 0.001f;
         }
 
         private static void GuardHospitalityGuestsFromVacuum(Map map, ServiceGroupRecord record)
@@ -724,6 +864,7 @@ namespace SpaceServices
             }
             ServiceDebugUtility.LogAudit("EnsureHospitalityDeparturePrepared begin " + RecordAudit(record));
             HospitalityBedUtility.PrepareGuestsForServiceDeparture(record);
+            EnsureHospitalityVacuumProtection(record.reservedPad == null ? null : record.reservedPad.Map, record, "departure");
             record.hospitalityDeparturePrepared = true;
             ServiceDebugUtility.LogAudit("EnsureHospitalityDeparturePrepared end " + RecordAudit(record) + " pawns=" + PawnSummary(record.pawns));
         }

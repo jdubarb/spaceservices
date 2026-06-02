@@ -26,8 +26,8 @@
   <JDB_SpaceServices_Settings_HospitalityRequireBedsDesc>Block new Hospitality guest groups unless enough free guest beds are available.</JDB_SpaceServices_Settings_HospitalityRequireBedsDesc>
   <JDB_SpaceServices_Settings_HospitalityAutoDepartBedless>Auto-depart Hospitality guests without beds</JDB_SpaceServices_Settings_HospitalityAutoDepartBedless>
   <JDB_SpaceServices_Settings_HospitalityAutoDepartBedlessDesc>After a grace period, send away Hospitality guests who cannot find usable guest beds.</JDB_SpaceServices_Settings_HospitalityAutoDepartBedlessDesc>
-  <JDB_SpaceServices_Settings_HospitalityVacuumGuard>Hospitality vacuum guard (periodic tick interrupt)</JDB_SpaceServices_Settings_HospitalityVacuumGuard>
-  <JDB_SpaceServices_Settings_HospitalityVacuumGuardDesc>Periodically interrupts Hospitality guests who try to walk through unsafe vacuum. Off by default because it runs during map ticks.</JDB_SpaceServices_Settings_HospitalityVacuumGuardDesc>
+  <JDB_SpaceServices_Settings_HospitalityVacuumGuard>Hospitality vacuum guard (fallback, tick-based)</JDB_SpaceServices_Settings_HospitalityVacuumGuard>
+  <JDB_SpaceServices_Settings_HospitalityVacuumGuardDesc>Fallback safety net for interrupting Hospitality guests who try to walk through unsafe vacuum during their stay. Recommended off for normal play; use Hospitality guest areas to keep guests inside safe rooms instead. Arrival and departure transfers still get short Space Services safety handling when this is off.</JDB_SpaceServices_Settings_HospitalityVacuumGuardDesc>
   <JDB_SpaceServices_Settings_HospitalityFallbackScheduler>Space Hospitality fallback visits (use if Hospitality is not spawning guests)</JDB_SpaceServices_Settings_HospitalityFallbackScheduler>
   <JDB_SpaceServices_Settings_HospitalityFallbackSchedulerDesc>Schedule Space Services visitor groups directly when Hospitality's normal space-map incident flow is not producing guests.</JDB_SpaceServices_Settings_HospitalityFallbackSchedulerDesc>
   <JDB_SpaceServices_Settings_HospitalityFallbackInterval>Fallback visit interval: {0} days</JDB_SpaceServices_Settings_HospitalityFallbackInterval>
