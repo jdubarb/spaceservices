@@ -55,11 +55,12 @@ namespace SpaceServices
                 return;
             }
             float vacuum = ServiceEnvironmentUtility.GetVacuum(cell, map);
-            if (VacuumResistance(pawn) + 0.001f < vacuum)
+            float targetVacuum = PracticalVacuumTargetFor(map, vacuum);
+            if (VacuumResistance(pawn) + 0.001f < targetVacuum)
             {
                 if (ShouldProvideSuitForArrival(pawn, map, cell))
                 {
-                    SuitPawnForVacuum(pawn, Mathf.Min(vacuum, PracticalVacuumSuitTarget));
+                    SuitPawnForVacuum(pawn, targetVacuum);
                 }
                 else
                 {
@@ -70,6 +71,15 @@ namespace SpaceServices
             {
                 RemoveKnownVacSuit(pawn);
             }
+        }
+
+        private static float PracticalVacuumTargetFor(Map map, float measuredVacuum)
+        {
+            if (map != null && SpaceServiceMapDetector.IsServiceEligible(map) && measuredVacuum > 0.001f)
+            {
+                return PracticalVacuumSuitTarget;
+            }
+            return Mathf.Min(measuredVacuum, PracticalVacuumSuitTarget);
         }
 
         private static bool ShouldProvideSuitForArrival(Pawn pawn, Map map, IntVec3 cell)
