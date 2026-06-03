@@ -1,0 +1,105 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Defs>
+
+  <SpaceServices.SpaceServiceHospitalTreatmentHediffDef>
+    <defName>JDB_SpaceServices_HospitalTreatment_Example_DiseasesPlus</defName>
+    <label>Space Services Diseases+ Hospital treatment condition candidates</label>
+    <enabled>false</enabled>
+    <requiredPackageIds>
+      <li>DimonSever000.DiseasesPlus.Specific</li>
+    </requiredPackageIds>
+    <hediffDefNames>
+      <li>DimonSever000_Pneumonia</li>
+      <li>DimonSever000_CommonCold</li>
+      <li>DimonSever000_Tuberculosis</li>
+      <li>DimonSever000_Conjunctivitis</li>
+      <li>DimonSever000_Otitis</li>
+      <li>DimonSever000_Schizophrenia</li>
+      <li>DimonSever000_ManicSyndrome</li>
+      <li>DimonSever000_ConfusionSyndrome</li>
+      <li>DimonSever000_Depression</li>
+      <li>DimonSever000_ParanoidSyndrome</li>
+      <li>DimonSever000_DeliriumTremens</li>
+      <li>DimonSever000_EpilepsySeizure</li>
+      <li>DimonSever000_Diabetes</li>
+      <li>DimonSever000_MotorParalysis</li>
+      <li>DimonSever000_Sepsis</li>
+      <li>DimonSever000_Arrhythmia</li>
+      <li>DimonSever000_Stenocardia</li>
+      <li>DimonSever000_KidneyFailure</li>
+      <li>DimonSever000_ChronicKidneyDisease</li>
+      <li>DimonSever000_ChronicHepatitis</li>
+      <li>DimonSever000_Angina</li>
+      <li>DimonSever000_Pneumothorax</li>
+      <li>DimonSever000_Scoliosis</li>
+      <li>DimonSever000_FractureOfTheVertebrae</li>
+      <li>DimonSever000_StomachUlcer</li>
+      <li>DimonSever000_UlcerativeColitis</li>
+      <li>DimonSever000_Dysbacteriosis</li>
+    </hediffDefNames>
+  </SpaceServices.SpaceServiceHospitalTreatmentHediffDef>
+
+  <SpaceServices.SpaceServiceHospitalTreatmentHediffDef>
+    <defName>JDB_SpaceServices_HospitalTreatment_Example_DeathRattle</defName>
+    <label>Space Services Death Rattle Hospital treatment condition candidates</label>
+    <enabled>false</enabled>
+    <requiredPackageIds>
+      <li>Troopersmith1.DeathRattle</li>
+    </requiredPackageIds>
+    <hediffDefNames>
+      <li>BrainDamage</li>
+    </hediffDefNames>
+  </SpaceServices.SpaceServiceHospitalTreatmentHediffDef>
+
+  <SpaceServices.SpaceServiceHospitalTreatmentHediffDef>
+    <defName>JDB_SpaceServices_HospitalTreatment_Example_MoreInjuries</defName>
+    <label>Space Services More Injuries Hospital treatment condition candidates</label>
+    <enabled>false</enabled>
+    <requiredPackageIds>
+      <li>Th3Fr3d.ExtendedInjuries</li>
+    </requiredPackageIds>
+    <hediffDefNames>
+      <li>AdrenalineRush</li>
+      <li>KetamineBuildup</li>
+      <li>ChloroformBuildup</li>
+      <li>BrainDamage_MotorDysfunction</li>
+      <li>BrainDamage_LanguageAphasia</li>
+      <li>BrainDamage_VisualAgnosia</li>
+      <li>BrainDamage_FrontalLobe</li>
+      <li>BrainDamage_PersonalityShift</li>
+      <li>BrainDamage_Confusion</li>
+      <li>OrganChemicalInjury</li>
+      <li>EmpShutdown</li>
+      <li>BoneFragmentLaceration</li>
+      <li>OrganHypoxia</li>
+      <li>BrainDamage_Hypoxia</li>
+      <li>StomachAcidBurn</li>
+      <li>TourniquetApplied</li>
+      <li>TourniquetQuicklyRemoved</li>
+      <li>MechaniteTherapy</li>
+      <li>MorphineBuildup</li>
+      <li>SpinalCordParalysis</li>
+      <li>SpallFragmentCut</li>
+      <li>SpontaneousBleeding</li>
+      <li>Vasodilation</li>
+    </hediffDefNames>
+  </SpaceServices.SpaceServiceHospitalTreatmentHediffDef>
+
+  <SpaceServices.SpaceServiceHospitalTreatmentHediffDef>
+    <defName>JDB_SpaceServices_HospitalTreatment_Example_MoreInjuriesOrganBridge</defName>
+    <label>Space Services More Injuries organ failure Hospital treatment condition candidates</label>
+    <enabled>false</enabled>
+    <requiredPackageIds>
+      <li>wenders.moreinjuries.organbridge</li>
+    </requiredPackageIds>
+    <hediffDefNames>
+      <li>MIFB_MechanicalVentilationSupport</li>
+      <li>MIFB_CirculatorySupport</li>
+      <li>MIFB_DialysisSupport</li>
+      <li>MIFB_ArtificialLiverSupport</li>
+      <li>MIFB_ECMOSupport</li>
+      <li>MIFB_SupportLineDislodgement</li>
+    </hediffDefNames>
+  </SpaceServices.SpaceServiceHospitalTreatmentHediffDef>
+
+</Defs>

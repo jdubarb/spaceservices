@@ -1,0 +1,63 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Defs>
+
+  <SpaceServices.SpaceServiceHospitalTreatmentHediffDef>
+    <defName>JDB_SpaceServices_HospitalTreatment_DeathRattle</defName>
+    <label>Space Services Death Rattle Hospital treatment conditions</label>
+    <requiredPackageIds>
+      <li>Troopersmith1.DeathRattle</li>
+    </requiredPackageIds>
+    <hediffDefNames>
+      <li>ArtificialComa</li>
+      <li>IntestinalFailure</li>
+      <li>LiverFailure</li>
+      <li>KidneyFailure</li>
+      <li>ClinicalDeathNoHeartbeat</li>
+      <li>ClinicalDeathAsphyxiation</li>
+      <li>Coma</li>
+    </hediffDefNames>
+  </SpaceServices.SpaceServiceHospitalTreatmentHediffDef>
+
+  <SpaceServices.SpaceServiceHospitalTreatmentHediffDef>
+    <defName>JDB_SpaceServices_HospitalTreatment_MoreInjuries</defName>
+    <label>Space Services More Injuries Hospital treatment conditions</label>
+    <requiredPackageIds>
+      <li>Th3Fr3d.ExtendedInjuries</li>
+    </requiredPackageIds>
+    <hediffDefNames>
+      <li>Acidosis</li>
+      <li>CardiacArrest</li>
+      <li>ChokingOnBlood</li>
+      <li>ChokingOnTourniquet</li>
+      <li>Coagulopathy</li>
+      <li>Concussion</li>
+      <li>Fracture</li>
+      <li>FractureHealing</li>
+      <li>HearingLossTemporary</li>
+      <li>Hemodilution</li>
+      <li>HemorrhagicStroke</li>
+      <li>HypovolemicShock</li>
+      <li>GangreneDry</li>
+      <li>GangreneWet</li>
+      <li>LungCollapse</li>
+    </hediffDefNames>
+  </SpaceServices.SpaceServiceHospitalTreatmentHediffDef>
+
+  <SpaceServices.SpaceServiceHospitalTreatmentHediffDef>
+    <defName>JDB_SpaceServices_HospitalTreatment_MoreInjuriesOrganBridge</defName>
+    <label>Space Services More Injuries organ failure Hospital treatment conditions</label>
+    <requiredPackageIds>
+      <li>wenders.moreinjuries.organbridge</li>
+    </requiredPackageIds>
+    <hediffDefNames>
+      <li>MIFB_MissingHeartCardiacArrest</li>
+      <li>MIFB_TraumaticHeartCardiacArrest</li>
+      <li>MIFB_AcuteLiverFailure</li>
+      <li>MIFB_HepaticEncephalopathy</li>
+      <li>MIFB_AcuteRenalFailure</li>
+      <li>MIFB_Uremia</li>
+      <li>MIFB_RespiratoryFailure</li>
+    </hediffDefNames>
+  </SpaceServices.SpaceServiceHospitalTreatmentHediffDef>
+
+</Defs>
