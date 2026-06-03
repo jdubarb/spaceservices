@@ -1,0 +1,7 @@
+# Local editor/system noise
+.DS_Store
+.directory
+*~
+
+# Keep RimWorld assemblies and textures tracked; this repo is a publishable mod staging tree.
+
