@@ -18,7 +18,10 @@ namespace SpaceServices
         private static bool HospitalSupportEnabled => SpaceServicesMod.Settings == null || SpaceServicesMod.Settings.enableHospital;
         private static bool HospitalPatientCareModeEnabled => SpaceServicesMod.Settings == null || SpaceServicesMod.Settings.hospitalPatientCareMode;
         private const int OngoingTreatmentBedJobRetryTicks = GenDate.TicksPerHour;
+        private const int OngoingTreatmentDecisionCacheTicks = 250;
         private static readonly Dictionary<int, int> LastOngoingTreatmentBedJobTickByPawn = new Dictionary<int, int>();
+        // Medical-rest think nodes call this path heavily; cache the reflected Hospital lookup briefly.
+        private static readonly Dictionary<int, OngoingTreatmentDecisionCache> OngoingTreatmentDecisionCacheByPawn = new Dictionary<int, OngoingTreatmentDecisionCache>();
         private static Dictionary<string, List<SpaceServiceHospitalTreatmentHediffDef>> OngoingTreatmentRulesByHediffDefName;
 
         public static void HospitalLandingSpotPostfix(object[] __args, ref IntVec3 __result)
@@ -142,6 +145,7 @@ namespace SpaceServices
                 bool hasArrivalCell = map != null && HospitalLandingRedirectContext.TryGetActiveCell(map, out arrivalCell);
                 foreach (Pawn pawn in pawns)
                 {
+                    ClearOngoingTreatmentCache(pawn);
                     IntVec3 cell = hasArrivalCell ? arrivalCell : pawn != null && pawn.Spawned ? pawn.Position : IntVec3.Invalid;
                     VacSuitUtility.SuitPawnForEnvironment(pawn, map, cell);
                 }
@@ -326,6 +330,20 @@ namespace SpaceServices
         public static bool ShouldKeepHospitalPatientForOngoingTreatment(Pawn pawn, out string reason)
         {
             reason = null;
+            if (TryGetCachedOngoingTreatmentDecision(pawn, out bool cachedResult, out string cachedReason))
+            {
+                reason = cachedReason;
+                return cachedResult;
+            }
+
+            bool result = ComputeShouldKeepHospitalPatientForOngoingTreatment(pawn, out reason);
+            StoreOngoingTreatmentDecision(pawn, result, reason);
+            return result;
+        }
+
+        private static bool ComputeShouldKeepHospitalPatientForOngoingTreatment(Pawn pawn, out string reason)
+        {
+            reason = null;
             if (pawn == null || pawn.health == null || pawn.health.hediffSet == null || !TryGetHospitalPatientData(pawn, out _, out _))
             {
                 return false;
@@ -345,6 +363,63 @@ namespace SpaceServices
                 }
             }
             return false;
+        }
+
+        private static bool TryGetCachedOngoingTreatmentDecision(Pawn pawn, out bool result, out string reason)
+        {
+            result = false;
+            reason = null;
+            if (pawn == null)
+            {
+                return false;
+            }
+            if (!OngoingTreatmentDecisionCacheByPawn.TryGetValue(pawn.thingIDNumber, out OngoingTreatmentDecisionCache cache))
+            {
+                return false;
+            }
+            int ticksGame = Find.TickManager == null ? 0 : Find.TickManager.TicksGame;
+            int mapId = pawn.Map == null ? -1 : pawn.Map.uniqueID;
+            int hediffCount = CurrentHediffCount(pawn);
+            if (ticksGame > cache.tick + OngoingTreatmentDecisionCacheTicks || mapId != cache.mapId || hediffCount != cache.hediffCount)
+            {
+                return false;
+            }
+            result = cache.result;
+            reason = cache.reason;
+            return true;
+        }
+
+        private static void StoreOngoingTreatmentDecision(Pawn pawn, bool result, string reason)
+        {
+            if (pawn == null)
+            {
+                return;
+            }
+            int ticksGame = Find.TickManager == null ? 0 : Find.TickManager.TicksGame;
+            OngoingTreatmentDecisionCacheByPawn[pawn.thingIDNumber] = new OngoingTreatmentDecisionCache
+            {
+                tick = ticksGame,
+                mapId = pawn.Map == null ? -1 : pawn.Map.uniqueID,
+                hediffCount = CurrentHediffCount(pawn),
+                result = result,
+                reason = reason
+            };
+        }
+
+        private static void ClearOngoingTreatmentCache(Pawn pawn)
+        {
+            if (pawn == null)
+            {
+                return;
+            }
+            OngoingTreatmentDecisionCacheByPawn.Remove(pawn.thingIDNumber);
+            LastOngoingTreatmentBedJobTickByPawn.Remove(pawn.thingIDNumber);
+        }
+
+        private static int CurrentHediffCount(Pawn pawn)
+        {
+            List<Hediff> hediffs = pawn == null || pawn.health == null || pawn.health.hediffSet == null ? null : pawn.health.hediffSet.hediffs;
+            return hediffs == null ? -1 : hediffs.Count;
         }
 
         public static bool IsActiveHospitalPatient(Pawn pawn)
@@ -488,6 +563,7 @@ namespace SpaceServices
             {
                 return;
             }
+            ClearOngoingTreatmentCache(pawn);
             ServiceLifecycleUtility.ReleasePawn(pawn, "Hospital removed patient from map");
         }
 
@@ -511,6 +587,7 @@ namespace SpaceServices
             bool notified = ServicePawnUtility.NotifyLordPawnLost(__state == null ? null : __state.lord, pawn, PawnLostCondition.Killed);
             int cleaned = ServicePawnUtility.CleanupTerminalPawnReferences(map, pawn);
             ServiceDebugUtility.LogAudit("HospitalPatientDied cleanup pawn=" + ServiceDebugUtility.PawnAuditSummary(pawn) + " lordNotified=" + notified + " refsCleaned=" + cleaned);
+            ClearOngoingTreatmentCache(pawn);
             ServiceLifecycleUtility.ReleasePawn(pawn, "Hospital patient died");
         }
 
@@ -598,6 +675,15 @@ namespace SpaceServices
             }
             string typeName = worker == null ? "" : worker.GetType().FullName ?? "";
             return typeName.IndexOf("MassCasualty", StringComparison.OrdinalIgnoreCase) >= 0;
+        }
+
+        private sealed class OngoingTreatmentDecisionCache
+        {
+            public int tick;
+            public int mapId;
+            public int hediffCount;
+            public bool result;
+            public string reason;
         }
     }
 
