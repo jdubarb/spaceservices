@@ -1925,7 +1925,7 @@ namespace SpaceServices
             {
                 return true;
             }
-            return record.serviceKind == "hospital" && record.state == "arrived";
+            return false;
         }
 
         private static string NoReservedPadBlockReason(Map map, ServiceUse use, ServiceGroupRecord record)
@@ -1938,6 +1938,8 @@ namespace SpaceServices
             }
             bool anyMatchingMode = false;
             bool anyReserved = false;
+            string firstSafetyReason = null;
+            string firstReachReason = null;
             string firstBlockedReason = null;
             foreach (Thing pad in pads)
             {
@@ -1962,11 +1964,13 @@ namespace SpaceServices
                 }
                 if (!ServiceEnvironmentUtility.IsPadSafeForPawns(pad, pawns, out string safetyReason))
                 {
-                    return safetyReason ?? "service pad is unsafe";
+                    firstSafetyReason = firstSafetyReason ?? safetyReason ?? "service pad is unsafe";
+                    continue;
                 }
                 if (!PadReachableForPawns(pad, pawns, false, ShouldBypassGuestArea(record), out string reachReason))
                 {
-                    return reachReason ?? "service pad cannot be reached";
+                    firstReachReason = firstReachReason ?? reachReason ?? "service pad cannot be reached";
+                    continue;
                 }
                 return null;
             }
@@ -1977,6 +1981,14 @@ namespace SpaceServices
             if (!anyMatchingMode && !string.IsNullOrEmpty(firstBlockedReason))
             {
                 return firstBlockedReason;
+            }
+            if (!string.IsNullOrEmpty(firstSafetyReason))
+            {
+                return firstSafetyReason;
+            }
+            if (!string.IsNullOrEmpty(firstReachReason))
+            {
+                return firstReachReason;
             }
             return "no usable " + use.ToString().ToLowerInvariant() + " service pad exists";
         }

@@ -185,6 +185,132 @@ namespace SpaceServices
             ServiceLifecycleUtility.RequestDepartureForPawn(pawn, "Hospital requested patient departure");
         }
 
+        public static void HospitalSentAwayPostfix(Pawn pawn, ref bool __result)
+        {
+            if (!__result || pawn == null || pawn.Map == null || !SpaceServiceMapDetector.IsServiceEligible(pawn.Map))
+            {
+                return;
+            }
+            if (ShouldKeepHospitalPatientForOngoingTreatment(pawn, out string reason))
+            {
+                // Hospital normally discharges diseases once the immediate tend/rest job is done.
+                // In space, keep those patients in Hospital's lord until the long hediff clears.
+                __result = false;
+                ServiceDebugUtility.LogThrottled(ServiceLogIntegration.Hospital, "hospital-delay-discharge-" + pawn.thingIDNumber, "Delayed Hospital patient departure for ongoing treatment: " + reason + " pawn=" + ServiceDebugUtility.PawnAuditSummary(pawn), GenDate.TicksPerHour);
+            }
+        }
+
+        public static void PatientGoToBedPostfix(Pawn pawn, ref Job __result)
+        {
+            if (__result != null || pawn == null || pawn.Map == null || !SpaceServiceMapDetector.IsServiceEligible(pawn.Map))
+            {
+                return;
+            }
+            if (!ShouldKeepHospitalPatientForOngoingTreatment(pawn, out string reason))
+            {
+                return;
+            }
+
+            Building_Bed bed = RestUtility.FindBedFor(pawn, pawn, false, false, (GuestStatus?)null);
+            if (bed == null)
+            {
+                ServiceDebugUtility.LogThrottled(ServiceLogIntegration.Hospital, "hospital-ongoing-bed-missing-" + pawn.thingIDNumber, "Could not find ongoing-treatment hospital bed for " + ServiceDebugUtility.PawnAuditSummary(pawn) + " reason=" + reason, GenDate.TicksPerHour);
+                return;
+            }
+
+            Job job = JobMaker.MakeJob(JobDefOf.LayDown, bed);
+            job.restUntilHealed = true;
+            __result = job;
+            ServiceDebugUtility.LogThrottled(ServiceLogIntegration.Hospital, "hospital-ongoing-bed-job-" + pawn.thingIDNumber, "Keeping Hospital patient in bed for ongoing treatment: " + reason + " bed=" + ServiceDebugUtility.ThingAuditSummary(bed), GenDate.TicksPerHour);
+        }
+
+        public static bool ShouldKeepHospitalPatientForOngoingTreatment(Pawn pawn, out string reason)
+        {
+            reason = null;
+            if (pawn == null || pawn.health == null || pawn.health.hediffSet == null || !TryGetHospitalPatientData(pawn, out string diagnosis, out bool dataLooksLikeDisease))
+            {
+                return false;
+            }
+            List<Hediff> hediffs = pawn.health.hediffSet.hediffs;
+            if (hediffs == null)
+            {
+                return false;
+            }
+            for (int i = 0; i < hediffs.Count; i++)
+            {
+                Hediff hediff = hediffs[i];
+                if (IsOngoingHospitalDiseaseHediff(hediff, diagnosis, dataLooksLikeDisease))
+                {
+                    reason = (hediff.LabelCap ?? hediff.def?.LabelCap ?? "ongoing condition").ToString();
+                    return true;
+                }
+            }
+            return false;
+        }
+
+        public static bool IsActiveHospitalPatient(Pawn pawn)
+        {
+            return TryGetHospitalPatientData(pawn, out _, out _);
+        }
+
+        private static bool TryGetHospitalPatientData(Pawn pawn, out string diagnosis, out bool dataLooksLikeDisease)
+        {
+            diagnosis = null;
+            dataLooksLikeDisease = false;
+            object hospital = HospitalIncidentGate.FindHospitalComponent(pawn == null ? null : pawn.Map);
+            IDictionary patients = hospital == null ? null : Reflect.GetMember(hospital, "Patients") as IDictionary;
+            if (patients == null || pawn == null || !patients.Contains(pawn))
+            {
+                return false;
+            }
+            object data = patients[pawn];
+            diagnosis = Reflect.GetMember(data, "Diagnosis") as string;
+            object type = Reflect.GetMember(data, "Type");
+            if (type != null && string.Equals(type.ToString(), "Disease", StringComparison.OrdinalIgnoreCase))
+            {
+                dataLooksLikeDisease = true;
+                return true;
+            }
+            string cure = Reflect.GetMember(data, "Cure") as string;
+            dataLooksLikeDisease = ContainsInsensitive(cure, "disease");
+            return true;
+        }
+
+        private static bool IsOngoingHospitalDiseaseHediff(Hediff hediff, string diagnosis, bool dataLooksLikeDisease)
+        {
+            if (hediff == null || hediff.def == null || hediff is Hediff_Injury)
+            {
+                return false;
+            }
+            if (hediff.Severity <= 0f || hediff.def.defName == "Anesthetic")
+            {
+                return false;
+            }
+            if (DiagnosisMatchesHediff(diagnosis, hediff))
+            {
+                return true;
+            }
+            return dataLooksLikeDisease && (hediff.def.tendable || hediff.def.makesSickThought || hediff.def.lethalSeverity > 0f);
+        }
+
+        private static bool DiagnosisMatchesHediff(string diagnosis, Hediff hediff)
+        {
+            if (string.IsNullOrEmpty(diagnosis) || hediff == null || hediff.def == null)
+            {
+                return false;
+            }
+            return ContainsInsensitive(diagnosis, hediff.def.label) ||
+                ContainsInsensitive(diagnosis, hediff.Label) ||
+                ContainsInsensitive(hediff.Label, diagnosis);
+        }
+
+        private static bool ContainsInsensitive(string text, string value)
+        {
+            return !string.IsNullOrEmpty(text) &&
+                !string.IsNullOrEmpty(value) &&
+                text.IndexOf(value, StringComparison.OrdinalIgnoreCase) >= 0;
+        }
+
         public static void HospitalPatientGonePostfix(Pawn pawn)
         {
             ServiceLifecycleUtility.ReleasePawn(pawn, "Hospital removed patient from map");

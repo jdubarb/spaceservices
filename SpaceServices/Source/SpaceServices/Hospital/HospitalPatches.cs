@@ -61,6 +61,12 @@ namespace SpaceServices
                 OptionalModPatches.PatchIfExists(harmony, AccessTools.Method(hospitalComponent, "PatientLeftTheMap"), typeof(HospitalPatchHandlers), postfix: nameof(HospitalPatchHandlers.HospitalPatientGonePostfix));
                 OptionalModPatches.PatchIfExists(harmony, AccessTools.Method(hospitalComponent, "PatientDied"), typeof(HospitalPatchHandlers), prefix: nameof(HospitalPatchHandlers.HospitalPatientDiedPrefix), postfix: nameof(HospitalPatchHandlers.HospitalPatientDiedPostfix));
             }
+            Type sentAwayTrigger = AccessTools.TypeByName("Hospital.Trigger_SentAway");
+            if (sentAwayTrigger != null)
+            {
+                OptionalModPatches.PatchIfExists(harmony, AccessTools.Method(sentAwayTrigger, "SentAway"), typeof(HospitalPatchHandlers), postfix: nameof(HospitalPatchHandlers.HospitalSentAwayPostfix));
+            }
+            OptionalModPatches.PatchIfExists(harmony, AccessTools.Method(typeof(JobGiver_PatientGoToBed), "TryGiveJob"), typeof(HospitalPatchHandlers), postfix: nameof(HospitalPatchHandlers.PatientGoToBedPostfix));
             OptionalModPatches.PatchIfExists(harmony, AccessTools.Method(typeof(DropPodUtility), "MakeDropPodAt", new[] { typeof(IntVec3), typeof(Map), typeof(ActiveTransporterInfo), typeof(Faction) }), typeof(HospitalPatchHandlers), prefix: nameof(HospitalPatchHandlers.HospitalDropPodAtPrefix));
             if (incidentHelper != null || patientArrival != null || massCasualty != null)
             {

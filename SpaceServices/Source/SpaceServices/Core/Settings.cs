@@ -76,6 +76,7 @@ namespace SpaceServices
             Checkbox(listing, "JDB_SpaceServices_Settings_SealedNoSuit", ref Settings.allowSealedNoSuitArrivals);
             bool moddedVisualsBefore = Settings.allowModdedShuttleVisuals;
             Checkbox(listing, "JDB_SpaceServices_Settings_ModdedShuttleVisuals", ref Settings.allowModdedShuttleVisuals);
+            Checkbox(listing, "JDB_SpaceServices_Settings_DisablePatientGamblingAddictions", ref Settings.disablePatientGamblingAddictions);
 
             Section(listing, "JDB_SpaceServices_Settings_SectionExperimental");
             Checkbox(listing, "JDB_SpaceServices_Settings_MedPodBridge", ref Settings.medPodServiceBridge);
@@ -139,6 +140,7 @@ namespace SpaceServices
         public float hospitalityVisitorTrafficRate = 0.25f;
         public bool allowSealedNoSuitArrivals = true;
         public bool allowModdedShuttleVisuals = true;
+        public bool disablePatientGamblingAddictions = true;
         public bool medPodServiceBridge = false;
         public bool suppressMassCasualtyPreDropEffects = false;
 
@@ -176,6 +178,7 @@ namespace SpaceServices
             hospitalityVisitorTrafficRate = QuantizeRate(hospitalityVisitorTrafficRate);
             Scribe_Values.Look(ref allowSealedNoSuitArrivals, "allowSealedNoSuitArrivals", true);
             Scribe_Values.Look(ref allowModdedShuttleVisuals, "allowModdedShuttleVisuals", true);
+            Scribe_Values.Look(ref disablePatientGamblingAddictions, "disablePatientGamblingAddictions", true);
             Scribe_Values.Look(ref medPodServiceBridge, "medPodServiceBridge", false);
             Scribe_Values.Look(ref suppressMassCasualtyPreDropEffects, "suppressMassCasualtyPreDropEffects", false);
         }

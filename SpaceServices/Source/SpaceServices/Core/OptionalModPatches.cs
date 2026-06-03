@@ -20,6 +20,7 @@ namespace SpaceServices
             HospitalPatches.Install(harmony);
             HospitalityPatches.Install(harmony);
             MedPodPatches.Install(harmony);
+            CasinoPatches.Install(harmony);
         }
 
         public static void PatchIfExists(Harmony harmony, MethodInfo method, Type handlerType, string prefix = null, string postfix = null, string finalizer = null)
