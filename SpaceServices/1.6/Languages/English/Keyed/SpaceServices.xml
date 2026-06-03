@@ -19,6 +19,8 @@
   <JDB_SpaceServices_Settings_AutoExtractDesc>Let Space Services recover service visitors that are ready to leave but get stuck outside the normal departure path.</JDB_SpaceServices_Settings_AutoExtractDesc>
   <JDB_SpaceServices_Settings_Hospital>Hospital support</JDB_SpaceServices_Settings_Hospital>
   <JDB_SpaceServices_Settings_HospitalDesc>Enable space-map handling for Hospital patient arrivals and departures. Disabling passes native Hospital behavior through immediately; enabling after startup may require a restart.</JDB_SpaceServices_Settings_HospitalDesc>
+  <JDB_SpaceServices_Settings_HospitalCareMode>Restrict Hospital patients to care</JDB_SpaceServices_Settings_HospitalCareMode>
+  <JDB_SpaceServices_Settings_HospitalCareModeDesc>Default on. Keeps active Hospital patients on bed rest, tending, and feeding while Space Services is delaying departure for whitelisted diseases or blood loss. Turning this off can let long-term patients wander, recreate, or trigger discharge edge cases.</JDB_SpaceServices_Settings_HospitalCareModeDesc>
   <JDB_SpaceServices_Settings_Hospitality>Hospitality support</JDB_SpaceServices_Settings_Hospitality>
   <JDB_SpaceServices_Settings_HospitalityDesc>Enable space-map handling for Hospitality guest arrivals and departures. Disabling passes native Hospitality behavior through immediately; enabling after startup may require a restart.</JDB_SpaceServices_Settings_HospitalityDesc>
   <JDB_SpaceServices_Settings_ReplaceExternalTabs>Replace Hospital/Hospitality tabs</JDB_SpaceServices_Settings_ReplaceExternalTabs>

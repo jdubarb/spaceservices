@@ -12,6 +12,7 @@
       <li>SpaceServices.ServiceShuttleGraphicUtility</li>
       <li>SpaceServices.VacSuitUtility</li>
       <li>SpaceServices.SpaceServiceVacuumApparelSetDef</li>
+      <li>SpaceServices.SpaceServiceHospitalTreatmentHediffDef</li>
       <li>SpaceServices.ServiceWearJobReservationPatch</li>
       <li>SpaceServices.ServiceApparelRemovePatch</li>
       <li>SpaceServices.ServiceApparelTryDropPatch</li>
@@ -59,6 +60,9 @@
       <li>SpaceServices.HospitalityBedUtility:Report</li>
       <li>SpaceServices.HospitalityBedUtility:PrepareGuestsForServiceDeparture</li>
       <li>SpaceServices.HospitalityBedUtility:GuestBeds</li>
+      <li>SpaceServices.HospitalPatchHandlers:PatientGoToBedPostfix</li>
+      <li>SpaceServices.HospitalPatchHandlers:ShouldSeekMedicalRestPostfix</li>
+      <li>SpaceServices.HospitalPatchHandlers:ShouldKeepHospitalPatientForOngoingTreatment</li>
       <li>SpaceServices.ServiceLifecycleUtility:NextTickInterval</li>
       <li>SpaceServices.ServiceLifecycleUtility:RequestDepartureForPawn</li>
       <li>SpaceServices.ServiceLifecycleUtility:MarkRecordDirty</li>

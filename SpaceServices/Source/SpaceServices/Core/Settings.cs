@@ -42,6 +42,7 @@ namespace SpaceServices
             Section(listing, "JDB_SpaceServices_Settings_SectionGeneral");
             Checkbox(listing, "JDB_SpaceServices_Settings_AutoExtract", ref Settings.autoExtractFallback);
             Checkbox(listing, "JDB_SpaceServices_Settings_Hospital", ref Settings.enableHospital);
+            Checkbox(listing, "JDB_SpaceServices_Settings_HospitalCareMode", ref Settings.hospitalPatientCareMode);
             Checkbox(listing, "JDB_SpaceServices_Settings_Hospitality", ref Settings.enableHospitality);
             Checkbox(listing, "JDB_SpaceServices_Settings_ReplaceExternalTabs", ref Settings.replaceExternalServiceTabs);
 
@@ -126,6 +127,7 @@ namespace SpaceServices
         public bool verboseDevLogging = false;
         public bool autoExtractFallback = true;
         public bool enableHospital = true;
+        public bool hospitalPatientCareMode = true;
         public bool enableHospitality = true;
         public bool replaceExternalServiceTabs = true;
         public bool hospitalityRequireGuestBeds = true;
@@ -161,6 +163,7 @@ namespace SpaceServices
             }
             Scribe_Values.Look(ref autoExtractFallback, "autoExtractFallback", true);
             Scribe_Values.Look(ref enableHospital, "enableHospital", true);
+            Scribe_Values.Look(ref hospitalPatientCareMode, "hospitalPatientCareMode", true);
             Scribe_Values.Look(ref enableHospitality, "enableHospitality", true);
             Scribe_Values.Look(ref replaceExternalServiceTabs, "replaceExternalServiceTabs", true);
             Scribe_Values.Look(ref hospitalityRequireGuestBeds, "hospitalityRequireGuestBeds", true);

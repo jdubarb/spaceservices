@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Defs>
+
+  <SpaceServices.SpaceServiceHospitalTreatmentHediffDef>
+    <defName>JDB_SpaceServices_HospitalTreatment_CoreDiseases</defName>
+    <label>Space Services core Hospital treatment diseases</label>
+    <hediffDefNames>
+      <li>Infection</li>
+      <li>Flu</li>
+      <li>Plague</li>
+      <li>Malaria</li>
+      <li>SleepingSickness</li>
+      <li>LungRot</li>
+      <li>GutWorms</li>
+      <li>MuscleParasites</li>
+      <li>FibrousMechanites</li>
+      <li>SensoryMechanites</li>
+    </hediffDefNames>
+  </SpaceServices.SpaceServiceHospitalTreatmentHediffDef>
+
+  <SpaceServices.SpaceServiceHospitalTreatmentHediffDef>
+    <defName>JDB_SpaceServices_HospitalTreatment_BloodLoss</defName>
+    <label>Space Services Hospital treatment blood loss</label>
+    <minSeverity>0.01</minSeverity>
+    <hediffDefNames>
+      <li>BloodLoss</li>
+    </hediffDefNames>
+  </SpaceServices.SpaceServiceHospitalTreatmentHediffDef>
+
+  <SpaceServices.SpaceServiceHospitalTreatmentHediffDef>
+    <defName>JDB_SpaceServices_HospitalTreatment_Royalty</defName>
+    <label>Space Services Royalty Hospital treatment conditions</label>
+    <hediffDefNames>
+      <li>BloodRot</li>
+      <li>Abasia</li>
+    </hediffDefNames>
+  </SpaceServices.SpaceServiceHospitalTreatmentHediffDef>
+
+</Defs>

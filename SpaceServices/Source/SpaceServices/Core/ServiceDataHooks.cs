@@ -129,6 +129,24 @@ namespace SpaceServices
 
     }
 
+    public sealed class SpaceServiceHospitalTreatmentHediffDef : Def
+    {
+        public bool enabled = true;
+        public float minSeverity = 0f;
+        public List<string> requiredPackageIds;
+        public List<string> hediffDefNames;
+
+        public bool AppliesTo(Hediff hediff)
+        {
+            return enabled &&
+                hediff != null &&
+                hediff.def != null &&
+                hediff.Severity >= minSeverity &&
+                !hediffDefNames.NullOrEmpty() &&
+                hediffDefNames.Contains(hediff.def.defName);
+        }
+    }
+
     public static class SpaceServiceDefFilters
     {
         public static bool MatchesServiceKind(List<string> serviceKinds, string serviceKind)

@@ -69,6 +69,8 @@ namespace SpaceServices
             {
                 OptionalModPatches.PatchIfExists(harmony, AccessTools.Method(sentAwayTrigger, "SentAway"), typeof(HospitalPatchHandlers), postfix: nameof(HospitalPatchHandlers.HospitalSentAwayPostfix));
             }
+            OptionalModPatches.PatchIfExists(harmony, AccessTools.Method(typeof(HealthAIUtility), "ShouldSeekMedicalRest", new[] { typeof(Pawn) }), typeof(HospitalPatchHandlers), postfix: nameof(HospitalPatchHandlers.ShouldSeekMedicalRestPostfix));
+            OptionalModPatches.PatchIfExists(harmony, AccessTools.Method(typeof(HealthAIUtility), "ShouldSeekMedicalRestUrgent", new[] { typeof(Pawn) }), typeof(HospitalPatchHandlers), postfix: nameof(HospitalPatchHandlers.ShouldSeekMedicalRestPostfix));
             OptionalModPatches.PatchIfExists(harmony, AccessTools.Method(typeof(JobGiver_PatientGoToBed), "TryGiveJob"), typeof(HospitalPatchHandlers), postfix: nameof(HospitalPatchHandlers.PatientGoToBedPostfix));
             OptionalModPatches.PatchIfExists(harmony, AccessTools.Method(typeof(DropPodUtility), "MakeDropPodAt", new[] { typeof(IntVec3), typeof(Map), typeof(ActiveTransporterInfo), typeof(Faction) }), typeof(HospitalPatchHandlers), prefix: nameof(HospitalPatchHandlers.HospitalDropPodAtPrefix));
             if (incidentHelper != null || patientArrival != null || massCasualty != null)

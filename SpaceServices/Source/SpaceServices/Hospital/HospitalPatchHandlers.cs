@@ -16,8 +16,10 @@ namespace SpaceServices
     public static class HospitalPatchHandlers
     {
         private static bool HospitalSupportEnabled => SpaceServicesMod.Settings == null || SpaceServicesMod.Settings.enableHospital;
+        private static bool HospitalPatientCareModeEnabled => SpaceServicesMod.Settings == null || SpaceServicesMod.Settings.hospitalPatientCareMode;
         private const int OngoingTreatmentBedJobRetryTicks = GenDate.TicksPerHour;
         private static readonly Dictionary<int, int> LastOngoingTreatmentBedJobTickByPawn = new Dictionary<int, int>();
+        private static Dictionary<string, List<SpaceServiceHospitalTreatmentHediffDef>> OngoingTreatmentRulesByHediffDefName;
 
         public static void HospitalLandingSpotPostfix(object[] __args, ref IntVec3 __result)
         {
@@ -246,7 +248,7 @@ namespace SpaceServices
 
         public static void PatientGoToBedPostfix(Pawn pawn, ref Job __result)
         {
-            if (!HospitalSupportEnabled)
+            if (!HospitalSupportEnabled || !HospitalPatientCareModeEnabled)
             {
                 return;
             }
@@ -287,6 +289,23 @@ namespace SpaceServices
             }
         }
 
+        public static void ShouldSeekMedicalRestPostfix(Pawn pawn, ref bool __result)
+        {
+            if (__result || !HospitalSupportEnabled || !HospitalPatientCareModeEnabled)
+            {
+                return;
+            }
+            if (pawn == null || pawn.Map == null || !SpaceServiceMapDetector.IsServiceEligible(pawn.Map))
+            {
+                return;
+            }
+            if (ShouldKeepHospitalPatientForOngoingTreatment(pawn, out _))
+            {
+                // Let Hospital's normal patient think tree choose bed rest instead of forcing a job globally.
+                __result = true;
+            }
+        }
+
         private static bool CanIssueOngoingTreatmentBedJob(Pawn pawn)
         {
             if (pawn == null)
@@ -307,7 +326,7 @@ namespace SpaceServices
         public static bool ShouldKeepHospitalPatientForOngoingTreatment(Pawn pawn, out string reason)
         {
             reason = null;
-            if (pawn == null || pawn.health == null || pawn.health.hediffSet == null || !TryGetHospitalPatientData(pawn, out string diagnosis, out bool dataLooksLikeDisease))
+            if (pawn == null || pawn.health == null || pawn.health.hediffSet == null || !TryGetHospitalPatientData(pawn, out _, out _))
             {
                 return false;
             }
@@ -319,7 +338,7 @@ namespace SpaceServices
             for (int i = 0; i < hediffs.Count; i++)
             {
                 Hediff hediff = hediffs[i];
-                if (IsOngoingHospitalDiseaseHediff(hediff, diagnosis, dataLooksLikeDisease))
+                if (IsOngoingHospitalTreatmentHediff(hediff))
                 {
                     reason = (hediff.LabelCap ?? hediff.def?.LabelCap ?? "ongoing condition").ToString();
                     return true;
@@ -358,25 +377,59 @@ namespace SpaceServices
             return true;
         }
 
-        private static bool IsOngoingHospitalDiseaseHediff(Hediff hediff, string diagnosis, bool dataLooksLikeDisease)
+        private static bool IsOngoingHospitalTreatmentHediff(Hediff hediff)
         {
             if (hediff == null || hediff.def == null || hediff is Hediff_Injury)
             {
                 return false;
             }
-            if (hediff.Severity <= 0f || hediff.def.defName == "Anesthetic")
+            if (hediff.Severity <= 0f)
             {
                 return false;
             }
-            if (DiagnosisMatchesHediff(diagnosis, hediff))
+            EnsureOngoingTreatmentRulesIndexed();
+            if (!OngoingTreatmentRulesByHediffDefName.TryGetValue(hediff.def.defName, out List<SpaceServiceHospitalTreatmentHediffDef> rules))
             {
-                return true;
+                return false;
             }
-            return dataLooksLikeDisease ||
-                hediff.def.tendable ||
-                hediff.def.makesSickThought ||
-                hediff.def.lethalSeverity > 0f ||
-                hediff.TryGetComp<HediffComp_Immunizable>() != null;
+            for (int i = 0; i < rules.Count; i++)
+            {
+                if (rules[i].AppliesTo(hediff))
+                {
+                    return true;
+                }
+            }
+            return false;
+        }
+
+        private static void EnsureOngoingTreatmentRulesIndexed()
+        {
+            if (OngoingTreatmentRulesByHediffDefName != null)
+            {
+                return;
+            }
+            OngoingTreatmentRulesByHediffDefName = new Dictionary<string, List<SpaceServiceHospitalTreatmentHediffDef>>(StringComparer.OrdinalIgnoreCase);
+            foreach (SpaceServiceHospitalTreatmentHediffDef rule in DefDatabase<SpaceServiceHospitalTreatmentHediffDef>.AllDefsListForReading)
+            {
+                if (rule == null || !rule.enabled || rule.hediffDefNames.NullOrEmpty() || !SpaceServiceDefFilters.RequiredPackagesLoaded(rule.requiredPackageIds))
+                {
+                    continue;
+                }
+                for (int i = 0; i < rule.hediffDefNames.Count; i++)
+                {
+                    string defName = rule.hediffDefNames[i];
+                    if (string.IsNullOrEmpty(defName))
+                    {
+                        continue;
+                    }
+                    if (!OngoingTreatmentRulesByHediffDefName.TryGetValue(defName, out List<SpaceServiceHospitalTreatmentHediffDef> rules))
+                    {
+                        rules = new List<SpaceServiceHospitalTreatmentHediffDef>();
+                        OngoingTreatmentRulesByHediffDefName[defName] = rules;
+                    }
+                    rules.Add(rule);
+                }
+            }
         }
 
         private static Building_Bed FindOngoingTreatmentBed(Pawn pawn)
@@ -420,17 +473,6 @@ namespace SpaceServices
                 }
             }
             return best;
-        }
-
-        private static bool DiagnosisMatchesHediff(string diagnosis, Hediff hediff)
-        {
-            if (string.IsNullOrEmpty(diagnosis) || hediff == null || hediff.def == null)
-            {
-                return false;
-            }
-            return ContainsInsensitive(diagnosis, hediff.def.label) ||
-                ContainsInsensitive(diagnosis, hediff.Label) ||
-                ContainsInsensitive(hediff.Label, diagnosis);
         }
 
         private static bool ContainsInsensitive(string text, string value)
