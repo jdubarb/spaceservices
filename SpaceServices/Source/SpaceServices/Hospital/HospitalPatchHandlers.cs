@@ -257,17 +257,23 @@ namespace SpaceServices
                 return;
             }
 
-            Building_Bed bed = RestUtility.FindBedFor(pawn, pawn, false, false, (GuestStatus?)null);
+            Building_Bed bed = FindOngoingTreatmentBed(pawn);
             if (bed == null)
             {
-                ServiceDebugUtility.LogThrottled(ServiceLogIntegration.Hospital, "hospital-ongoing-bed-missing-" + pawn.thingIDNumber, "Could not find ongoing-treatment hospital bed for " + ServiceDebugUtility.PawnAuditSummary(pawn) + " reason=" + reason, GenDate.TicksPerHour);
+                if (ServiceDebugUtility.ShouldLog(ServiceLogIntegration.Hospital))
+                {
+                    ServiceDebugUtility.LogThrottled(ServiceLogIntegration.Hospital, "hospital-ongoing-bed-missing-" + pawn.thingIDNumber, "Could not find ongoing-treatment hospital bed for " + ServiceDebugUtility.PawnAuditSummary(pawn) + " reason=" + reason, GenDate.TicksPerHour);
+                }
                 return;
             }
 
             Job job = JobMaker.MakeJob(JobDefOf.LayDown, bed);
             job.restUntilHealed = true;
             __result = job;
-            ServiceDebugUtility.LogThrottled(ServiceLogIntegration.Hospital, "hospital-ongoing-bed-job-" + pawn.thingIDNumber, "Keeping Hospital patient in bed for ongoing treatment: " + reason + " bed=" + ServiceDebugUtility.ThingAuditSummary(bed), GenDate.TicksPerHour);
+            if (ServiceDebugUtility.ShouldLog(ServiceLogIntegration.Hospital))
+            {
+                ServiceDebugUtility.LogThrottled(ServiceLogIntegration.Hospital, "hospital-ongoing-bed-job-" + pawn.thingIDNumber, "Keeping Hospital patient in bed for ongoing treatment: " + reason + " bed=" + ServiceDebugUtility.ThingAuditSummary(bed), GenDate.TicksPerHour);
+            }
         }
 
         public static bool ShouldKeepHospitalPatientForOngoingTreatment(Pawn pawn, out string reason)
@@ -338,7 +344,54 @@ namespace SpaceServices
             {
                 return true;
             }
-            return dataLooksLikeDisease && (hediff.def.tendable || hediff.def.makesSickThought || hediff.def.lethalSeverity > 0f);
+            return dataLooksLikeDisease ||
+                hediff.def.tendable ||
+                hediff.def.makesSickThought ||
+                hediff.def.lethalSeverity > 0f ||
+                hediff.TryGetComp<HediffComp_Immunizable>() != null;
+        }
+
+        private static Building_Bed FindOngoingTreatmentBed(Pawn pawn)
+        {
+            Building_Bed bed = RestUtility.FindBedFor(pawn, pawn, false, false, (GuestStatus?)null);
+            if (bed != null)
+            {
+                return bed;
+            }
+            Map map = pawn == null ? null : pawn.Map;
+            if (map == null || map.listerBuildings == null)
+            {
+                return null;
+            }
+
+            // Hospital patients can be non-colony pawns, so vanilla's owner/social checks sometimes miss beds
+            // that Hospital itself is already counting. This fallback stays medical-only and reservation-aware.
+            Building_Bed best = null;
+            float bestDistance = float.MaxValue;
+            foreach (Building building in map.listerBuildings.allBuildingsColonist)
+            {
+                Building_Bed candidate = building as Building_Bed;
+                if (candidate == null ||
+                    !candidate.Spawned ||
+                    candidate.Destroyed ||
+                    candidate.ForPrisoners ||
+                    !candidate.Medical ||
+                    !candidate.AnyUnoccupiedSleepingSlot)
+                {
+                    continue;
+                }
+                if (!pawn.CanReserve(candidate) || !pawn.CanReach(candidate, PathEndMode.OnCell, Danger.Some))
+                {
+                    continue;
+                }
+                float distance = pawn.Position.DistanceToSquared(candidate.Position);
+                if (distance < bestDistance)
+                {
+                    bestDistance = distance;
+                    best = candidate;
+                }
+            }
+            return best;
         }
 
         private static bool DiagnosisMatchesHediff(string diagnosis, Hediff hediff)

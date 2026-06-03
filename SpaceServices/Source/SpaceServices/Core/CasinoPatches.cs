@@ -56,11 +56,19 @@ namespace SpaceServices
         private static bool ShouldSuppressGambling(Pawn pawn, out string reason)
         {
             reason = null;
-            if (SpaceServicesMod.Settings == null || !SpaceServicesMod.Settings.disablePatientGamblingAddictions)
+            if (SpaceServicesMod.Settings == null ||
+                !SpaceServicesMod.Settings.enableHospital ||
+                !SpaceServicesMod.Settings.disablePatientGamblingAddictions)
             {
                 return false;
             }
             if (pawn == null || pawn.Map == null || !SpaceServiceMapDetector.IsServiceEligible(pawn.Map))
+            {
+                return false;
+            }
+            if (!ServiceLifecycleUtility.TryFindRecordForPawn(pawn, out _, out ServiceGroupRecord record) ||
+                record == null ||
+                !string.Equals(record.serviceKind, "hospital", StringComparison.OrdinalIgnoreCase))
             {
                 return false;
             }

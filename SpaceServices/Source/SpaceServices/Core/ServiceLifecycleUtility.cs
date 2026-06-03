@@ -531,9 +531,40 @@ namespace SpaceServices
                 }
                 if (Find.TickManager.TicksGame > record.timeoutTick)
                 {
+                    if (ShouldDelayHospitalTimeout(record, out string treatmentReason))
+                    {
+                        record.timeoutTick = Find.TickManager.TicksGame + GenDate.TicksPerHour;
+                        MarkRecordDirty(map, record, "hospital patient still needs ongoing treatment");
+                        ServiceDebugUtility.LogThrottled(ServiceLogIntegration.Hospital, "hospital-timeout-treatment-delay-" + record.id, "Hospital service timeout delayed for ongoing treatment: " + treatmentReason, GenDate.TicksPerHour);
+                        continue;
+                    }
                     BeginDeparture(map, record, "service visit timeout");
                 }
             }
+        }
+
+        private static bool ShouldDelayHospitalTimeout(ServiceGroupRecord record, out string reason)
+        {
+            reason = null;
+            if (record == null ||
+                !string.Equals(record.serviceKind, "hospital", StringComparison.OrdinalIgnoreCase) ||
+                record.pawns == null)
+            {
+                return false;
+            }
+            foreach (Pawn pawn in record.pawns)
+            {
+                if (pawn == null || ServicePawnUtility.IsTerminalPawn(pawn))
+                {
+                    continue;
+                }
+                if (HospitalPatchHandlers.ShouldKeepHospitalPatientForOngoingTreatment(pawn, out string pawnReason))
+                {
+                    reason = pawn.LabelShortCap + ": " + pawnReason;
+                    return true;
+                }
+            }
+            return false;
         }
 
         private static bool ShouldLogBlockedDeparture()

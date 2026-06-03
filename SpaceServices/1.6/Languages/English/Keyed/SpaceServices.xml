@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <LanguageData>
   <JDB_SpaceServices_Settings_SectionGeneral>General</JDB_SpaceServices_Settings_SectionGeneral>
-  <JDB_SpaceServices_Settings_SectionVerbose>Verbose logging</JDB_SpaceServices_Settings_SectionVerbose>
+  <JDB_SpaceServices_Settings_SectionVerbose>Logging</JDB_SpaceServices_Settings_SectionVerbose>
   <JDB_SpaceServices_Settings_SectionHospitality>Hospitality</JDB_SpaceServices_Settings_SectionHospitality>
   <JDB_SpaceServices_Settings_SectionTraffic>Traffic rates</JDB_SpaceServices_Settings_SectionTraffic>
   <JDB_SpaceServices_Settings_SectionCompatibility>Compatibility</JDB_SpaceServices_Settings_SectionCompatibility>

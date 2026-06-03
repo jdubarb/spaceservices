@@ -69,6 +69,16 @@ namespace SpaceServices
             }
         }
 
+        public static bool ShouldLog(ServiceLogIntegration integration)
+        {
+            return NormalLogging(integration);
+        }
+
+        public static bool ShouldLogAudit(ServiceLogIntegration integration)
+        {
+            return VerboseLogging(integration);
+        }
+
         public static void Log(string message)
         {
             Log(GuessIntegration(message), message);

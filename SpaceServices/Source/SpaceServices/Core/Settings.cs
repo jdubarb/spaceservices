@@ -40,13 +40,13 @@ namespace SpaceServices
             // Settings are grouped by the debugging workflow: global behavior, per-integration logs,
             // service-specific rules, traffic pacing, then soft-mod compatibility.
             Section(listing, "JDB_SpaceServices_Settings_SectionGeneral");
-            Checkbox(listing, "JDB_SpaceServices_Settings_DebugLogging", ref Settings.debugLogging);
             Checkbox(listing, "JDB_SpaceServices_Settings_AutoExtract", ref Settings.autoExtractFallback);
             Checkbox(listing, "JDB_SpaceServices_Settings_Hospital", ref Settings.enableHospital);
             Checkbox(listing, "JDB_SpaceServices_Settings_Hospitality", ref Settings.enableHospitality);
             Checkbox(listing, "JDB_SpaceServices_Settings_ReplaceExternalTabs", ref Settings.replaceExternalServiceTabs);
 
             Section(listing, "JDB_SpaceServices_Settings_SectionVerbose");
+            Checkbox(listing, "JDB_SpaceServices_Settings_DebugLogging", ref Settings.debugLogging);
             Checkbox(listing, "JDB_SpaceServices_Settings_VerboseCoreLogging", ref Settings.verboseCoreLogging);
             Checkbox(listing, "JDB_SpaceServices_Settings_VerboseHospitalLogging", ref Settings.verboseHospitalLogging);
             Checkbox(listing, "JDB_SpaceServices_Settings_VerboseHospitalityLogging", ref Settings.verboseHospitalityLogging);
