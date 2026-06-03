@@ -29,5 +29,7 @@
   </loadAfter>
   <description>
 Adds infrastructure for running Hospital and Hospitality-style services on stationary Odyssey asteroid, orbit, moon, and station maps. Actual gravships are intentionally blocked.
+
+Licensed under GNU GPLv3; see LICENSE.txt in the mod folder.
   </description>
 </ModMetaData>
