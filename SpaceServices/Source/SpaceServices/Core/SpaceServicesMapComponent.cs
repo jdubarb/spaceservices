@@ -19,10 +19,12 @@ namespace SpaceServices
         public List<PrebuildPadModeRecord> prebuildPadModes = new List<PrebuildPadModeRecord>();
         private List<ScheduledServiceShuttleArrival> pendingShuttleArrivals = new List<ScheduledServiceShuttleArrival>();
         private List<ScheduledHospitalityIncident> pendingHospitalityIncidents = new List<ScheduledHospitalityIncident>();
-        private const int StaleReferenceCleanupVersion = 9;
+        private const int StaleReferenceCleanupVersion = 10;
         private const int HospitalitySchedulerBlockedRetryTicks = 15000;
+        private const int HospitalityLordReferenceCleanupTicks = 2500;
         private int nextDebugTick;
         private int nextLifecycleTick;
+        private int nextHospitalityLordReferenceCleanupTick;
         private int nextReservationWatchTick;
         private bool servicePadCacheDirty = true;
         private List<Thing> cachedServicePads = new List<Thing>();
@@ -125,6 +127,11 @@ namespace SpaceServices
                 RunStaleReferenceCleanup();
                 ServiceLifecycleUtility.Tick(map, serviceGroups);
                 WatchServicePadReservations();
+            }
+            if (Find.TickManager.TicksGame >= nextHospitalityLordReferenceCleanupTick)
+            {
+                nextHospitalityLordReferenceCleanupTick = Find.TickManager.TicksGame + HospitalityLordReferenceCleanupTicks;
+                StaleReferenceCleanupUtility.CleanupInvalidHospitalityLordReferences(map);
             }
             if (Find.TickManager.TicksGame < nextDebugTick)
             {

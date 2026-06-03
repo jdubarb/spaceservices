@@ -40,6 +40,7 @@ namespace SpaceServices
             Type selectFaction = AccessTools.TypeByName("Hospitality.IncidentWorker_VisitorGroupSelectFaction");
             Type spawnUtility = AccessTools.TypeByName("Hospitality.Utilities.SpawnGroupUtility");
             Type guestUtility = AccessTools.TypeByName("Hospitality.Utilities.GuestUtility");
+            Type itemUtility = AccessTools.TypeByName("Hospitality.Utilities.ItemUtility");
             Type visitPoint = AccessTools.TypeByName("Hospitality.LordToil_VisitPoint");
             Type guestApparelOptimizer = AccessTools.TypeByName("Hospitality.JobGiver_OptimizeApparel_Guest");
 
@@ -50,6 +51,7 @@ namespace SpaceServices
             OptionalModPatches.PatchIfExists(harmony, AccessTools.Method(visitorGroup, "CreateLord"), typeof(HospitalityPatchHandlers), postfix: nameof(HospitalityPatchHandlers.CreateLordPostfix));
             OptionalModPatches.PatchIfExists(harmony, AccessTools.Method(spawnUtility, "SpawnVisitor"), typeof(HospitalityPatchHandlers), prefix: nameof(HospitalityPatchHandlers.SpawnVisitorPrefix), postfix: nameof(HospitalityPatchHandlers.SpawnVisitorPostfix));
             OptionalModPatches.PatchIfExists(harmony, AccessTools.Method(guestUtility, "Leave"), typeof(HospitalityPatchHandlers), prefix: nameof(HospitalityPatchHandlers.GuestLeavePrefix));
+            OptionalModPatches.PatchIfExists(harmony, AccessTools.Method(itemUtility, "PocketHeadgear"), typeof(HospitalityPatchHandlers), prefix: nameof(HospitalityPatchHandlers.PocketHeadgearPrefix));
             OptionalModPatches.PatchIfExists(harmony, AccessTools.Method(visitPoint, "Leave"), typeof(HospitalityPatchHandlers), postfix: nameof(HospitalityPatchHandlers.VisitPointLeavePostfix));
             OptionalModPatches.PatchIfExists(harmony, AccessTools.Method(guestApparelOptimizer, "TryGiveJob"), typeof(HospitalityPatchHandlers), prefix: nameof(HospitalityPatchHandlers.OptimizeApparelGuestPrefix));
         }

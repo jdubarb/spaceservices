@@ -216,6 +216,19 @@ namespace SpaceServices
             return true;
         }
 
+        public static bool PocketHeadgearPrefix(Pawn pawn)
+        {
+            if (!ServiceLifecycleUtility.ShouldSuppressHospitalityVacuumApparelJob(pawn, null))
+            {
+                return true;
+            }
+
+            // Hospitality pockets normal headgear when guests "arrive"; in space that can remove
+            // temperature or vacuum-relevant helmets before the guest reaches atmosphere.
+            ServiceDebugUtility.LogAudit(ServiceLogIntegration.Hospitality, "Suppressed Hospitality headgear pocketing during vacuum transit: " + ServiceDebugUtility.PawnAuditSummary(pawn));
+            return false;
+        }
+
         public static bool OptimizeApparelGuestPrefix(object __instance, Pawn pawn, ref Job __result)
         {
             if (!ServiceLifecycleUtility.ShouldSuppressHospitalityVacuumApparelJob(pawn, null))

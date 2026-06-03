@@ -31,10 +31,11 @@ namespace SpaceServices
             int removedDirectRelations = CleanupBrokenDirectRelations(map);
             int removedRelationshipRecords = ServicePawnUtility.CleanupBrokenRelationshipRecords();
             int removedRuntimeLords = CleanupUnspawnedPawnRuntimeLords(map);
+            int removedHospitalityCompLords = CleanupInvalidHospitalityLordReferences(map);
 
-            if (removedHospitalPatients > 0 || removedLordPawns > 0 || removedServicePawns > 0 || removedLegacyShuttles > 0 || removedServiceShuttles > 0 || removedSocialMemories > 0 || removedDirectRelations > 0 || removedRelationshipRecords > 0 || removedRuntimeLords > 0)
+            if (removedHospitalPatients > 0 || removedLordPawns > 0 || removedServicePawns > 0 || removedLegacyShuttles > 0 || removedServiceShuttles > 0 || removedSocialMemories > 0 || removedDirectRelations > 0 || removedRelationshipRecords > 0 || removedRuntimeLords > 0 || removedHospitalityCompLords > 0)
             {
-                ServiceDebugUtility.Log(ServiceLogIntegration.Core, "cleaned stale service references: hospitalPatients=" + removedHospitalPatients + ", lordPawns=" + removedLordPawns + ", servicePawns=" + removedServicePawns + ", legacyPassengerShuttles=" + removedLegacyShuttles + ", serviceShuttlePayloads=" + removedServiceShuttles + ", socialMemories=" + removedSocialMemories + ", directRelations=" + removedDirectRelations + ", relationshipRecords=" + removedRelationshipRecords + ", runtimeLordRefs=" + removedRuntimeLords);
+                ServiceDebugUtility.Log(ServiceLogIntegration.Core, "cleaned stale service references: hospitalPatients=" + removedHospitalPatients + ", lordPawns=" + removedLordPawns + ", servicePawns=" + removedServicePawns + ", legacyPassengerShuttles=" + removedLegacyShuttles + ", serviceShuttlePayloads=" + removedServiceShuttles + ", socialMemories=" + removedSocialMemories + ", directRelations=" + removedDirectRelations + ", relationshipRecords=" + removedRelationshipRecords + ", runtimeLordRefs=" + removedRuntimeLords + ", hospitalityCompLords=" + removedHospitalityCompLords);
             }
         }
 
@@ -363,6 +364,48 @@ namespace SpaceServices
                     continue;
                 }
                 removed += ServicePawnUtility.ClearRuntimeLordReferences(pawn);
+            }
+            return removed;
+        }
+
+        public static int CleanupInvalidHospitalityLordReferences(Map map)
+        {
+            if (map == null || map.lordManager == null || map.lordManager.lords == null)
+            {
+                return 0;
+            }
+
+            HashSet<Lord> liveLords = new HashSet<Lord>(map.lordManager.lords.Where(lord => lord != null));
+            int removed = 0;
+            foreach (Pawn pawn in MapPawnsToClean(map).Concat(ServiceRecordPawns(map)).Distinct())
+            {
+                if (pawn == null || pawn.AllComps == null)
+                {
+                    continue;
+                }
+                foreach (ThingComp comp in pawn.AllComps)
+                {
+                    if (comp == null || comp.GetType().FullName != "Hospitality.CompGuest")
+                    {
+                        continue;
+                    }
+                    Lord lord = Reflect.GetMember(comp, "lord") as Lord;
+                    if (lord == null)
+                    {
+                        continue;
+                    }
+                    // Hospitality serializes CompGuest.lord even though Lord is not deep-saved.
+                    // Clear stale refs once the lord has left the map manager or no longer owns this pawn.
+                    if (!liveLords.Contains(lord) || lord.ownedPawns == null || !lord.ownedPawns.Contains(pawn))
+                    {
+                        Reflect.SetMember(comp, "lord", null);
+                        removed++;
+                    }
+                }
+            }
+            if (removed > 0)
+            {
+                ServiceDebugUtility.LogThrottled(ServiceLogIntegration.Hospitality, "hospitality-invalid-comp-lords-cleaned-" + map.uniqueID, "Cleared invalid Hospitality CompGuest lord references: " + removed, GenDate.TicksPerHour);
             }
             return removed;
         }
