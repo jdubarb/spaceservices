@@ -15,6 +15,8 @@ namespace SpaceServices
 {
     public sealed class ServiceGroupRecord : IExposable
     {
+        // Service groups outlive the source mod's immediate incident. These records let Space Services
+        // own pad reservation, extraction, and recovery without making Hospital/Hospitality save our state.
         public string id;
         public string serviceKind;
         public string state = "arrived";

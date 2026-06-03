@@ -67,9 +67,6 @@ namespace SpaceServices
         private bool legacyAllowPatients = true;
         private bool legacyAllowEmergency = true;
         private int modeVersion = 2;
-        public bool requireVacSafeRoof = false;
-        public bool preferShuttle = true;
-        public bool requirePower = true;
         public string reservedForGroup;
         public int reservedAtTick;
 
@@ -86,9 +83,6 @@ namespace SpaceServices
             Scribe_Values.Look(ref legacyAllowGuests, "allowGuests", true);
             Scribe_Values.Look(ref legacyAllowPatients, "allowPatients", true);
             Scribe_Values.Look(ref legacyAllowEmergency, "allowEmergency", true);
-            Scribe_Values.Look(ref requireVacSafeRoof, "requireVacSafeRoof", false);
-            Scribe_Values.Look(ref preferShuttle, "preferShuttle", true);
-            Scribe_Values.Look(ref requirePower, "requirePower", true);
             Scribe_Values.Look(ref reservedForGroup, "reservedForGroup");
             Scribe_Values.Look(ref reservedAtTick, "reservedAtTick", 0);
 

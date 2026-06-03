@@ -24,6 +24,8 @@ namespace SpaceServices
             Type patientUtility = AccessTools.TypeByName("Hospital.Utilities.PatientUtility") ?? AccessTools.TypeByName("Hospital.PatientUtility");
             if (patientUtility != null)
             {
+                // Hospital has moved helper classes between releases, so use reflection and patch only
+                // methods that exist in the active build instead of binding to one exact version.
                 foreach (MethodInfo method in patientUtility.GetMethods(AccessTools.all).Where(m => m.Name == "SetUpNewPatient" || m.Name == "Arrive"))
                 {
                     OptionalModPatches.PatchIfExists(harmony, method, typeof(OptionalPatchUtility), postfix: nameof(OptionalPatchUtility.SuitPawnsInArgsPostfix));
@@ -48,6 +50,7 @@ namespace SpaceServices
             if (massCasualty != null)
             {
                 OptionalModPatches.PatchIfExists(harmony, AccessTools.Method(massCasualty, "TryExecuteWorker"), typeof(HospitalPatchHandlers), prefix: nameof(HospitalPatchHandlers.HospitalPatientArrivesTryExecutePrefix), postfix: nameof(HospitalPatchHandlers.HospitalMassCasualtyTryExecutePostfix), finalizer: nameof(HospitalPatchHandlers.HospitalMassCasualtyTryExecuteFinalizer));
+                // Mass casualty SpawnPatient has changed signatures; patch every overload and inspect args at runtime.
                 foreach (MethodInfo method in massCasualty.GetMethods(AccessTools.all).Where(m => m.Name == "SpawnPatient"))
                 {
                     OptionalModPatches.PatchIfExists(harmony, method, typeof(HospitalPatchHandlers), prefix: nameof(HospitalPatchHandlers.HospitalSpawnPatientPrefix), postfix: nameof(HospitalPatchHandlers.HospitalSpawnPatientPostfix), finalizer: nameof(HospitalPatchHandlers.HospitalSpawnPatientFinalizer));

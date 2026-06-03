@@ -20,6 +20,10 @@ namespace SpaceServices
 
         public static bool VisitorGroupTryExecutePrefix(object __instance, IncidentParms parms, ref bool __result)
         {
+            if (SpaceServicesMod.Settings != null && !SpaceServicesMod.Settings.enableHospitality)
+            {
+                return true;
+            }
             Map map = parms == null ? null : parms.target as Map;
             if (map == null || !SpaceServiceMapDetector.IsServiceEligible(map))
             {
@@ -80,16 +84,24 @@ namespace SpaceServices
 
         public static void VisitorGroupTryExecutePostfix(IncidentParms parms)
         {
+            if (SpaceServicesMod.Settings != null && !SpaceServicesMod.Settings.enableHospitality)
+            {
+                return;
+            }
             Map map = parms == null ? null : parms.target as Map;
             if (map != null && SpaceServiceMapDetector.IsServiceEligible(map))
             {
                 HospitalityArrivalContext.FinalizeArrival(map);
-                HospitalityArrivalContext.Pop();
+                HospitalityArrivalContext.Pop(map);
             }
         }
 
         public static void VisitorGroupTryExecuteFinalizer(IncidentParms parms, Exception __exception)
         {
+            if (SpaceServicesMod.Settings != null && !SpaceServicesMod.Settings.enableHospitality)
+            {
+                return;
+            }
             if (__exception == null)
             {
                 return;
@@ -97,12 +109,16 @@ namespace SpaceServices
             Map map = parms == null ? null : parms.target as Map;
             if (map != null && SpaceServiceMapDetector.IsServiceEligible(map))
             {
-                HospitalityArrivalContext.Pop();
+                HospitalityArrivalContext.Pop(map);
             }
         }
 
         public static bool AskForSafetyPrefix(IncidentParms parms, Action allow)
         {
+            if (SpaceServicesMod.Settings != null && !SpaceServicesMod.Settings.enableHospitality)
+            {
+                return true;
+            }
             Map map = parms == null ? null : parms.target as Map;
             if (map == null || !SpaceServiceMapDetector.IsServiceEligible(map))
             {
@@ -120,6 +136,10 @@ namespace SpaceServices
 
         public static void SpawnGroupPrefix(IncidentParms parms, Map map)
         {
+            if (SpaceServicesMod.Settings != null && !SpaceServicesMod.Settings.enableHospitality)
+            {
+                return;
+            }
             if (map != null && SpaceServiceMapDetector.IsServiceEligible(map) && ServicePadUtility.TryFindNearestServicePadCell(map, ServiceUse.Guest, parms == null ? IntVec3.Invalid : parms.spawnCenter, out IntVec3 cell))
             {
                 parms.spawnCenter = cell;
@@ -128,23 +148,35 @@ namespace SpaceServices
 
         public static void SpawnGroupPostfix(IncidentParms parms, Map map)
         {
+            if (SpaceServicesMod.Settings != null && !SpaceServicesMod.Settings.enableHospitality)
+            {
+                return;
+            }
             if (map != null && SpaceServiceMapDetector.IsServiceEligible(map))
             {
                 HospitalityArrivalContext.FinalizeArrival(map);
-                HospitalityArrivalContext.Pop();
+                HospitalityArrivalContext.Pop(map);
             }
         }
 
         public static void SpawnGroupFinalizer(Map map, Exception __exception)
         {
+            if (SpaceServicesMod.Settings != null && !SpaceServicesMod.Settings.enableHospitality)
+            {
+                return;
+            }
             if (__exception != null && map != null && SpaceServiceMapDetector.IsServiceEligible(map))
             {
-                HospitalityArrivalContext.Pop();
+                HospitalityArrivalContext.Pop(map);
             }
         }
 
         public static void SpawnVisitorPrefix(Pawn pawn, Map map, ref IntVec3 location)
         {
+            if (SpaceServicesMod.Settings != null && !SpaceServicesMod.Settings.enableHospitality)
+            {
+                return;
+            }
             if (map == null || !SpaceServiceMapDetector.IsServiceEligible(map))
             {
                 return;
@@ -159,6 +191,10 @@ namespace SpaceServices
 
         public static void SpawnVisitorPostfix(List<Pawn> spawned, Pawn pawn, Map map, Pawn __result)
         {
+            if (SpaceServicesMod.Settings != null && !SpaceServicesMod.Settings.enableHospitality)
+            {
+                return;
+            }
             if (map == null || !SpaceServiceMapDetector.IsServiceEligible(map))
             {
                 return;
@@ -187,6 +223,10 @@ namespace SpaceServices
 
         public static void CreateLordPostfix(List<Pawn> pawns, Map map)
         {
+            if (SpaceServicesMod.Settings != null && !SpaceServicesMod.Settings.enableHospitality)
+            {
+                return;
+            }
             if (map == null || !SpaceServiceMapDetector.IsServiceEligible(map))
             {
                 return;
@@ -202,11 +242,17 @@ namespace SpaceServices
 
         public static bool GuestLeavePrefix(Pawn pawn)
         {
+            if (SpaceServicesMod.Settings != null && !SpaceServicesMod.Settings.enableHospitality)
+            {
+                return true;
+            }
             if (pawn != null && NativeGuestLeaveAllowed.Remove(pawn))
             {
                 ServiceDebugUtility.LogAudit("Hospitality GuestUtility.Leave allowed through Space Services bypass: " + HospitalityBedUtility.GuestDebugSummary(pawn));
                 return true;
             }
+            // Native Hospitality removes guests by walking/despawning them. In space-service maps we
+            // intercept that handoff so pickup shuttles can own the departure instead.
             if (ServiceLifecycleUtility.RequestDepartureForPawn(pawn, "Hospitality marked guest leaving"))
             {
                 ServiceDebugUtility.LogAudit("Hospitality GuestUtility.Leave blocked; Space Services owns departure: " + HospitalityBedUtility.GuestDebugSummary(pawn));
@@ -218,6 +264,10 @@ namespace SpaceServices
 
         public static bool PocketHeadgearPrefix(Pawn pawn)
         {
+            if (SpaceServicesMod.Settings != null && !SpaceServicesMod.Settings.enableHospitality)
+            {
+                return true;
+            }
             if (!ServiceLifecycleUtility.ShouldSuppressHospitalityVacuumApparelJob(pawn, null))
             {
                 return true;
@@ -231,6 +281,10 @@ namespace SpaceServices
 
         public static bool OptimizeApparelGuestPrefix(object __instance, Pawn pawn, ref Job __result)
         {
+            if (SpaceServicesMod.Settings != null && !SpaceServicesMod.Settings.enableHospitality)
+            {
+                return true;
+            }
             if (!ServiceLifecycleUtility.ShouldSuppressHospitalityVacuumApparelJob(pawn, null))
             {
                 return true;
@@ -238,6 +292,7 @@ namespace SpaceServices
 
             __result = null;
             SetNextOptimizeTick(__instance, pawn);
+            // Without bumping Hospitality's optimizer cooldown, blocked outfit jobs can retry every think tick.
             ServiceDebugUtility.LogAudit(ServiceLogIntegration.Hospitality, "Suppressed Hospitality guest apparel optimization during vacuum transit: " + ServiceDebugUtility.PawnAuditSummary(pawn));
             return false;
         }
@@ -295,6 +350,10 @@ namespace SpaceServices
 
         public static void VisitPointLeavePostfix(object __instance)
         {
+            if (SpaceServicesMod.Settings != null && !SpaceServicesMod.Settings.enableHospitality)
+            {
+                return;
+            }
             Lord lord = Reflect.GetMember(__instance, "lord") as Lord;
             if (lord == null || lord.ownedPawns == null)
             {

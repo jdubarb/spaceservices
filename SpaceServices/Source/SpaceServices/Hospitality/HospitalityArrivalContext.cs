@@ -48,6 +48,14 @@ namespace SpaceServices
             }
         }
 
+        public static void Pop(Map map)
+        {
+            if (Requests.Count > 0 && Requests.Peek().map == map)
+            {
+                Requests.Pop();
+            }
+        }
+
         public static bool TryGetArrivalCell(Map map, out IntVec3 cell)
         {
             foreach (Request request in Requests)

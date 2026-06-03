@@ -18,12 +18,20 @@ namespace SpaceServices
         public static void SuitPawnsInArgsPostfix(MethodBase __originalMethod, object[] __args)
         {
             Map map = FindMap(__args);
-            if (map != null && !SpaceServiceMapDetector.IsServiceEligible(map))
+            if (map == null || !SpaceServiceMapDetector.IsServiceEligible(map))
             {
                 return;
             }
             string methodName = __originalMethod == null || __originalMethod.DeclaringType == null ? "" : __originalMethod.DeclaringType.FullName ?? "";
             bool isHospitality = methodName.IndexOf("Hospitality.", StringComparison.OrdinalIgnoreCase) >= 0;
+            if (methodName.IndexOf("Hospital.", StringComparison.OrdinalIgnoreCase) >= 0 && SpaceServicesMod.Settings != null && !SpaceServicesMod.Settings.enableHospital)
+            {
+                return;
+            }
+            if (isHospitality && SpaceServicesMod.Settings != null && !SpaceServicesMod.Settings.enableHospitality)
+            {
+                return;
+            }
             Thing hospitalityArrivalPad = null;
             if (isHospitality && (map == null || !HospitalityArrivalContext.TryGetArrivalPad(map, out hospitalityArrivalPad)))
             {
@@ -95,7 +103,7 @@ namespace SpaceServices
                     return pawn.MapHeld;
                 }
             }
-            return Find.CurrentMap;
+            return null;
         }
     }
 }

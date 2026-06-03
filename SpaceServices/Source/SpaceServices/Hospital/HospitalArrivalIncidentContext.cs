@@ -49,6 +49,14 @@ namespace SpaceServices
             }
         }
 
+        public static void Pop(Map map)
+        {
+            if (Requests.Count > 0 && Requests.Peek().map == map)
+            {
+                Requests.Pop();
+            }
+        }
+
         public static void MarkPatientFallbackSuppressed(Map map)
         {
             if (map != null)

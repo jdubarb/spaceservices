@@ -168,6 +168,8 @@ namespace SpaceServices
             List<VacuumApparelCandidate> autoCandidates = SelectAutomaticApparel(pawn, targetVacuum);
             if (autoCandidates.Count > 0)
             {
+                // Prefer active modded apparel that already advertises vacuum resistance, then fall back
+                // to explicit XML sets and Odyssey vacsuits if the generated outfit still is not enough.
                 for (int i = 0; i < autoCandidates.Count; i++)
                 {
                     TryWearIfNeeded(pawn, autoCandidates[i].def, true);

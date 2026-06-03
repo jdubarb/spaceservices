@@ -18,9 +18,9 @@
   <JDB_SpaceServices_Settings_AutoExtract>Auto-extract fallback</JDB_SpaceServices_Settings_AutoExtract>
   <JDB_SpaceServices_Settings_AutoExtractDesc>Let Space Services recover service visitors that are ready to leave but get stuck outside the normal departure path.</JDB_SpaceServices_Settings_AutoExtractDesc>
   <JDB_SpaceServices_Settings_Hospital>Hospital support</JDB_SpaceServices_Settings_Hospital>
-  <JDB_SpaceServices_Settings_HospitalDesc>Enable space-map handling for Hospital patient arrivals and departures.</JDB_SpaceServices_Settings_HospitalDesc>
+  <JDB_SpaceServices_Settings_HospitalDesc>Enable space-map handling for Hospital patient arrivals and departures. Disabling passes native Hospital behavior through immediately; enabling after startup may require a restart.</JDB_SpaceServices_Settings_HospitalDesc>
   <JDB_SpaceServices_Settings_Hospitality>Hospitality support</JDB_SpaceServices_Settings_Hospitality>
-  <JDB_SpaceServices_Settings_HospitalityDesc>Enable space-map handling for Hospitality guest arrivals and departures.</JDB_SpaceServices_Settings_HospitalityDesc>
+  <JDB_SpaceServices_Settings_HospitalityDesc>Enable space-map handling for Hospitality guest arrivals and departures. Disabling passes native Hospitality behavior through immediately; enabling after startup may require a restart.</JDB_SpaceServices_Settings_HospitalityDesc>
   <JDB_SpaceServices_Settings_ReplaceExternalTabs>Replace Hospital/Hospitality tabs</JDB_SpaceServices_Settings_ReplaceExternalTabs>
   <JDB_SpaceServices_Settings_ReplaceExternalTabsDesc>Hide the native Hospital and Hospitality bottom tabs and use the Space Services tab as the combined entry point. Disable this to show all three tabs.</JDB_SpaceServices_Settings_ReplaceExternalTabsDesc>
   <JDB_SpaceServices_Settings_HospitalityRequireBeds>Require free guest beds for Hospitality arrivals</JDB_SpaceServices_Settings_HospitalityRequireBeds>

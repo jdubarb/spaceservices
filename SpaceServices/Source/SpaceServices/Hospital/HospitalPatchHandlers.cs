@@ -15,8 +15,14 @@ namespace SpaceServices
 {
     public static class HospitalPatchHandlers
     {
+        private static bool HospitalSupportEnabled => SpaceServicesMod.Settings == null || SpaceServicesMod.Settings.enableHospital;
+
         public static void HospitalLandingSpotPostfix(object[] __args, ref IntVec3 __result)
         {
+            if (!HospitalSupportEnabled)
+            {
+                return;
+            }
             Map map = OptionalPatchUtility.FindMap(__args);
             if (map != null && SpaceServiceMapDetector.IsServiceEligible(map) && ServicePadUtility.TryFindServicePadCell(map, ServiceUse.Patient, out IntVec3 cell))
             {
@@ -26,6 +32,10 @@ namespace SpaceServices
 
         public static void HospitalCanSpawnPatientPostfix(Map map, ref bool __result)
         {
+            if (!HospitalSupportEnabled)
+            {
+                return;
+            }
             if (map == null || !SpaceServiceMapDetector.IsServiceEligible(map))
             {
                 return;
@@ -35,6 +45,10 @@ namespace SpaceServices
 
         public static bool HospitalPatientArrivesTryExecutePrefix(object __instance, IncidentParms parms, ref bool __result)
         {
+            if (!HospitalSupportEnabled)
+            {
+                return true;
+            }
             Map map = parms == null ? null : parms.target as Map;
             if (map == null || !SpaceServiceMapDetector.IsServiceEligible(map))
             {
@@ -65,6 +79,10 @@ namespace SpaceServices
 
         public static void HospitalTryFindEntryCellPostfix(Map map, ref IntVec3 cell, ref bool __result)
         {
+            if (!HospitalSupportEnabled)
+            {
+                return;
+            }
             if (map == null || !SpaceServiceMapDetector.IsServiceEligible(map))
             {
                 return;
@@ -78,6 +96,10 @@ namespace SpaceServices
 
         public static void HospitalSpawnPatientPrefix(MethodBase __originalMethod, object[] __args)
         {
+            if (!HospitalSupportEnabled)
+            {
+                return;
+            }
             Map map = OptionalPatchUtility.FindMap(__args);
             if (map == null || !SpaceServiceMapDetector.IsServiceEligible(map))
             {
@@ -104,6 +126,10 @@ namespace SpaceServices
 
         public static void HospitalSpawnPatientPostfix(object[] __args)
         {
+            if (!HospitalSupportEnabled)
+            {
+                return;
+            }
             try
             {
                 Map map = OptionalPatchUtility.FindMap(__args);
@@ -129,6 +155,10 @@ namespace SpaceServices
 
         public static void HospitalSpawnPatientFinalizer(Exception __exception)
         {
+            if (!HospitalSupportEnabled)
+            {
+                return;
+            }
             if (__exception == null)
             {
                 return;
@@ -140,6 +170,10 @@ namespace SpaceServices
 
         public static bool HospitalDropPodAtPrefix(ref IntVec3 c, Map map, ActiveTransporterInfo info, Faction faction)
         {
+            if (!HospitalSupportEnabled)
+            {
+                return true;
+            }
             if (map == null || !SpaceServiceMapDetector.IsServiceEligible(map))
             {
                 return true;
@@ -182,11 +216,19 @@ namespace SpaceServices
 
         public static void HospitalPatientDeparturePostfix(Pawn pawn)
         {
+            if (!HospitalSupportEnabled)
+            {
+                return;
+            }
             ServiceLifecycleUtility.RequestDepartureForPawn(pawn, "Hospital requested patient departure");
         }
 
         public static void HospitalSentAwayPostfix(Pawn pawn, ref bool __result)
         {
+            if (!HospitalSupportEnabled)
+            {
+                return;
+            }
             if (!__result || pawn == null || pawn.Map == null || !SpaceServiceMapDetector.IsServiceEligible(pawn.Map))
             {
                 return;
@@ -202,6 +244,10 @@ namespace SpaceServices
 
         public static void PatientGoToBedPostfix(Pawn pawn, ref Job __result)
         {
+            if (!HospitalSupportEnabled)
+            {
+                return;
+            }
             if (__result != null || pawn == null || pawn.Map == null || !SpaceServiceMapDetector.IsServiceEligible(pawn.Map))
             {
                 return;
@@ -257,6 +303,8 @@ namespace SpaceServices
         {
             diagnosis = null;
             dataLooksLikeDisease = false;
+            // Hospital's public behavior is driven by an internal Patients dictionary. Reflection here is
+            // intentionally narrow: only enough to decide whether long-running hediffs should keep bed rest.
             object hospital = HospitalIncidentGate.FindHospitalComponent(pawn == null ? null : pawn.Map);
             IDictionary patients = hospital == null ? null : Reflect.GetMember(hospital, "Patients") as IDictionary;
             if (patients == null || pawn == null || !patients.Contains(pawn))
@@ -313,16 +361,28 @@ namespace SpaceServices
 
         public static void HospitalPatientGonePostfix(Pawn pawn)
         {
+            if (!HospitalSupportEnabled)
+            {
+                return;
+            }
             ServiceLifecycleUtility.ReleasePawn(pawn, "Hospital removed patient from map");
         }
 
         public static void HospitalPatientDiedPrefix(Pawn pawn, ref HospitalPatientDeathState __state)
         {
+            if (!HospitalSupportEnabled)
+            {
+                return;
+            }
             __state = HospitalPatientDeathState.Capture(pawn);
         }
 
         public static void HospitalPatientDiedPostfix(Pawn pawn, HospitalPatientDeathState __state)
         {
+            if (!HospitalSupportEnabled)
+            {
+                return;
+            }
             Map map = __state == null ? pawn?.MapHeld : __state.map;
             // Hospital clears patient data on death, but the corpse can still save its old lord ref.
             bool notified = ServicePawnUtility.NotifyLordPawnLost(__state == null ? null : __state.lord, pawn, PawnLostCondition.Killed);
@@ -333,6 +393,10 @@ namespace SpaceServices
 
         public static void HospitalPatientArrivesTryExecutePostfix(object __instance, IncidentParms parms, ref bool __result)
         {
+            if (!HospitalSupportEnabled)
+            {
+                return;
+            }
             try
             {
                 if (__result || __instance == null || parms == null)
@@ -366,28 +430,40 @@ namespace SpaceServices
             }
             finally
             {
-                HospitalArrivalIncidentContext.Pop();
+                HospitalArrivalIncidentContext.Pop(parms == null ? null : parms.target as Map);
             }
         }
 
-        public static void HospitalPatientArrivesTryExecuteFinalizer(Exception __exception)
+        public static void HospitalPatientArrivesTryExecuteFinalizer(IncidentParms parms, Exception __exception)
         {
+            if (!HospitalSupportEnabled)
+            {
+                return;
+            }
             if (__exception != null)
             {
-                HospitalArrivalIncidentContext.Pop();
+                HospitalArrivalIncidentContext.Pop(parms == null ? null : parms.target as Map);
             }
         }
 
-        public static void HospitalMassCasualtyTryExecutePostfix()
+        public static void HospitalMassCasualtyTryExecutePostfix(IncidentParms parms)
         {
-            HospitalArrivalIncidentContext.Pop();
+            if (!HospitalSupportEnabled)
+            {
+                return;
+            }
+            HospitalArrivalIncidentContext.Pop(parms == null ? null : parms.target as Map);
         }
 
-        public static void HospitalMassCasualtyTryExecuteFinalizer(Exception __exception)
+        public static void HospitalMassCasualtyTryExecuteFinalizer(IncidentParms parms, Exception __exception)
         {
+            if (!HospitalSupportEnabled)
+            {
+                return;
+            }
             if (__exception != null)
             {
-                HospitalArrivalIncidentContext.Pop();
+                HospitalArrivalIncidentContext.Pop(parms == null ? null : parms.target as Map);
             }
         }
 

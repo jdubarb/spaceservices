@@ -33,6 +33,10 @@ namespace SpaceServices
         private int staleReferenceCleanupVersion;
         private bool hospitalityGuestAreaTipShown;
         private int debugLimitSemanticsVersion;
+        private Dictionary<string, float> trafficRateProgressByIncident = new Dictionary<string, float>();
+        private List<string> trafficRateProgressKeys;
+        private List<float> trafficRateProgressValues;
+        private int lastServiceArrivalTick = -999999;
         public int debugHospitalPatientLimit = -1;
         public int debugHospitalityGroupLimit = -1;
         public int debugHospitalityPawnLimit = -1;
@@ -64,6 +68,12 @@ namespace SpaceServices
             Scribe_Values.Look(ref staleReferenceCleanupVersion, "staleReferenceCleanupVersion", 0);
             Scribe_Values.Look(ref nextHospitalityServiceVisitTick, "nextHospitalityServiceVisitTick", 0);
             Scribe_Values.Look(ref hospitalityGuestAreaTipShown, "hospitalityGuestAreaTipShown", false);
+            Scribe_Values.Look(ref lastServiceArrivalTick, "lastServiceArrivalTick", -999999);
+            Scribe_Collections.Look(ref trafficRateProgressByIncident, "trafficRateProgressByIncident", LookMode.Value, LookMode.Value, ref trafficRateProgressKeys, ref trafficRateProgressValues);
+            if (trafficRateProgressByIncident == null)
+            {
+                trafficRateProgressByIncident = new Dictionary<string, float>();
+            }
             if (Scribe.mode == LoadSaveMode.Saving)
             {
                 debugLimitSemanticsVersion = 1;
@@ -98,6 +108,65 @@ namespace SpaceServices
             if (pendingHospitalityIncidents == null)
             {
                 pendingHospitalityIncidents = new List<ScheduledHospitalityIncident>();
+            }
+        }
+
+        public bool TrafficRateAllows(string incidentDefName, int sharedCadenceTicks)
+        {
+            float rate = ServiceIncidentUtility.TrafficRateFor(incidentDefName);
+            if (rate <= 0f)
+            {
+                return false;
+            }
+            if (!SharedTrafficCadenceReady(sharedCadenceTicks))
+            {
+                ServiceDebugUtility.LogVerbose(ServiceLogIntegration.Core, "Service traffic blocked by shared one-hour cadence: " + (incidentDefName ?? "unknown"));
+                return false;
+            }
+            if (rate >= 1f)
+            {
+                MarkSharedTrafficUsed();
+                return true;
+            }
+
+            // This is deterministic pacing, not a random chance. Progress is saved with the map so
+            // repeated reloads cannot reroll service traffic.
+            string key = incidentDefName ?? "";
+            float progress;
+            trafficRateProgressByIncident.TryGetValue(key, out progress);
+            progress += rate;
+            if (progress >= 1f)
+            {
+                trafficRateProgressByIncident[key] = progress - 1f;
+                MarkSharedTrafficUsed();
+                return true;
+            }
+            trafficRateProgressByIncident[key] = progress;
+            return false;
+        }
+
+        public bool TryConsumeSharedTrafficSlot(int sharedCadenceTicks)
+        {
+            if (!SharedTrafficCadenceReady(sharedCadenceTicks))
+            {
+                return false;
+            }
+            MarkSharedTrafficUsed();
+            return true;
+        }
+
+        private bool SharedTrafficCadenceReady(int sharedCadenceTicks)
+        {
+            return Find.TickManager == null ||
+                lastServiceArrivalTick <= 0 ||
+                Find.TickManager.TicksGame - lastServiceArrivalTick >= sharedCadenceTicks;
+        }
+
+        private void MarkSharedTrafficUsed()
+        {
+            if (Find.TickManager != null)
+            {
+                lastServiceArrivalTick = Find.TickManager.TicksGame;
             }
         }
 
@@ -178,6 +247,8 @@ namespace SpaceServices
 
         private void ReleaseTransientArrivalReservations()
         {
+            // Arrival reservations are short-lived visual locks. If a save happens during touchdown and
+            // the pending incident is gone on reload, release the pad instead of leaving it stuck forever.
             HashSet<string> pendingReservations = new HashSet<string>();
             foreach (ScheduledHospitalityIncident incident in pendingHospitalityIncidents)
             {
@@ -300,6 +371,8 @@ namespace SpaceServices
         public void DebugResetServiceTraffic(string reason)
         {
             ClearAllServiceReservations(reason ?? "debug reset service traffic");
+            trafficRateProgressByIncident.Clear();
+            lastServiceArrivalTick = -999999;
             int shuttlesRemoved = ServiceShuttleUtility.CleanupAllServiceShuttles(map);
             foreach (ServiceGroupRecord record in serviceGroups)
             {
@@ -448,6 +521,8 @@ namespace SpaceServices
                 ServiceDebugUtility.LogAudit("ScheduleHospitalityIncident rejected reservation id=" + reservationId + " pad=" + ServiceDebugUtility.ThingAuditSummary(pad) + " comp=" + (comp != null));
                 return false;
             }
+            // The Hospitality incident still does the actual pawn generation. We only delay it until the
+            // shuttle visual reaches touchdown, so any native faction/guest setup remains intact.
             pendingHospitalityIncidents.Add(new ScheduledHospitalityIncident
             {
                 worker = worker,
@@ -533,19 +608,42 @@ namespace SpaceServices
                 incident.parms.spawnCenter = incident.pad.Position;
                 ServiceDebugUtility.LogAudit("TickPendingHospitalityIncidents executing reservation=" + incident.reservationId + " incident=" + incident.incidentDefName + " spawnCenter=" + incident.parms.spawnCenter + " pad=" + ServiceDebugUtility.ThingAuditSummary(incident.pad));
                 ReleaseArrivalReservation(incident);
+                // This context tells Hospitality spawn hooks which service pad owns the native spawn.
                 HospitalityDelayedIncidentContext.Push(map, incident.pad);
+                bool executed = false;
                 try
                 {
                     MethodInfo method = AccessTools.Method(incident.worker.GetType(), "TryExecuteWorker");
-                    method?.Invoke(incident.worker, new object[] { incident.parms });
+                    if (method == null)
+                    {
+                        ServiceDebugUtility.LogWarning(ServiceLogIntegration.Hospitality, "Delayed Hospitality visitor arrival failed: TryExecuteWorker not found on " + incident.worker.GetType().FullName);
+                    }
+                    else
+                    {
+                        object result = method.Invoke(incident.worker, new object[] { incident.parms });
+                        executed = result is bool && (bool)result;
+                        if (!executed)
+                        {
+                            ServiceDebugUtility.LogWarning(ServiceLogIntegration.Hospitality, "Delayed Hospitality visitor arrival waved off: TryExecuteWorker returned false for " + (incident.incidentDefName ?? "unknown"));
+                        }
+                    }
+                }
+                catch (TargetInvocationException ex)
+                {
+                    Exception inner = ex.InnerException ?? ex;
+                    ServiceDebugUtility.LogWarning(ServiceLogIntegration.Hospitality, "Delayed Hospitality visitor arrival failed: " + inner.GetType().Name + " " + inner.Message);
                 }
                 catch (Exception ex)
                 {
-                    Log.Warning("[Space Services] Delayed Hospitality visitor arrival failed: " + ex);
+                    ServiceDebugUtility.LogWarning(ServiceLogIntegration.Hospitality, "Delayed Hospitality visitor arrival failed: " + ex.GetType().Name + " " + ex.Message);
                 }
                 finally
                 {
                     HospitalityDelayedIncidentContext.Pop();
+                }
+                if (!executed)
+                {
+                    Messages.Message("Space Services: visitor arrival waved off", incident.pad, MessageTypeDefOf.RejectInput, false);
                 }
                 ServiceShuttleUtility.SpawnDeparture(map, incident.pad.Position, "hospitality", incident.shuttleVisualDefName);
             }

@@ -387,10 +387,12 @@ namespace SpaceServices
             foreach (ThingDef thingDef in DefDatabase<ThingDef>.AllDefsListForReading)
             {
                 SpaceServiceShuttleVisualExtension extension = thingDef.GetModExtension<SpaceServiceShuttleVisualExtension>();
-                if (extension == null || !VisualSourceAllowed(extension.requiredPackageIds) || !extension.AppliesTo(serviceKind))
+                if (extension == null || !VisualSourceAllowed(extension.requiredPackageIds, thingDef.modContentPack) || !extension.AppliesTo(serviceKind))
                 {
                     continue;
                 }
+                // Extensions let other mods add texture-only shuttle visuals without replacing our
+                // non-interactive payload/shuttle lifecycle.
                 string shipDefName = !string.IsNullOrEmpty(extension.shipThingDefName) ? extension.shipThingDefName :
                     extension.graphicData == null ? thingDef.defName : "JDB_ServiceShuttlePayload";
                 ShuttleVisual visual = FromNames(thingDef.defName, extension.weight, shipDefName, extension.incomingSkyfallerDefName, extension.leavingSkyfallerDefName, extension.rotation, extension.graphicData, extension.angleOffset);
@@ -404,9 +406,21 @@ namespace SpaceServices
 
         private static bool VisualSourceAllowed(List<string> requiredPackageIds)
         {
-            if (SpaceServicesMod.Settings == null || SpaceServicesMod.Settings.allowModdedShuttleVisuals || requiredPackageIds.NullOrEmpty())
+            return VisualSourceAllowed(requiredPackageIds, null);
+        }
+
+        private static bool VisualSourceAllowed(List<string> requiredPackageIds, ModContentPack owner)
+        {
+            if (SpaceServicesMod.Settings == null || SpaceServicesMod.Settings.allowModdedShuttleVisuals)
             {
                 return true;
+            }
+            if (requiredPackageIds.NullOrEmpty())
+            {
+                // XML defs can declare package gates directly. ThingDef extensions may not, so fall back
+                // to the owning mod when the user disables third-party shuttle visuals.
+                string packageId = owner == null || owner.PackageIdPlayerFacing == null ? null : owner.PackageIdPlayerFacing;
+                return IsLudeonPackage(packageId) || string.Equals(packageId, "jdubarb.spaceservices", StringComparison.OrdinalIgnoreCase);
             }
             return requiredPackageIds.All(IsLudeonPackage);
         }
@@ -529,6 +543,7 @@ namespace SpaceServices
 
     public sealed class ServiceShuttleSkyfaller : Skyfaller
     {
+        private static readonly MethodInfo TimeInAnimationGetter = AccessTools.PropertyGetter(typeof(Skyfaller), "TimeInAnimation");
         public string visualDefName;
         private Material cachedServiceShadowMaterial;
 
@@ -562,15 +577,15 @@ namespace SpaceServices
 
             // The base Skyfaller draw path cannot add a per-visual texture rotation, so this mirrors
             // the vanilla curve handling and changes only the final graphic angle.
-            float pos = Traverse.Create(this).Property<float>("TimeInAnimation").Value;
+            float pos = TimeInAnimationGetter == null ? 0f : (float)TimeInAnimationGetter.Invoke(this, null);
             float drawAngle = 0f;
-            if (def.skyfaller.rotateGraphicTowardsDirection)
-            {
-                drawAngle = angle;
-            }
             if (def.skyfaller.angleCurve != null)
             {
                 angle = def.skyfaller.angleCurve.Evaluate(pos);
+            }
+            if (def.skyfaller.rotateGraphicTowardsDirection)
+            {
+                drawAngle = angle;
             }
             if (def.skyfaller.rotationCurve != null)
             {
