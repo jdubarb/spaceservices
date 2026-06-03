@@ -16,6 +16,8 @@ namespace SpaceServices
     public static class HospitalPatchHandlers
     {
         private static bool HospitalSupportEnabled => SpaceServicesMod.Settings == null || SpaceServicesMod.Settings.enableHospital;
+        private const int OngoingTreatmentBedJobRetryTicks = GenDate.TicksPerHour;
+        private static readonly Dictionary<int, int> LastOngoingTreatmentBedJobTickByPawn = new Dictionary<int, int>();
 
         public static void HospitalLandingSpotPostfix(object[] __args, ref IntVec3 __result)
         {
@@ -256,6 +258,14 @@ namespace SpaceServices
             {
                 return;
             }
+            if (pawn.CurJob != null && pawn.CurJob.def == JobDefOf.LayDown)
+            {
+                return;
+            }
+            if (!CanIssueOngoingTreatmentBedJob(pawn))
+            {
+                return;
+            }
 
             Building_Bed bed = FindOngoingTreatmentBed(pawn);
             if (bed == null)
@@ -269,11 +279,29 @@ namespace SpaceServices
 
             Job job = JobMaker.MakeJob(JobDefOf.LayDown, bed);
             job.restUntilHealed = true;
+            job.expiryInterval = OngoingTreatmentBedJobRetryTicks;
             __result = job;
             if (ServiceDebugUtility.ShouldLog(ServiceLogIntegration.Hospital))
             {
                 ServiceDebugUtility.LogThrottled(ServiceLogIntegration.Hospital, "hospital-ongoing-bed-job-" + pawn.thingIDNumber, "Keeping Hospital patient in bed for ongoing treatment: " + reason + " bed=" + ServiceDebugUtility.ThingAuditSummary(bed), GenDate.TicksPerHour);
             }
+        }
+
+        private static bool CanIssueOngoingTreatmentBedJob(Pawn pawn)
+        {
+            if (pawn == null)
+            {
+                return false;
+            }
+            int ticksGame = Find.TickManager == null ? 0 : Find.TickManager.TicksGame;
+            if (LastOngoingTreatmentBedJobTickByPawn.TryGetValue(pawn.thingIDNumber, out int lastTick) && ticksGame < lastTick + OngoingTreatmentBedJobRetryTicks)
+            {
+                return false;
+            }
+            // Some long hediffs make vanilla immediately discard LayDown, so retry slowly instead of
+            // reissuing the same bed job during every job scan.
+            LastOngoingTreatmentBedJobTickByPawn[pawn.thingIDNumber] = ticksGame;
+            return true;
         }
 
         public static bool ShouldKeepHospitalPatientForOngoingTreatment(Pawn pawn, out string reason)
