@@ -111,6 +111,39 @@ namespace SpaceServices
             return removed;
         }
 
+        public static int DetachDirectRelationsForDeparture(Pawn departingPawn, Map map = null)
+        {
+            if (departingPawn == null)
+            {
+                return 0;
+            }
+
+            int removed = CleanupDirectRelationsReferencing(departingPawn, map);
+            List<DirectPawnRelation> directRelations = departingPawn.relations == null ? null : departingPawn.relations.DirectRelations;
+            if (directRelations == null || directRelations.Count == 0)
+            {
+                return removed;
+            }
+
+            // Service pawns are transient visitors/patients. Clearing their direct relations before they
+            // become world-GC candidates avoids vanilla ClearAllRelations touching stale reciprocal refs later.
+            foreach (DirectPawnRelation relation in directRelations.ToList())
+            {
+                Pawn otherPawn = relation == null ? null : relation.otherPawn;
+                if (otherPawn == null || otherPawn.relations == null || otherPawn.relations.DirectRelations == null)
+                {
+                    continue;
+                }
+                removed += otherPawn.relations.DirectRelations.RemoveAll(otherRelation =>
+                    otherRelation == null ||
+                    otherRelation.otherPawn == departingPawn ||
+                    IsInvalidDirectRelation(otherPawn, otherRelation, null));
+            }
+            removed += directRelations.Count;
+            directRelations.Clear();
+            return removed;
+        }
+
         public static int CleanupBrokenDirectRelations(Map map = null)
         {
             HashSet<Pawn> knownPawns = KnownPersistentPawns();
