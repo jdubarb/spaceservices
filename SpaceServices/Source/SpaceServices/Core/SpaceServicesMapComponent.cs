@@ -29,7 +29,6 @@ namespace SpaceServices
         private int nextHospitalityServiceVisitTick;
         private bool staleReferenceCleanupDone;
         private int staleReferenceCleanupVersion;
-        public bool debugForceHospitalityDanger;
         private bool hospitalityGuestAreaTipShown;
         private int debugLimitSemanticsVersion;
         public int debugHospitalPatientLimit = -1;
@@ -62,7 +61,6 @@ namespace SpaceServices
             Scribe_Values.Look(ref staleReferenceCleanupDone, "staleReferenceCleanupDone", false);
             Scribe_Values.Look(ref staleReferenceCleanupVersion, "staleReferenceCleanupVersion", 0);
             Scribe_Values.Look(ref nextHospitalityServiceVisitTick, "nextHospitalityServiceVisitTick", 0);
-            Scribe_Values.Look(ref debugForceHospitalityDanger, "debugForceHospitalityDanger", false);
             Scribe_Values.Look(ref hospitalityGuestAreaTipShown, "hospitalityGuestAreaTipShown", false);
             if (Scribe.mode == LoadSaveMode.Saving)
             {
@@ -226,6 +224,144 @@ namespace SpaceServices
                 }
             }
             return cachedServicePads;
+        }
+
+        public void NotifyServicePadUnavailable(Thing pad, IntVec3 oldPosition, string reason)
+        {
+            if (pad == null)
+            {
+                return;
+            }
+
+            DirtyServicePadCache();
+            int recordsReset = ResetRecordsForUnavailablePad(pad, oldPosition, reason);
+            int pendingCanceled = CancelPendingHospitalityIncidentsForPad(pad, oldPosition, reason);
+            int shuttlesRemoved = oldPosition.IsValid ? ServiceShuttleUtility.CleanupServiceShuttlesNear(map, oldPosition, 10f) : 0;
+            RequestLifecycleTickSoon(reason ?? "service pad unavailable");
+            ServiceDebugUtility.LogAudit("Service pad unavailable recovery reason=" + (reason ?? "none") + " records=" + recordsReset + " pending=" + pendingCanceled + " shuttles=" + shuttlesRemoved + " pad=" + ServiceDebugUtility.ThingAuditSummary(pad));
+        }
+
+        public void ClearAllServiceReservations(string reason)
+        {
+            int cleared = 0;
+            foreach (Thing pad in AllServicePadBuildingsIncludingInactive())
+            {
+                CompSpaceServicePad comp = pad == null ? null : pad.TryGetComp<CompSpaceServicePad>();
+                if (comp != null && !string.IsNullOrEmpty(comp.reservedForGroup))
+                {
+                    comp.ForceRelease();
+                    cleared++;
+                }
+            }
+            foreach (ServiceGroupRecord record in serviceGroups)
+            {
+                if (record != null)
+                {
+                    record.reservedPad = null;
+                    if (record.state == "pickupInbound" || record.state == "boardingPickup")
+                    {
+                        record.state = "departing";
+                        record.pickupShuttleTouchdownTick = 0;
+                        record.pickupShuttleThingDefName = null;
+                    }
+                }
+            }
+            foreach (ScheduledHospitalityIncident incident in pendingHospitalityIncidents)
+            {
+                ReleaseArrivalReservation(incident);
+            }
+            pendingHospitalityIncidents.Clear();
+            RequestLifecycleTickSoon(reason ?? "debug cleared all service reservations");
+            Messages.Message("Space Services: cleared " + cleared + " pad reservations", MessageTypeDefOf.NeutralEvent, false);
+        }
+
+        private IEnumerable<Thing> AllServicePadBuildingsIncludingInactive()
+        {
+            if (map == null || map.listerBuildings == null)
+            {
+                yield break;
+            }
+            foreach (Building building in map.listerBuildings.allBuildingsColonist)
+            {
+                if (building != null && !building.Destroyed && building.TryGetComp<CompSpaceServicePad>() != null)
+                {
+                    yield return building;
+                }
+            }
+        }
+
+        public void DebugResetServiceTraffic(string reason)
+        {
+            ClearAllServiceReservations(reason ?? "debug reset service traffic");
+            int shuttlesRemoved = ServiceShuttleUtility.CleanupAllServiceShuttles(map);
+            foreach (ServiceGroupRecord record in serviceGroups)
+            {
+                if (record == null || record.state == "completed" || record.state == "extracting")
+                {
+                    continue;
+                }
+                if (record.state == "pickupInbound" || record.state == "boardingPickup")
+                {
+                    record.state = "departing";
+                }
+                record.pickupShuttleTouchdownTick = 0;
+                record.pickupShuttleThingDefName = null;
+            }
+            RequestLifecycleTickSoon(reason ?? "debug reset service traffic");
+            Messages.Message("Space Services: reset service traffic and removed " + shuttlesRemoved + " service shuttles", MessageTypeDefOf.NeutralEvent, false);
+        }
+
+        private int ResetRecordsForUnavailablePad(Thing pad, IntVec3 oldPosition, string reason)
+        {
+            int reset = 0;
+            foreach (ServiceGroupRecord record in serviceGroups)
+            {
+                if (record == null)
+                {
+                    continue;
+                }
+                if (record.arrivalPad == pad)
+                {
+                    record.arrivalPad = null;
+                }
+                if (record.reservedPad != pad)
+                {
+                    continue;
+                }
+                CompSpaceServicePad comp = pad.TryGetComp<CompSpaceServicePad>();
+                comp?.Release(record.id);
+                record.reservedPad = null;
+                if (record.state == "pickupInbound" || record.state == "boardingPickup")
+                {
+                    record.state = "departing";
+                    record.pickupShuttleTouchdownTick = 0;
+                    record.pickupShuttleThingDefName = null;
+                }
+                reset++;
+            }
+            return reset;
+        }
+
+        private int CancelPendingHospitalityIncidentsForPad(Thing pad, IntVec3 oldPosition, string reason)
+        {
+            int canceled = 0;
+            for (int i = pendingHospitalityIncidents.Count - 1; i >= 0; i--)
+            {
+                ScheduledHospitalityIncident incident = pendingHospitalityIncidents[i];
+                if (incident == null || incident.pad != pad)
+                {
+                    continue;
+                }
+                pendingHospitalityIncidents.RemoveAt(i);
+                ReleaseArrivalReservation(incident);
+                canceled++;
+                if (oldPosition.IsValid)
+                {
+                    ServiceShuttleUtility.CleanupTouchdownShuttle(map, oldPosition, incident.shuttleThingDefName);
+                    ServiceShuttleUtility.SpawnDeparture(map, oldPosition, "hospitality", incident.shuttleVisualDefName);
+                }
+            }
+            return canceled;
         }
 
         private void WatchServicePadReservations()

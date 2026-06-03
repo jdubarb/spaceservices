@@ -28,6 +28,8 @@ namespace SpaceServices
         public override void DeSpawn(DestroyMode mode = DestroyMode.Vanish)
         {
             Map oldMap = Map;
+            IntVec3 oldPosition = Position;
+            oldMap?.GetComponent<SpaceServicesMapComponent>()?.NotifyServicePadUnavailable(this, oldPosition, "service pad despawned");
             base.DeSpawn(mode);
             oldMap?.GetComponent<SpaceServicesMapComponent>()?.DirtyServicePadCache();
             ServicePadUtility.RequestLifecycleTickSoon(oldMap, "service pad despawned");
@@ -123,6 +125,11 @@ namespace SpaceServices
                 reason = "pad unavailable";
                 return false;
             }
+            if (IsMarkedForDeconstruction())
+            {
+                reason = "marked for deconstruction";
+                return false;
+            }
             if (!HasRequiredPower(out reason))
             {
                 return false;
@@ -153,6 +160,11 @@ namespace SpaceServices
                 reason = "pad unavailable";
                 return false;
             }
+            if (IsMarkedForDeconstruction())
+            {
+                reason = "marked for deconstruction";
+                return false;
+            }
             if (!HasRequiredPower(out reason))
             {
                 return false;
@@ -175,6 +187,11 @@ namespace SpaceServices
             if (parent == null || parent.Destroyed || parent.Map == null)
             {
                 reason = "pad unavailable";
+                return false;
+            }
+            if (IsMarkedForDeconstruction())
+            {
+                reason = "marked for deconstruction";
                 return false;
             }
             if (!HasRequiredPower(out reason))
@@ -214,16 +231,14 @@ namespace SpaceServices
                 float vacuum = SafeMaxVacuum();
                 bool roofAccessible = SafeRoofAccessible(out string roofReason);
                 bool usable = SafeGenerallyUsable(out string usableReason);
-                SpaceServicesMapComponent comp = parent.Map.GetComponent<SpaceServicesMapComponent>();
 
                 builder.AppendLine("Space Services");
                 builder.AppendLine("Mode: " + ModeLabel());
                 builder.AppendLine("Reservation: " + ReservationLabel());
-                if (comp != null && comp.debugForceHospitalityDanger)
+                if (IsMarkedForDeconstruction())
                 {
-                    builder.AppendLine("Debug danger: forced");
+                    builder.AppendLine("Status: inactive, marked for deconstruction");
                 }
-                builder.AppendLine("Damage: immune");
                 builder.AppendLine("Vacuum exposed: " + (vacuum > 0.001f ? "yes (" + vacuum.ToStringPercent() + ")" : "no"));
                 builder.AppendLine("Roof accessible: " + (roofAccessible ? "yes, " + SafeRoofAccessReport() : "no, " + roofReason));
                 builder.AppendLine("Map: " + (eligibility.allowed ? "eligible" : "blocked"));
@@ -378,6 +393,14 @@ namespace SpaceServices
             return activeMode.ToString();
         }
 
+        public bool IsMarkedForDeconstruction()
+        {
+            return parent != null &&
+                parent.Map != null &&
+                parent.Map.designationManager != null &&
+                parent.Map.designationManager.DesignationOn(parent, DesignationDefOf.Deconstruct) != null;
+        }
+
         public bool TryReserve(string groupId)
         {
             if (string.IsNullOrEmpty(reservedForGroup))
@@ -510,21 +533,10 @@ namespace SpaceServices
             }
             if (ShouldShowDevGizmos())
             {
-                yield return DebugDangerToggle();
                 yield return new Command_Action
                 {
-                    defaultLabel = "JDB_SpaceServices_Gizmo_ReportMap".Translate(),
-                    defaultDesc = "JDB_SpaceServices_Gizmo_ReportMapDesc".Translate(),
-                    action = delegate
-                    {
-                        SpaceServiceEligibility eligibility = SpaceServiceMapDetector.Evaluate(parent.MapHeld);
-                        ServiceDebugUtility.Log(ServiceLogIntegration.Core, eligibility.ToLogString(parent.MapHeld));
-                        Messages.Message(eligibility.allowed ? "Space Services: map eligible" : "Space Services: map blocked", parent, MessageTypeDefOf.NeutralEvent, false);
-                    }
-                };
-                yield return new Command_Action
-                {
-                    defaultLabel = "DEV: Clear service reservation",
+                    defaultLabel = "JDB_SpaceServices_Gizmo_ClearPadReservation".Translate(),
+                    defaultDesc = "JDB_SpaceServices_Gizmo_ClearPadReservationDesc".Translate(),
                     action = delegate
                     {
                         string oldReservation = reservedForGroup;
@@ -726,29 +738,6 @@ namespace SpaceServices
         {
             return DebugSettings.godMode;
         }
-
-        private Command_Toggle DebugDangerToggle()
-        {
-            return new Command_Toggle
-            {
-                defaultLabel = "DEV: Force Hospitality danger",
-                defaultDesc = "Pretend this map has an active Hospitality traffic threat so arrivals wave off and departures wait.",
-                isActive = delegate
-                {
-                    SpaceServicesMapComponent comp = parent == null || parent.MapHeld == null ? null : parent.MapHeld.GetComponent<SpaceServicesMapComponent>();
-                    return comp != null && comp.debugForceHospitalityDanger;
-                },
-                toggleAction = delegate
-                {
-                    SpaceServicesMapComponent comp = parent == null || parent.MapHeld == null ? null : parent.MapHeld.GetComponent<SpaceServicesMapComponent>();
-                    if (comp != null)
-                    {
-                        comp.debugForceHospitalityDanger = !comp.debugForceHospitalityDanger;
-                        Messages.Message("Space Services: debug Hospitality danger " + (comp.debugForceHospitalityDanger ? "on" : "off"), parent, MessageTypeDefOf.NeutralEvent, false);
-                    }
-                }
-            };
-        }
     }
 
     [HarmonyPatch(typeof(Thing), nameof(Thing.TakeDamage))]
@@ -800,17 +789,26 @@ namespace SpaceServices
             {
                 foreach (Thing pad in cachedPads)
                 {
-                    yield return pad;
+                    if (IsActivePadBuilding(pad))
+                    {
+                        yield return pad;
+                    }
                 }
                 yield break;
             }
             foreach (Building building in map.listerBuildings.allBuildingsColonist)
             {
-                if (building != null && building.TryGetComp<CompSpaceServicePad>() != null)
+                if (IsActivePadBuilding(building))
                 {
                     yield return building;
                 }
             }
+        }
+
+        public static bool IsActivePadBuilding(Thing pad)
+        {
+            CompSpaceServicePad comp = pad == null || pad.Destroyed || pad.Map == null ? null : pad.TryGetComp<CompSpaceServicePad>();
+            return comp != null && !comp.IsMarkedForDeconstruction();
         }
 
         public static void RequestLifecycleTickSoon(Map map, string reason)

@@ -69,10 +69,6 @@ namespace SpaceServices
             listing.Label("JDB_SpaceServices_Panel_Pads".Translate(pads, patientPads, guestPads));
             listing.Label("JDB_SpaceServices_Panel_HospitalSummary".Translate(hospitalGroups, hospitalPatients));
             listing.Label("JDB_SpaceServices_Panel_HospitalitySummary".Translate(hospitalityGroups, hospitalityPawns));
-            if (comp != null && comp.debugForceHospitalityDanger)
-            {
-                listing.Label("JDB_SpaceServices_Panel_DebugDangerOn".Translate());
-            }
         }
 
         private static void DrawNativePanelButtons(Listing_Standard listing)
@@ -105,12 +101,30 @@ namespace SpaceServices
             comp.debugHospitalityGroupLimit = LimitSlider(listing, "JDB_SpaceServices_Panel_HospitalityGroupLimit", comp.debugHospitalityGroupLimit, 20);
             comp.debugHospitalityPawnLimit = LimitSlider(listing, "JDB_SpaceServices_Panel_HospitalityPawnLimit", comp.debugHospitalityPawnLimit, 60);
 
-            bool danger = comp.debugForceHospitalityDanger;
-            listing.CheckboxLabeled("JDB_SpaceServices_Panel_ForceDanger".Translate(), ref danger, "JDB_SpaceServices_Panel_ForceDangerDesc".Translate());
-            if (danger != comp.debugForceHospitalityDanger)
+            listing.GapLine();
+            listing.Label("JDB_SpaceServices_Panel_DebugActions".Translate());
+            Rect row = listing.GetRect(32f);
+            float width = (row.width - 8f) / 2f;
+            if (Widgets.ButtonText(new Rect(row.x, row.y, width, row.height), "JDB_SpaceServices_Panel_ReportMap".Translate()))
             {
-                comp.debugForceHospitalityDanger = danger;
-                comp.RequestLifecycleTickSoon("debug danger changed from Space Services panel");
+                SpaceServiceEligibility eligibility = SpaceServiceMapDetector.Evaluate(map);
+                ServiceDebugUtility.Log(ServiceLogIntegration.Core, eligibility.ToLogString(map));
+                Messages.Message(eligibility.allowed ? "Space Services: map eligible" : "Space Services: map blocked", MessageTypeDefOf.NeutralEvent, false);
+            }
+            if (Widgets.ButtonText(new Rect(row.x + width + 8f, row.y, width, row.height), "JDB_SpaceServices_Panel_ClearReservations".Translate()))
+            {
+                comp.ClearAllServiceReservations("debug panel cleared service reservations");
+            }
+
+            row = listing.GetRect(32f);
+            if (Widgets.ButtonText(new Rect(row.x, row.y, width, row.height), "JDB_SpaceServices_Panel_RemoveShuttles".Translate()))
+            {
+                int removed = ServiceShuttleUtility.CleanupAllServiceShuttles(map);
+                Messages.Message("Space Services: removed " + removed + " service shuttles", MessageTypeDefOf.NeutralEvent, false);
+            }
+            if (Widgets.ButtonText(new Rect(row.x + width + 8f, row.y, width, row.height), "JDB_SpaceServices_Panel_ResetTraffic".Translate()))
+            {
+                comp.DebugResetServiceTraffic("debug panel reset service traffic");
             }
         }
 

@@ -22,12 +22,6 @@ namespace SpaceServices
 
         public static bool HospitalityTrafficBlocked(Map map, out string reason)
         {
-            SpaceServicesMapComponent comp = map == null ? null : map.GetComponent<SpaceServicesMapComponent>();
-            if (comp != null && comp.debugForceHospitalityDanger)
-            {
-                reason = "debug forced danger";
-                return true;
-            }
             if (HasActiveHostileThreat(map))
             {
                 reason = "active hostile threat";

@@ -185,6 +185,41 @@ namespace SpaceServices
             return CleanupShuttleThingsNear(map, shuttleDef, cell, radius);
         }
 
+        public static int CleanupServiceShuttlesNear(Map map, IntVec3 cell, float radius)
+        {
+            if (map == null || !cell.IsValid)
+            {
+                return 0;
+            }
+            return CleanupMatchingServiceShuttles(map, thing => thing.Position.InHorDistOf(cell, radius));
+        }
+
+        public static int CleanupAllServiceShuttles(Map map)
+        {
+            if (map == null)
+            {
+                return 0;
+            }
+            return CleanupMatchingServiceShuttles(map, thing => true);
+        }
+
+        private static int CleanupMatchingServiceShuttles(Map map, Func<Thing, bool> predicate)
+        {
+            HashSet<ThingDef> shipDefs = ShuttleVisual.KnownShipThingDefs();
+            HashSet<ThingDef> skyfallerDefs = ShuttleVisual.KnownSkyfallerThingDefs();
+            List<Thing> things = map.listerThings.AllThings
+                .Where(thing => thing != null &&
+                    !thing.Destroyed &&
+                    predicate(thing) &&
+                    (shipDefs.Contains(thing.def) || skyfallerDefs.Contains(thing.def)))
+                .ToList();
+            foreach (Thing thing in things)
+            {
+                thing.Destroy(DestroyMode.Vanish);
+            }
+            return things.Count;
+        }
+
         private static int CleanupShuttleThingsNear(Map map, ThingDef shuttleDef, IntVec3 cell, float radius)
         {
             if (map == null || shuttleDef == null || !cell.IsValid)
@@ -268,6 +303,56 @@ namespace SpaceServices
         public static void ClearCache()
         {
             VisualsByKind.Clear();
+        }
+
+        public static HashSet<ThingDef> KnownShipThingDefs()
+        {
+            HashSet<ThingDef> defs = new HashSet<ThingDef>();
+            AddKnownVisualDefs(defs, null, skyfallers: false);
+            AddKnownVisualDefs(defs, "hospital", skyfallers: false);
+            AddKnownVisualDefs(defs, "hospitality", skyfallers: false);
+            return defs;
+        }
+
+        public static HashSet<ThingDef> KnownSkyfallerThingDefs()
+        {
+            HashSet<ThingDef> defs = new HashSet<ThingDef>();
+            AddKnownVisualDefs(defs, null, skyfallers: true);
+            AddKnownVisualDefs(defs, "hospital", skyfallers: true);
+            AddKnownVisualDefs(defs, "hospitality", skyfallers: true);
+            return defs;
+        }
+
+        private static void AddKnownVisualDefs(HashSet<ThingDef> defs, string serviceKind, bool skyfallers)
+        {
+            List<ShuttleVisual> visuals = AvailableVisuals(serviceKind).ToList();
+            ShuttleVisual fallback = FallbackVisual();
+            if (fallback != null)
+            {
+                visuals.Add(fallback);
+            }
+            foreach (ShuttleVisual visual in visuals)
+            {
+                if (visual == null)
+                {
+                    continue;
+                }
+                if (skyfallers)
+                {
+                    if (visual.incomingSkyfallerDef != null)
+                    {
+                        defs.Add(visual.incomingSkyfallerDef);
+                    }
+                    if (visual.leavingSkyfallerDef != null)
+                    {
+                        defs.Add(visual.leavingSkyfallerDef);
+                    }
+                }
+                else if (visual.shipThingDef != null)
+                {
+                    defs.Add(visual.shipThingDef);
+                }
+            }
         }
 
         private static List<ShuttleVisual> AvailableVisuals(string serviceKind)
