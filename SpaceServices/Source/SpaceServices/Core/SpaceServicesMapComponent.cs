@@ -187,6 +187,10 @@ namespace SpaceServices
         public override void MapComponentTick()
         {
             base.MapComponentTick();
+            if (IsDormant())
+            {
+                return;
+            }
             ServiceShuttleUtility.TickPendingArrivals(map, pendingShuttleArrivals);
             TickPendingHospitalityIncidents();
             TickNaturalHospitalityScheduler();
@@ -212,6 +216,31 @@ namespace SpaceServices
                 SpaceServiceEligibility eligibility = SpaceServiceMapDetector.Evaluate(map);
                 ServiceDebugUtility.LogVerbose(ServiceLogIntegration.Core, eligibility.ToLogString(map));
             }
+        }
+
+        private bool IsDormant()
+        {
+            if (pendingShuttleArrivals.Count > 0 || pendingHospitalityIncidents.Count > 0)
+            {
+                return false;
+            }
+            for (int i = 0; i < serviceGroups.Count; i++)
+            {
+                ServiceGroupRecord group = serviceGroups[i];
+                if (group != null && group.state != "completed")
+                {
+                    return false;
+                }
+            }
+            List<Thing> pads = CachedServicePadBuildings();
+            for (int i = 0; i < pads.Count; i++)
+            {
+                if (ServicePadUtility.IsActivePadBuilding(pads[i]))
+                {
+                    return false;
+                }
+            }
+            return true;
         }
 
         public void RequestLifecycleTickSoon(string reason)
