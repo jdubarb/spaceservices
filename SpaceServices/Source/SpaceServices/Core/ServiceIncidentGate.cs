@@ -19,7 +19,7 @@ namespace SpaceServices
     {
         public static void Postfix(IncidentWorker __instance, IncidentParms parms, ref bool __result)
         {
-            if (__result || __instance == null || parms == null)
+            if (__instance == null || parms == null)
             {
                 return;
             }
@@ -31,7 +31,17 @@ namespace SpaceServices
             }
 
             IncidentDef incident = Reflect.GetMember(__instance, "def") as IncidentDef;
-            if (!ServiceIncidentUtility.ShouldForceAllow(incident == null ? null : incident.defName, map))
+            string incidentDefName = incident == null ? null : incident.defName;
+
+            // Some event mods can legally fire on orbit maps but are colony-ending on static service bases.
+            // Block those before Space Services considers force-allowing its own traffic.
+            if (__result && ServiceIncidentUtility.ShouldBlockIncident(incidentDefName, map))
+            {
+                __result = false;
+                return;
+            }
+
+            if (__result || !ServiceIncidentUtility.ShouldForceAllow(incidentDefName, map))
             {
                 return;
             }
@@ -43,6 +53,7 @@ namespace SpaceServices
     public static class ServiceIncidentUtility
     {
         private const int SharedServiceArrivalCadenceTicks = 2500;
+        private const string VgeAsteroidShowerIncident = "VGE_AsteroidShower";
 
         private static readonly HashSet<string> HospitalIncidents = new HashSet<string>
         {
@@ -83,6 +94,25 @@ namespace SpaceServices
                 return (SpaceServicesMod.Settings == null || SpaceServicesMod.Settings.enableHospitality) &&
                     HospitalityIncidentGate.CanAcceptHospitalityIncident(incidentDefName, map);
             }
+            return false;
+        }
+
+        public static bool ShouldBlockIncident(string incidentDefName, Map map)
+        {
+            if (string.IsNullOrEmpty(incidentDefName) || map == null)
+            {
+                return false;
+            }
+
+            SpaceServicesSettings settings = SpaceServicesMod.Settings;
+            if (settings != null &&
+                settings.blockVgeAsteroidShower &&
+                string.Equals(incidentDefName, VgeAsteroidShowerIncident, StringComparison.OrdinalIgnoreCase))
+            {
+                ServiceDebugUtility.LogThrottled(ServiceLogIntegration.Core, "vge-asteroid-shower-block-" + map.uniqueID, "Blocked VGE asteroid shower on stationary service map.", GenDate.TicksPerHour);
+                return true;
+            }
+
             return false;
         }
 

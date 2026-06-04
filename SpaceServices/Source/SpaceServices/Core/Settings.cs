@@ -78,6 +78,7 @@ namespace SpaceServices
             bool moddedVisualsBefore = Settings.allowModdedShuttleVisuals;
             Checkbox(listing, "JDB_SpaceServices_Settings_ModdedShuttleVisuals", ref Settings.allowModdedShuttleVisuals);
             Checkbox(listing, "JDB_SpaceServices_Settings_DisablePatientGamblingAddictions", ref Settings.disablePatientGamblingAddictions);
+            Checkbox(listing, "JDB_SpaceServices_Settings_BlockVGEAsteroidShower", ref Settings.blockVgeAsteroidShower);
 
             Section(listing, "JDB_SpaceServices_Settings_SectionExperimental");
             Checkbox(listing, "JDB_SpaceServices_Settings_MedPodBridge", ref Settings.medPodServiceBridge);
@@ -143,6 +144,7 @@ namespace SpaceServices
         public bool allowSealedNoSuitArrivals = true;
         public bool allowModdedShuttleVisuals = true;
         public bool disablePatientGamblingAddictions = true;
+        public bool blockVgeAsteroidShower = true;
         public bool medPodServiceBridge = false;
         public bool suppressMassCasualtyPreDropEffects = false;
 
@@ -182,6 +184,7 @@ namespace SpaceServices
             Scribe_Values.Look(ref allowSealedNoSuitArrivals, "allowSealedNoSuitArrivals", true);
             Scribe_Values.Look(ref allowModdedShuttleVisuals, "allowModdedShuttleVisuals", true);
             Scribe_Values.Look(ref disablePatientGamblingAddictions, "disablePatientGamblingAddictions", true);
+            Scribe_Values.Look(ref blockVgeAsteroidShower, "blockVgeAsteroidShower", true);
             Scribe_Values.Look(ref medPodServiceBridge, "medPodServiceBridge", false);
             Scribe_Values.Look(ref suppressMassCasualtyPreDropEffects, "suppressMassCasualtyPreDropEffects", false);
         }

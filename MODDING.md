@@ -72,7 +72,7 @@ Native RimWorld flags are also respected where possible:
 - `preventNeutralVisitors` blocks Hospitality-style service arrivals.
 - `causesTraderCaravanExit` is reserved for future trade service behavior.
 
-Space Services only gates its own service traffic. It does not suppress or rewrite event mods themselves.
+Space Services normally only gates its own service traffic. The default-on Vanilla Gravship Expanded - Chapter 1 asteroid shower setting is a specific exception for an incident that can destroy stationary service bases before a service hazard condition exists.
 
 ## Hospital Treatment Hediffs
 

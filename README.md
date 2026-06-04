@@ -68,6 +68,7 @@ The script can discover common Steam library paths. Override paths with `RIMWORL
 - Exposed pads should be close to pressurized rooms. Odyssey can still apply vacuum burns below `100%` vacuum resistance.
 - Sealed pads can allow most arrivals to skip vacsuits. Exposed pads require practical `100%` vacuum resistance.
 - Traffic rates are deterministic by default. At `0.25x`, every fourth eligible service attempt is allowed, not a random 25% chance.
+- Vanilla Gravship Expanded - Chapter 1 asteroid showers can be blocked on eligible stationary service maps through a default-on compatibility setting.
 - MedPod support works, but MedPod itself can heavily reduce TPS while occupied. The bridge is experimental and off by default.
 
 ## Mod Integration
