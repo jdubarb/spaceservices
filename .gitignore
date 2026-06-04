@@ -5,3 +5,5 @@
 
 # Keep RimWorld assemblies and textures tracked; this repo is a publishable mod staging tree.
 
+# Local Steam Workshop publish/update state.
+SpaceServices/About/PublishedFileId.txt
