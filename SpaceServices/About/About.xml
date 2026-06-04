@@ -26,6 +26,7 @@
     <li>Adamas.Hospital</li>
     <li>Orion.Hospitality</li>
     <li>Nebulae.SimplyMoreRoofs</li>
+    <li>MrHydralisk.ComplementaryOdyssey</li>
   </loadAfter>
   <description>
 Adds infrastructure for running Hospital and Hospitality-style services on stationary Odyssey asteroid, orbit, moon, and station maps. Actual gravships are intentionally blocked.

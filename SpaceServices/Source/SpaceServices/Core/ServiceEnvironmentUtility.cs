@@ -18,10 +18,12 @@ namespace SpaceServices
         private const float Epsilon = 0.001f;
         private const int PadVacuumCacheTicks = 120;
         private static readonly Dictionary<int, CachedPadVacuum> PadVacuumCache = new Dictionary<int, CachedPadVacuum>();
+        // These roofs seal space maps but should not block visual service shuttles or redirected drop pods.
         private static readonly HashSet<string> KnownFlyThroughRoofs = new HashSet<string>
         {
             "SMR_VacBarrierRoof",
-            "SMR_AdvancedVacBarrierRoof"
+            "SMR_AdvancedVacBarrierRoof",
+            "CO_VacRoof"
         };
 
         public static float GetVacuum(IntVec3 cell, Map map)
