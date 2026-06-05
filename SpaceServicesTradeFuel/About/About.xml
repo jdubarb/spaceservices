@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ModMetaData>
+  <name>Space Services: Trade and Fuel</name>
+  <author>j'mangus dubarb D.D.S</author>
+  <modVersion>0.1.0</modVersion>
+  <packageId>jdubarb.spaceservices.tradefuel</packageId>
+  <supportedVersions>
+    <li>1.6</li>
+  </supportedVersions>
+  <modDependencies>
+    <li>
+      <packageId>brrainz.harmony</packageId>
+      <displayName>Harmony</displayName>
+      <steamWorkshopUrl>steam://url/CommunityFilePage/2009463077</steamWorkshopUrl>
+    </li>
+    <li>
+      <packageId>Ludeon.RimWorld.Odyssey</packageId>
+      <displayName>Odyssey</displayName>
+    </li>
+    <li>
+      <packageId>jdubarb.spaceservices</packageId>
+      <displayName>Space Services</displayName>
+      <steamWorkshopUrl>steam://url/CommunityFilePage/3738014590</steamWorkshopUrl>
+    </li>
+  </modDependencies>
+  <loadAfter>
+    <li>brrainz.harmony</li>
+    <li>Ludeon.RimWorld.Odyssey</li>
+    <li>jdubarb.spaceservices</li>
+  </loadAfter>
+  <description>
+Adds trade-stop and fuel-sale services for stationary Space Services maps.
+
+Initial scope is planned around custom Space Services trader visits and chemfuel sales. DBH water sales and Vanilla Gravship Expanded astrofuel sales are planned as optional integrations.
+  </description>
+</ModMetaData>
