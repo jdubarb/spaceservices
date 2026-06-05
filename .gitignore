@@ -8,3 +8,7 @@
 # Local Steam Workshop publish/update state.
 SpaceServices/About/PublishedFileId.txt
 SpaceServicesTradeFuel/About/PublishedFileId.txt
+
+# Addon staging kept local until it is ready for public GitHub/workshop staging.
+SpaceServicesTradeFuel/
+TRADE_FUEL_ADDON.md

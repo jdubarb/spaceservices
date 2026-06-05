@@ -47,8 +47,6 @@ SpaceServices/
 
 Install that folder as the RimWorld mod.
 
-`SpaceServicesTradeFuel/` is staged as the future optional Trade and Fuel addon. It is not gameplay-complete yet.
-
 ## Build
 
 ```bash
