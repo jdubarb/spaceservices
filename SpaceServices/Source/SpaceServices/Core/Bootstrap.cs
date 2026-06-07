@@ -17,7 +17,6 @@ namespace SpaceServices
     public static class SpaceServicesBootstrap
     {
         public const string PackageId = "jdubarb.spaceservices";
-        public const string CategoryDefName = "JDB_SpaceServices";
 
         private static readonly Harmony Harmony = new Harmony(PackageId);
 
@@ -28,7 +27,6 @@ namespace SpaceServices
             ServiceTabVisibilityPatches.Install(Harmony);
             HospitalMassCasualtyVisualPatches.Install(Harmony);
             OptionalModPatches.Install(Harmony);
-            LongEventHandler.ExecuteWhenFinished(ArchitectMenuPatch.InjectArchitectDesignators);
             LongEventHandler.ExecuteWhenFinished(SpaceServicesMainButtonUtility.HideReplacedServiceTabs);
             ServiceDebugUtility.Log(ServiceLogIntegration.Core, "Loaded.");
         }

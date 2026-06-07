@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Patch>
+  <Operation Class="PatchOperationFindMod">
+    <mods>
+      <li>Better Architect Menu</li>
+    </mods>
+    <match Class="PatchOperationSequence">
+      <operations>
+        <li Class="PatchOperationAdd">
+          <xpath>/Defs</xpath>
+          <value>
+            <DesignationCategoryDef>
+              <defName>JDB_SpaceServices</defName>
+              <label>Space Services</label>
+              <description>Landing, departure, and service infrastructure for stationary space facilities.</description>
+              <order>7</order>
+              <specialDesignatorClasses>
+                <li>Designator_Cancel</li>
+                <li>Designator_Deconstruct</li>
+                <li>Designator_RemoveFoundation</li>
+              </specialDesignatorClasses>
+              <modExtensions>
+                <li Class="BetterArchitect.NestedCategoryExtension">
+                  <parentCategory>Ferny_Space</parentCategory>
+                </li>
+              </modExtensions>
+            </DesignationCategoryDef>
+          </value>
+        </li>
+        <li Class="PatchOperationReplace">
+          <xpath>/Defs/ThingDef[defName="JDB_ServiceLandingPad"]/designationCategory</xpath>
+          <value>
+            <designationCategory>JDB_SpaceServices</designationCategory>
+          </value>
+        </li>
+      </operations>
+    </match>
+  </Operation>
+</Patch>

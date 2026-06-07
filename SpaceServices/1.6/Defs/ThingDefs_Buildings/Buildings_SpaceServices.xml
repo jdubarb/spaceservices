@@ -20,7 +20,7 @@
     <clearBuildingArea>true</clearBuildingArea>
     <useHitPoints>false</useHitPoints>
     <canOverlapZones>true</canOverlapZones>
-    <designationCategory>JDB_SpaceServices</designationCategory>
+    <designationCategory>Misc</designationCategory>
     <uiOrder>100</uiOrder>
     <placeWorkers>
       <li>PlaceWorker_InvalidOverSubstructure</li>

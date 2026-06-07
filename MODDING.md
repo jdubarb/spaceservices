@@ -225,6 +225,8 @@ If your map mod is a stationary space map and Space Services does not detect it,
 
 ## Architect Icon
 
+Space Services places its service landing pad under vanilla Architect > Misc by default. When Better Architect Menu is installed, Space Services adds a nested `JDB_SpaceServices` category under `Ferny_Space` and moves the pad there.
+
 Space Services includes an Architect Icons / Better Architect Menu icon at:
 
 ```text
