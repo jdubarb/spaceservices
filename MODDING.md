@@ -223,11 +223,13 @@ Current hard blocks include:
 
 If your map mod is a stationary space map and Space Services does not detect it, prefer exposing one of the stable signals above. If that is not practical, open an issue or compatibility patch request for a dedicated map eligibility hook.
 
-## Architect Icon
+## Architect Menu
 
-Space Services places its service landing pad under vanilla Architect > Misc by default. When Better Architect Menu is installed, Space Services adds a nested `JDB_SpaceServices` category under `Ferny_Space` and moves the pad there.
+Space Services places its service landing pad under vanilla Architect > Odyssey. When Better Architect Menu is installed, that vanilla Odyssey placement appears under Space > More.
 
-Space Services includes an Architect Icons / Better Architect Menu icon at:
+Space Services currently avoids adding a dedicated Better Architect child category. A dedicated category may return later when the trade and fuel addon adds enough buildings to justify it.
+
+The reserved category icon is kept at:
 
 ```text
 SpaceServices/1.6/Textures/UI/ArchitectIcons/JDB_SpaceServices.png

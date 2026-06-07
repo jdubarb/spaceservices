@@ -27,7 +27,7 @@ Soft integrations:
 - Simply More Roofs
 - Vanilla Events Expanded
 - VE Events Space maps Compatibility Patch
-- Architect Icons / Better Architect Menu
+- Better Architect Menu
 - MedPod, experimental and disabled by default
 
 Not supported directly:
@@ -65,7 +65,7 @@ The script can discover common Steam library paths. Override paths with `RIMWORL
 ## Gameplay Notes
 
 - Keep Hospitality guest areas inside sealed, safe rooms. Include the service-adjacent paths guests are allowed to use.
-- The service landing pad appears under vanilla Architect > Misc by default. With Better Architect Menu installed, it appears under Space > Space Services.
+- The service landing pad appears under vanilla Architect > Odyssey. With Better Architect Menu installed, this is shown under Space > More.
 - Exposed pads should be close to pressurized rooms. Odyssey can still apply vacuum burns below `100%` vacuum resistance.
 - Sealed pads can allow most arrivals to skip vacsuits. Exposed pads require practical `100%` vacuum resistance.
 - Traffic rates are deterministic by default. At `0.25x`, every fourth eligible service attempt is allowed, not a random 25% chance.
