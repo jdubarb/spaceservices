@@ -28,7 +28,6 @@
     <li>Nebulae.SimplyMoreRoofs</li>
     <li>MrHydralisk.ComplementaryOdyssey</li>
     <li>com.bymarcin.ArchitectIcons</li>
-    <li>ferny.BetterArchitect</li>
   </loadAfter>
   <description>
 Adds infrastructure for running Hospital and Hospitality-style services on stationary Odyssey asteroid, orbit, moon, and station maps. Actual gravships are intentionally blocked.
