@@ -192,7 +192,8 @@ namespace SpaceServices
             {
                 Reflect.SetMember(comp, "lord", null);
             }
-            ServiceDebugUtility.LogAudit("Cleared Hospitality runtime refs reason=" + reason + " oldCompLord=" + LordLabel(oldLord as Lord) + " pawn=" + GuestDebugSummary(pawn));
+            int runtimeLordRefs = ServicePawnUtility.ClearRuntimeLordReferences(pawn);
+            ServiceDebugUtility.LogAudit("Cleared Hospitality runtime refs reason=" + reason + " oldCompLord=" + LordLabel(oldLord as Lord) + " runtimeLordRefs=" + runtimeLordRefs + " pawn=" + GuestDebugSummary(pawn));
         }
 
         private static IEnumerable<Thing> GuestBeds(Map map)
