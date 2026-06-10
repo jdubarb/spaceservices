@@ -579,7 +579,8 @@ namespace SpaceServices
                     Pawn detachedRescuedGuest = record.pawns.FirstOrDefault(IsDetachedRescuedHospitalityServicePawn);
                     if (detachedRescuedGuest != null)
                     {
-                        BeginDeparture(map, record, "tracked Hospitality service guest recovered outside visitor lord: " + detachedRescuedGuest.LabelShortCap);
+                        ServiceGroupRecord departureRecord = SplitDetachedRescuedHospitalityPawn(map, records, record, detachedRescuedGuest);
+                        BeginDeparture(map, departureRecord, "tracked Hospitality service guest recovered outside visitor lord: " + detachedRescuedGuest.LabelShortCap);
                         continue;
                     }
                     if (record.pawns.Any(IsTryingToLeave))
@@ -2164,6 +2165,37 @@ namespace SpaceServices
                 return false;
             }
             return pawn.GetLord() == null;
+        }
+
+        private static ServiceGroupRecord SplitDetachedRescuedHospitalityPawn(Map map, List<ServiceGroupRecord> records, ServiceGroupRecord sourceRecord, Pawn pawn)
+        {
+            if (map == null ||
+                records == null ||
+                sourceRecord == null ||
+                pawn == null ||
+                sourceRecord.pawns == null ||
+                sourceRecord.pawns.Count <= 1)
+            {
+                return sourceRecord;
+            }
+
+            sourceRecord.pawns.RemoveAll(tracked => tracked == null || tracked == pawn || ServicePawnUtility.IsTerminalPawn(tracked));
+            MarkRecordDirty(map, sourceRecord, "detached rescued Hospitality guest split for solo departure");
+
+            ServiceGroupRecord departureRecord = new ServiceGroupRecord
+            {
+                id = "SS-" + Find.UniqueIDsManager.GetNextThingID(),
+                serviceKind = sourceRecord.serviceKind,
+                state = "arrived",
+                arrivalTick = sourceRecord.arrivalTick,
+                timeoutTick = Math.Max(sourceRecord.timeoutTick, Find.TickManager.TicksGame + GenDate.TicksPerHour),
+                arrivalPad = sourceRecord.arrivalPad,
+                pawns = new List<Pawn> { pawn }
+            };
+            records.Add(departureRecord);
+            ServiceDebugUtility.LogAudit("Split detached rescued Hospitality service pawn source=" + RecordAudit(sourceRecord) + " departure=" + RecordAudit(departureRecord) + " pawn=" + ServiceDebugUtility.PawnAuditSummary(pawn));
+            MarkRecordDirty(map, departureRecord, "detached rescued Hospitality guest solo departure");
+            return departureRecord;
         }
 
         private static bool ContainsAny(string value, params string[] needles)
