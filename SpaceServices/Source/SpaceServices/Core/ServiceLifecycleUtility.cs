@@ -215,12 +215,19 @@ namespace SpaceServices
             }
             if (record.pawns != null)
             {
+                bool pickupDeparture = record.state == "pickupInbound" || record.state == "boardingPickup";
                 foreach (Pawn terminalPawn in record.pawns.Where(ServicePawnUtility.IsTerminalPawn).Where(tracked => tracked != null).Distinct().ToList())
                 {
                     // External mod callbacks can release dead pawns before our lifecycle tick sees them.
                     ServicePawnUtility.CleanupTerminalPawnReferences(map, terminalPawn);
                 }
                 record.pawns.RemoveAll(tracked => tracked == null || tracked == pawn || ServicePawnUtility.IsTerminalPawn(tracked));
+                if (record.pawns.Count == 0 && pickupDeparture)
+                {
+                    DepartureUtility.CompleteDeparture(map ?? (record.reservedPad == null ? null : record.reservedPad.Map), record, "last service pawn removed during pickup: " + (reason ?? "none"));
+                    ServiceDebugUtility.Log("Released service group " + record.id + ": " + reason);
+                    return true;
+                }
             }
             if (record.pawns == null || record.pawns.Count == 0)
             {
@@ -2145,6 +2152,10 @@ namespace SpaceServices
             {
                 ServiceDebugUtility.LogAudit("BoardReadyPawns extracting pawn=" + ServiceDebugUtility.PawnAuditSummary(pawn) + " record=" + RecordAudit(record));
                 DepartureUtility.TryAutoExtract(map ?? pawn.MapHeld, new[] { pawn }, "service pawn boarded pickup shuttle");
+            }
+            if (boarding.Count > 0 && ReadyForBoardingCompletion(record))
+            {
+                DepartureUtility.CompleteDeparture(map ?? (record.reservedPad == null ? null : record.reservedPad.Map), record, "service pawns boarded pickup shuttle");
             }
             if (boarding.Count == 0)
             {

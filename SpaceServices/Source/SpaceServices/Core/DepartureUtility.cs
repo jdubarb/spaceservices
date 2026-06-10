@@ -22,6 +22,9 @@ namespace SpaceServices
                 return false;
             }
 
+            bool shouldPlayDepartureVisual = record.reservedPad != null &&
+                record.reservedPad.Spawned &&
+                !string.IsNullOrEmpty(record.pickupShuttleVisualDefName);
             record.state = "extracting";
             record.departureRequestedTick = Find.TickManager.TicksGame;
             ServiceDebugUtility.Log("Departing " + record.serviceKind + " service group " + record.id + ": " + reason);
@@ -33,6 +36,10 @@ namespace SpaceServices
             List<Pawn> departingPawns = record.pawns.Where(pawn => !ServicePawnUtility.IsTerminalPawn(pawn) && !ServicePawnUtility.IsPlayerOwnedPawn(pawn)).ToList();
             if (departingPawns.Count == 0)
             {
+                if (shouldPlayDepartureVisual)
+                {
+                    ServiceShuttleUtility.SpawnDeparture(record.reservedPad.Map, record.reservedPad.Position, record.serviceKind, record.pickupShuttleVisualDefName);
+                }
                 record.state = "completed";
                 ReleaseReservation(record);
                 ServiceDebugUtility.LogAudit("CompleteDeparture finished without extractable pawns id=" + record.id + " pawns=" + PawnListAudit(record.pawns));
