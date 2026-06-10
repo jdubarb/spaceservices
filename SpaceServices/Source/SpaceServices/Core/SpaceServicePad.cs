@@ -539,7 +539,75 @@ namespace SpaceServices
                         Messages.Message("Space Services: pad reservation cleared", parent, MessageTypeDefOf.NeutralEvent, false);
                     }
                 };
+                yield return new Command_Action
+                {
+                    defaultLabel = "SS debug: social fight",
+                    defaultDesc = "Force a social fight between two spawned humanlike pawns on this map.",
+                    action = DebugForceSocialFight
+                };
             }
+        }
+
+        private void DebugForceSocialFight()
+        {
+            Map map = parent == null ? null : parent.MapHeld ?? parent.Map;
+            List<Pawn> pawns = DebugSocialFightPawns(map);
+            if (pawns.Count < 2)
+            {
+                Messages.Message("Space Services: need two spawned humanlike pawns", parent, MessageTypeDefOf.RejectInput, false);
+                return;
+            }
+            List<FloatMenuOption> options = new List<FloatMenuOption>();
+            foreach (Pawn pawn in pawns)
+            {
+                Pawn localInitiator = pawn;
+                options.Add(new FloatMenuOption("Initiator: " + localInitiator.LabelShortCap, delegate
+                {
+                    DebugChooseSocialFightTarget(localInitiator, pawns);
+                }));
+            }
+            Find.WindowStack.Add(new FloatMenu(options));
+        }
+
+        private void DebugChooseSocialFightTarget(Pawn initiator, List<Pawn> pawns)
+        {
+            List<FloatMenuOption> options = new List<FloatMenuOption>();
+            foreach (Pawn pawn in pawns)
+            {
+                if (pawn == initiator)
+                {
+                    continue;
+                }
+                Pawn localTarget = pawn;
+                options.Add(new FloatMenuOption("Target: " + localTarget.LabelShortCap, delegate
+                {
+                    string reason;
+                    if (ServiceLifecycleUtility.DebugForceSocialFight(initiator, localTarget, out reason))
+                    {
+                        Messages.Message("Space Services: " + reason, initiator, MessageTypeDefOf.NeutralEvent, false);
+                    }
+                    else
+                    {
+                        Messages.Message("Space Services: " + (reason ?? "could not force social fight"), initiator, MessageTypeDefOf.RejectInput, false);
+                    }
+                }));
+            }
+            Find.WindowStack.Add(new FloatMenu(options));
+        }
+
+        private static List<Pawn> DebugSocialFightPawns(Map map)
+        {
+            return map == null || map.mapPawns == null
+                ? new List<Pawn>()
+                : map.mapPawns.AllPawnsSpawned
+                    .Where(pawn => pawn != null &&
+                        pawn.RaceProps != null &&
+                        pawn.RaceProps.Humanlike &&
+                        !pawn.Dead &&
+                        !pawn.Destroyed &&
+                        !pawn.Downed)
+                    .OrderBy(pawn => pawn.LabelShortCap)
+                    .ToList();
         }
 
         public void DrawModeOverlay(Vector3 baseDrawPos)

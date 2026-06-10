@@ -22,6 +22,9 @@ namespace SpaceServices
         private const float AutoSetSelectionChance = 0.35f;
         // Odyssey still applies vacuum harm below full resistance, so service transit treats 100% as the practical safety floor.
         public const float PracticalVacuumSuitTarget = 1f;
+        // VGE gravship apparel reports slightly below 100% resistance after its own short-transit safety model.
+        public const float VgeShortTransitVacuumSuitTarget = 0.95f;
+        private static readonly List<string> VgeGravshipPackageIds = new List<string> { "vanillaexpanded.gravship" };
         private static StatDef vacuumResistance;
         private static List<VacuumApparelCandidate> cachedAutoCandidates;
         private static int internalVacGearRemovalDepth;
@@ -150,6 +153,11 @@ namespace SpaceServices
         public static void EnsurePracticalVacuumProtection(Pawn pawn)
         {
             SuitPawnForVacuum(pawn, PracticalVacuumSuitTarget);
+        }
+
+        public static float PracticalDepartureVacuumSuitTarget()
+        {
+            return SpaceServiceDefFilters.RequiredPackagesLoaded(VgeGravshipPackageIds) ? VgeShortTransitVacuumSuitTarget : PracticalVacuumSuitTarget;
         }
 
         private static void SuitPawnForVacuum(Pawn pawn, float targetVacuum)

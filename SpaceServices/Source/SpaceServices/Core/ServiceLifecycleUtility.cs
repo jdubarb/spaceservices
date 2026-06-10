@@ -336,6 +336,62 @@ namespace SpaceServices
             return ShouldSuppressHospitalityVacuumApparelJob(wearer, null);
         }
 
+        public static bool DebugForceSocialFight(Pawn initiator, Pawn recipient, out string reason)
+        {
+            reason = null;
+            if (initiator == null || recipient == null || initiator == recipient)
+            {
+                reason = "pick two different pawns";
+                return false;
+            }
+            if (!CanDebugSocialFightPawn(initiator) || !CanDebugSocialFightPawn(recipient))
+            {
+                reason = "both pawns must be spawned, awake, non-dead humanlikes";
+                return false;
+            }
+            if ((initiator.MapHeld ?? initiator.Map) != (recipient.MapHeld ?? recipient.Map))
+            {
+                reason = "pawns are not on the same map";
+                return false;
+            }
+
+            object interactions = initiator.interactions;
+            MethodInfo startSocialFight = interactions == null ? null : AccessTools.Method(interactions.GetType(), "StartSocialFight");
+            if (startSocialFight == null)
+            {
+                reason = "could not find Pawn_InteractionsTracker.StartSocialFight";
+                return false;
+            }
+            try
+            {
+                ParameterInfo[] parameters = startSocialFight.GetParameters();
+                object[] args = parameters.Length >= 2
+                    ? new object[] { recipient, "Sentence_SocialFightStarted" }
+                    : new object[] { recipient };
+                startSocialFight.Invoke(interactions, args);
+                reason = "forced social fight: " + initiator.LabelShortCap + " vs " + recipient.LabelShortCap;
+                ServiceDebugUtility.LogAudit(reason);
+                return true;
+            }
+            catch (Exception ex)
+            {
+                reason = "StartSocialFight failed: " + ex.GetType().Name + " " + ex.Message;
+                ServiceDebugUtility.LogVerbose(reason);
+                return false;
+            }
+        }
+
+        private static bool CanDebugSocialFightPawn(Pawn pawn)
+        {
+            return pawn != null &&
+                pawn.RaceProps != null &&
+                pawn.RaceProps.Humanlike &&
+                pawn.Spawned &&
+                !pawn.Dead &&
+                !pawn.Destroyed &&
+                !pawn.Downed;
+        }
+
         public static void Tick(Map map, List<ServiceGroupRecord> records)
         {
             if (map == null || records == null || records.Count == 0)
@@ -518,11 +574,19 @@ namespace SpaceServices
                 }
                 if (record.serviceKind == "hospitality" && record.state == "arrived" &&
                     Find.TickManager.TicksGame > record.arrivalTick + HospitalityDepartureDetectionGraceTicks &&
-                    ShouldCheckLeaveState(record) &&
-                    record.pawns.Any(IsTryingToLeave))
+                    ShouldCheckLeaveState(record))
                 {
-                    BeginDeparture(map, record, "Hospitality group entered departure state");
-                    continue;
+                    Pawn detachedRescuedGuest = record.pawns.FirstOrDefault(IsDetachedRescuedHospitalityServicePawn);
+                    if (detachedRescuedGuest != null)
+                    {
+                        BeginDeparture(map, record, "tracked Hospitality service guest recovered outside visitor lord: " + detachedRescuedGuest.LabelShortCap);
+                        continue;
+                    }
+                    if (record.pawns.Any(IsTryingToLeave))
+                    {
+                        BeginDeparture(map, record, "Hospitality group entered departure state");
+                        continue;
+                    }
                 }
                 if (record.serviceKind != "hospital" && record.serviceKind != "hospitality" && record.pawns.Any(IsTryingToLeave))
                 {
@@ -1082,7 +1146,7 @@ namespace SpaceServices
 
         private static bool IsActiveHospitalityServicePawn(Pawn pawn)
         {
-            if (ServicePawnUtility.IsTerminalPawn(pawn) || !pawn.Spawned)
+            if (ServicePawnUtility.IsTerminalPawn(pawn))
             {
                 return false;
             }
@@ -1091,7 +1155,11 @@ namespace SpaceServices
                 // Hospitality join offers and recruit-guest mods turn visitors into colonists; never route them to extraction.
                 return false;
             }
-            return !HospitalityBedUtility.IsRescuedGuest(pawn);
+            if (!pawn.Spawned)
+            {
+                return pawn.Downed || HospitalityBedUtility.IsRescuedGuest(pawn);
+            }
+            return true;
         }
 
         private static void BeginDeparture(Map map, ServiceGroupRecord record, string reason)
@@ -1396,9 +1464,10 @@ namespace SpaceServices
 
         private static bool ShouldPreferVacuumDeparturePad(List<Pawn> pawns)
         {
+            float target = DepartureVacuumSuitTarget();
             return pawns != null &&
                 pawns.Count > 0 &&
-                pawns.All(pawn => pawn != null && !pawn.Destroyed && VacSuitUtility.VacuumResistance(pawn) + 0.001f >= VacSuitUtility.PracticalVacuumSuitTarget);
+                pawns.All(pawn => pawn != null && !pawn.Destroyed && VacSuitUtility.VacuumResistance(pawn) + 0.001f >= target);
         }
 
         private static bool IsVacuumPad(Thing pad)
@@ -1431,7 +1500,7 @@ namespace SpaceServices
             {
                 return false;
             }
-            return ServiceEnvironmentUtility.IsPadSafeForPawns(pad, pawns, out string _) &&
+            return ServiceEnvironmentUtility.IsPadSafeForPawnsAtTarget(pad, pawns, DepartureVacuumSuitTarget(), out string _) &&
                 PadReachableForPawns(pad, pawns, false, bypassGuestArea, out string _);
         }
 
@@ -1456,7 +1525,7 @@ namespace SpaceServices
             {
                 return false;
             }
-            return ServiceEnvironmentUtility.IsPadSafeForPawns(pad, record.pawns, out string _) &&
+            return ServiceEnvironmentUtility.IsPadSafeForPawnsAtTarget(pad, record.pawns, DepartureVacuumSuitTarget(), out string _) &&
                 PadReachableForPawns(pad, record.pawns, false, bypassGuestArea, out string _);
         }
 
@@ -1586,7 +1655,7 @@ namespace SpaceServices
             {
                 return false;
             }
-            if (!ServiceEnvironmentUtility.IsPadSafeForPawns(record.reservedPad, record.pawns, out string _))
+            if (!ServiceEnvironmentUtility.IsPadSafeForPawnsAtTarget(record.reservedPad, record.pawns, DepartureVacuumSuitTarget(), out string _))
             {
                 return false;
             }
@@ -1600,7 +1669,7 @@ namespace SpaceServices
             {
                 return false;
             }
-            if (!ServiceEnvironmentUtility.IsPadSafeForPawns(record.reservedPad, record.pawns, out string _))
+            if (!ServiceEnvironmentUtility.IsPadSafeForPawnsAtTarget(record.reservedPad, record.pawns, DepartureVacuumSuitTarget(), out string _))
             {
                 return false;
             }
@@ -1993,7 +2062,7 @@ namespace SpaceServices
                     anyReserved = true;
                     continue;
                 }
-                if (!ServiceEnvironmentUtility.IsPadSafeForPawns(pad, pawns, out string safetyReason))
+                if (!ServiceEnvironmentUtility.IsPadSafeForPawnsAtTarget(pad, pawns, DepartureVacuumSuitTarget(), out string safetyReason))
                 {
                     firstSafetyReason = firstSafetyReason ?? safetyReason ?? "service pad is unsafe";
                     continue;
@@ -2050,7 +2119,7 @@ namespace SpaceServices
                 reason = "departure pad blocked: " + (reason ?? "settings block this service");
                 return false;
             }
-            if (!ServiceEnvironmentUtility.IsPadSafeForPawns(record.reservedPad, record.pawns, out reason))
+            if (!ServiceEnvironmentUtility.IsPadSafeForPawnsAtTarget(record.reservedPad, record.pawns, DepartureVacuumSuitTarget(), out reason))
             {
                 return false;
             }
@@ -2061,6 +2130,11 @@ namespace SpaceServices
         private static bool ReservedPadStillExists(ServiceGroupRecord record)
         {
             return record != null && record.reservedPad != null && !record.reservedPad.Destroyed && record.reservedPad.Map != null;
+        }
+
+        private static float DepartureVacuumSuitTarget()
+        {
+            return VacSuitUtility.PracticalDepartureVacuumSuitTarget();
         }
 
         private static bool IsTryingToLeave(Pawn pawn)
@@ -2077,6 +2151,19 @@ namespace SpaceServices
             }
             string duty = pawn.mindState == null || pawn.mindState.duty == null || pawn.mindState.duty.def == null ? "" : pawn.mindState.duty.def.defName;
             return ContainsAny(duty, "Exit", "Depart", "Leave");
+        }
+
+        private static bool IsDetachedRescuedHospitalityServicePawn(Pawn pawn)
+        {
+            if (ServicePawnUtility.IsTerminalPawn(pawn) ||
+                !pawn.Spawned ||
+                pawn.Downed ||
+                ServicePawnUtility.IsPlayerOwnedPawn(pawn) ||
+                !HospitalityBedUtility.IsRescuedGuest(pawn))
+            {
+                return false;
+            }
+            return pawn.GetLord() == null;
         }
 
         private static bool ContainsAny(string value, params string[] needles)

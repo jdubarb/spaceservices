@@ -221,13 +221,18 @@ namespace SpaceServices
 
         public static bool IsPadSafeForPawns(Thing pad, IEnumerable<Pawn> pawns, out string reason)
         {
+            return IsPadSafeForPawnsAtTarget(pad, pawns, VacSuitUtility.PracticalVacuumSuitTarget, out reason);
+        }
+
+        public static bool IsPadSafeForPawnsAtTarget(Thing pad, IEnumerable<Pawn> pawns, float practicalVacuumSuitTarget, out string reason)
+        {
             reason = null;
             if (pad == null || pad.Destroyed || pad.Map == null)
             {
                 reason = "departure pad unavailable";
                 return false;
             }
-            float vacuum = Mathf.Min(GetMaxVacuum(pad), VacSuitUtility.PracticalVacuumSuitTarget);
+            float vacuum = Mathf.Min(GetMaxVacuum(pad), Mathf.Clamp01(practicalVacuumSuitTarget));
             foreach (Pawn pawn in pawns ?? Enumerable.Empty<Pawn>())
             {
                 if (pawn == null || pawn.Destroyed)
