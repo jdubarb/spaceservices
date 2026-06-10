@@ -94,6 +94,11 @@ namespace SpaceServices
             {
                 return;
             }
+            if (!ServiceLifecycleUtility.TryClearPadFootprintForServiceShuttle(request.pad, "hospitality", "hospitality arrival visual", out string clearReason))
+            {
+                ServiceDebugUtility.LogThrottled(ServiceLogIntegration.Hospitality, "hospitality-arrival-visual-pad-occupied-" + request.pad.thingIDNumber, "Hospitality arrival visual skipped because the service pad could not be cleared: " + clearReason, 250);
+                return;
+            }
 
             ServiceShuttleUtility.SpawnArrival(map, request.pad.Position, visual);
             SpaceServicesMapComponent comp = map.GetComponent<SpaceServicesMapComponent>();

@@ -24,6 +24,9 @@
       <li>SpaceServices.HospitalityPatchHandlers</li>
       <li>SpaceServices.ScheduledHospitalityIncident</li>
       <li>SpaceServices.Alert_SpaceServicesDepartureBlocked</li>
+      <li>SpaceServices.JobDriver_BoardServiceShuttle</li>
+      <li>SpaceServices.JobDriver_ServiceGoto</li>
+      <li>SpaceServices.ServiceJobDefUtility</li>
     </Types>
     <Methods>
       <li>SpaceServices.SpaceServicesMapComponent:MapComponentTick</li>
@@ -75,6 +78,12 @@
       <li>SpaceServices.ServiceLifecycleUtility:HospitalityPawnNeedsVacuumGear</li>
       <li>SpaceServices.ServiceLifecycleUtility:GuardHospitalityGuestsFromVacuum</li>
       <li>SpaceServices.ServiceLifecycleUtility:FindHospitalitySafeCell</li>
+      <li>SpaceServices.ServiceLifecycleUtility:FindHospitalityRouteSafeCell</li>
+      <li>SpaceServices.ServiceLifecycleUtility:FirstHospitalityRouteSafeCell</li>
+      <li>SpaceServices.ServiceLifecycleUtility:IsHospitalityRouteSafeStopCell</li>
+      <li>SpaceServices.ServiceLifecycleUtility:CurrentJobTargetCell</li>
+      <li>SpaceServices.ServiceLifecycleUtility:HospitalityArrivalRouteStopRecentlyHandled</li>
+      <li>SpaceServices.ServiceLifecycleUtility:MarkHospitalityArrivalRouteStopHandled</li>
       <li>SpaceServices.ServiceLifecycleUtility:FindHospitalityGuestAreaSafeCell</li>
       <li>SpaceServices.ServiceLifecycleUtility:CachedHospitalityAreaSafeCells</li>
       <li>SpaceServices.ServiceLifecycleUtility:BestCachedSafeReachableCell</li>
@@ -87,22 +96,58 @@
       <li>SpaceServices.ServiceLifecycleUtility:PawnCurrentJobTargetsUnsafeVacuum</li>
       <li>SpaceServices.ServiceLifecycleUtility:IsHospitalitySafeCellCandidate</li>
       <li>SpaceServices.ServiceLifecycleUtility:AddSafeCellCandidate</li>
+      <li>SpaceServices.ServiceLifecycleUtility:BestPathReachableCell</li>
+      <li>SpaceServices.ServiceLifecycleUtility:PathCostToCell</li>
       <li>SpaceServices.ServiceLifecycleUtility:ActiveTrackedPawns</li>
       <li>SpaceServices.ServiceLifecycleUtility:BeginDeparture</li>
       <li>SpaceServices.ServiceLifecycleUtility:EnsureHospitalityDeparturePrepared</li>
       <li>SpaceServices.ServiceLifecycleUtility:TryReserveBestDeparturePad</li>
       <li>SpaceServices.ServiceLifecycleUtility:OrderedDeparturePads</li>
       <li>SpaceServices.ServiceLifecycleUtility:DeparturePadScore</li>
+      <li>SpaceServices.ServiceLifecycleUtility:PadCanSafelyServe</li>
       <li>SpaceServices.ServiceLifecycleUtility:PadCanSafelyServeDeparture</li>
+      <li>SpaceServices.ServiceLifecycleUtility:DepartureModeFallbackPads</li>
+      <li>SpaceServices.ServiceLifecycleUtility:AllowsDepartureModeFallback</li>
       <li>SpaceServices.ServiceLifecycleUtility:ReadyForExtraction</li>
       <li>SpaceServices.ServiceLifecycleUtility:HospitalityReadyForPickupCall</li>
+      <li>SpaceServices.ServiceLifecycleUtility:PawnReadyForPickupCall</li>
+      <li>SpaceServices.ServiceLifecycleUtility:PickupTimedOut</li>
+      <li>SpaceServices.ServiceLifecycleUtility:HospitalityPickupTimedOut</li>
+      <li>SpaceServices.ServiceLifecycleUtility:HospitalPickupTimedOut</li>
+      <li>SpaceServices.ServiceLifecycleUtility:CanSafelyForceHospitalityPickup</li>
+      <li>SpaceServices.ServiceLifecycleUtility:ReadyForBoardingCompletion</li>
+      <li>SpaceServices.ServiceLifecycleUtility:HospitalPickupReadyForDownedFallback</li>
+      <li>SpaceServices.ServiceLifecycleUtility:TryClearPadFootprintForServiceShuttle</li>
+      <li>SpaceServices.ServiceLifecycleUtility:TryMovePawnOffPadFootprint</li>
+      <li>SpaceServices.ServiceLifecycleUtility:BestPadClearanceCell</li>
+      <li>SpaceServices.ServiceLifecycleUtility:BoardReadyPawns</li>
+      <li>SpaceServices.ServiceLifecycleUtility:NotifyPawnBoardedPickupShuttle</li>
+      <li>SpaceServices.ServiceLifecycleUtility:BoardingStatusSummary</li>
       <li>SpaceServices.ServiceLifecycleUtility:GuideDepartingPawnsToPad</li>
       <li>SpaceServices.ServiceLifecycleUtility:GuideBoardingPawnsToShuttle</li>
+      <li>SpaceServices.ServiceLifecycleUtility:PawnSafelyStagedForPickup</li>
+      <li>SpaceServices.ServiceLifecycleUtility:PawnNearDeparturePad</li>
+      <li>SpaceServices.ServiceLifecycleUtility:PawnAtPickupShuttle</li>
       <li>SpaceServices.ServiceLifecycleUtility:PadReachableForPawns</li>
+      <li>SpaceServices.ServiceLifecycleUtility:SameRoomAsPad</li>
+      <li>SpaceServices.ServiceLifecycleUtility:PickupBoardingCell</li>
+      <li>SpaceServices.ServiceLifecycleUtility:PickupBoardingRect</li>
+      <li>SpaceServices.ServiceLifecycleUtility:DepartureWaitCell</li>
+      <li>SpaceServices.ServiceLifecycleUtility:BestReachableBoardingCell</li>
+      <li>SpaceServices.ServiceLifecycleUtility:BetterCell</li>
+      <li>SpaceServices.ServiceLifecycleUtility:PawnAlreadyGoingTo</li>
+      <li>SpaceServices.ServiceLifecycleUtility:ServiceGotoJob</li>
+      <li>SpaceServices.ServiceLifecycleUtility:ServiceBoardingJob</li>
       <li>SpaceServices.ServiceLifecycleUtility:BestReachableCell</li>
       <li>SpaceServices.ServiceLifecycleUtility:BlockedDepartures</li>
       <li>SpaceServices.ServiceLifecycleUtility:BuildBlockedDepartures</li>
+      <li>SpaceServices.ServiceLifecycleUtility:ShouldReportDepartureBlock</li>
+      <li>SpaceServices.ServiceLifecycleUtility:NoReservedPadBlockReason</li>
       <li>SpaceServices.ServiceLifecycleUtility:ReservedPadCanServe</li>
+      <li>SpaceServices.ServiceLifecycleUtility:ReservedPadStillExists</li>
+      <li>SpaceServices.ServiceLifecycleUtility:DepartureVacuumSuitTarget</li>
+      <li>SpaceServices.ServiceLifecycleUtility:IsDetachedRescuedHospitalityServicePawn</li>
+      <li>SpaceServices.ServiceLifecycleUtility:SplitDetachedRescuedHospitalityPawn</li>
       <li>SpaceServices.VacSuitUtility:SuitPawnsForEnvironment</li>
       <li>SpaceServices.VacSuitUtility:SuitPawnForEnvironment</li>
       <li>SpaceServices.VacSuitUtility:VacuumResistance</li>
@@ -136,12 +181,18 @@
       <li>SpaceServices.ServiceEnvironmentUtility:GetMaxVacuum</li>
       <li>SpaceServices.ServiceEnvironmentUtility:IsRoofAccessible</li>
       <li>SpaceServices.ServiceEnvironmentUtility:IsSafeForPawn</li>
-      <li>SpaceServices.ServiceEnvironmentUtility:IsPadSafeForPawns</li>
+      <li>SpaceServices.ServiceEnvironmentUtility:IsPadSafeForPawnsAtTarget</li>
       <li>SpaceServices.DepartureUtility:CompleteDeparture</li>
       <li>SpaceServices.DepartureUtility:TryAutoExtract</li>
       <li>SpaceServices.DepartureUtility:TryExitSpawnedPawn</li>
       <li>SpaceServices.DepartureUtility:CleanupDepartingPawnReferences</li>
       <li>SpaceServices.DepartureUtility:CleanupLordReferences</li>
+      <li>SpaceServices.JobDriver_BoardServiceShuttle:TryMakePreToilReservations</li>
+      <li>SpaceServices.JobDriver_BoardServiceShuttle:MakeNewToils</li>
+      <li>SpaceServices.JobDriver_ServiceGoto:TryMakePreToilReservations</li>
+      <li>SpaceServices.JobDriver_ServiceGoto:MakeNewToils</li>
+      <li>SpaceServices.ServiceJobDefUtility:get_BoardServiceShuttle</li>
+      <li>SpaceServices.ServiceJobDefUtility:get_ServiceGoto</li>
     </Methods>
   </SpaceServices>
 </Analyzer>

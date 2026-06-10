@@ -61,6 +61,12 @@ namespace SpaceServices
             Thing pad = ServicePadUtility.TryFindNearestServicePad(map, ServiceUse.Guest, parms == null ? IntVec3.Invalid : parms.spawnCenter);
             if (visual != null && pad != null)
             {
+                if (!ServiceLifecycleUtility.TryClearPadFootprintForServiceShuttle(pad, "hospitality", "hospitality arrival scheduling", out string clearReason))
+                {
+                    ServiceDebugUtility.LogThrottled(ServiceLogIntegration.Hospitality, "hospitality-arrival-pad-occupied-" + pad.thingIDNumber, "Hospitality visitor shuttle delayed because the service pad could not be cleared: " + clearReason, 250);
+                    __result = false;
+                    return false;
+                }
                 parms.spawnCenter = pad.Position;
                 SpaceServicesMapComponent comp = map.GetComponent<SpaceServicesMapComponent>();
                 if (comp != null && comp.ScheduleHospitalityIncident(__instance, parms, pad, visual.shipThingDef == null ? null : visual.shipThingDef.defName, visual.id))

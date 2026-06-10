@@ -23,7 +23,7 @@ namespace SpaceServices
         private const int HospitalityVacuumProtectionTickInterval = 600;
         private const float HospitalitySafeCellSearchRadius = 12f;
         private const float HospitalityAreaSafeCellSearchRadius = 16f;
-        private const int HospitalitySafeCellReachabilityChecks = 6;
+        private const int HospitalitySafeCellReachabilityChecks = 24;
         private const float VacuumEpsilon = 0.001f;
         private const float VacuumPadDistanceTolerance = 2.5f;
         private const int BlockedDepartureCacheTicks = 60;
@@ -31,9 +31,12 @@ namespace SpaceServices
         private const int StableBedlessCheckTicks = 2500;
         private const int StableLeaveStateCheckTicks = 2500;
         private const int HospitalitySafeCellCacheTicks = 120;
+        private const int HospitalityRouteSafeCellScanLimit = 120;
+        private const int HospitalityArrivalRouteStopCooldownTicks = 3000;
         private static readonly List<ServiceDepartureBlock> CachedDepartureBlocks = new List<ServiceDepartureBlock>();
         private static int cachedDepartureBlocksTick = -999999;
         private static readonly Dictionary<string, CachedHospitalitySafeCells> HospitalitySafeCellCache = new Dictionary<string, CachedHospitalitySafeCells>();
+        private static readonly Dictionary<int, int> HospitalityArrivalRouteStopTickByPawn = new Dictionary<int, int>();
 
         public static int NextTickInterval(List<ServiceGroupRecord> records)
         {
@@ -480,7 +483,7 @@ namespace SpaceServices
                 if (record.state == "pickupInbound")
                 {
                     EnsureHospitalityDeparturePrepared(record);
-                    if (HospitalityPickupTimedOut(map, record))
+                    if (PickupTimedOut(map, record))
                     {
                         continue;
                     }
@@ -497,6 +500,11 @@ namespace SpaceServices
                         }
                         record.state = "boardingPickup";
                         GuideBoardingPawnsToShuttle(record);
+                        BoardReadyPawns(map, record);
+                        if (HospitalPickupReadyForDownedFallback(record))
+                        {
+                            DepartureUtility.CompleteDeparture(map, record, "hospital downed patient at pickup shuttle");
+                        }
                     }
                     else
                     {
@@ -507,7 +515,8 @@ namespace SpaceServices
                 if (record.state == "boardingPickup")
                 {
                     EnsureHospitalityDeparturePrepared(record);
-                    if (HospitalityPickupTimedOut(map, record))
+                    BoardReadyPawns(map, record);
+                    if (PickupTimedOut(map, record))
                     {
                         continue;
                     }
@@ -517,6 +526,11 @@ namespace SpaceServices
                         {
                             ServiceDebugUtility.Log("Service pickup boarding waiting: " + blockedReason);
                         }
+                        continue;
+                    }
+                    if (HospitalPickupReadyForDownedFallback(record))
+                    {
+                        DepartureUtility.CompleteDeparture(map, record, "hospital downed patient at pickup shuttle");
                         continue;
                     }
                     if (ReadyForBoardingCompletion(record))
@@ -759,27 +773,47 @@ namespace SpaceServices
                 }
                 bool unsafeNow = ServiceEnvironmentUtility.GetVacuum(pawn.Position, map) > VacuumEpsilon;
                 bool unsafeDestination = PawnCurrentJobTargetsUnsafeVacuum(pawn, map);
-                if (!unsafeNow && !unsafeDestination)
+                // During the short arrival handoff, also stop long Hospitality routes once
+                // they have reached the first safe guest-area tile.
+                bool requireAtmosphere = HospitalityArrivalTransitGuardActive(record);
+                bool stopArrivalRoute = requireAtmosphere &&
+                    CurrentJobTargetCell(pawn, map).IsValid &&
+                    !HospitalityArrivalRouteStopRecentlyHandled(pawn, ticksGame);
+                if (!unsafeNow && !unsafeDestination && !stopArrivalRoute)
                 {
                     continue;
                 }
                 // During arrival, "safe because they are wearing a suit" is not enough.
                 // Hospitality can re-apply guest outfits if we let them idle on the pad,
                 // so move them to real atmosphere before normal guest AI takes over.
-                bool requireAtmosphere = HospitalityArrivalTransitGuardActive(record);
-                IntVec3 safeCell = FindHospitalitySafeCell(map, pad, pawn, requireAtmosphere);
-                if (!safeCell.IsValid || safeCell == pawn.Position)
+                IntVec3 safeCell = FindHospitalityRouteSafeCell(map, pawn, requireAtmosphere);
+                if (!safeCell.IsValid && (unsafeNow || unsafeDestination))
+                {
+                    safeCell = FindHospitalitySafeCell(map, pad, pawn, requireAtmosphere, true);
+                }
+                if (!safeCell.IsValid)
                 {
                     continue;
                 }
                 Job current = pawn.CurJob;
-                if (current != null && current.def == JobDefOf.Goto && current.targetA.IsValid && current.targetA.Cell == safeCell)
+                if (safeCell == pawn.Position)
+                {
+                    if ((unsafeDestination || stopArrivalRoute) && current != null)
+                    {
+                        pawn.jobs.EndCurrentJob(JobCondition.Incompletable);
+                        if (stopArrivalRoute)
+                        {
+                            MarkHospitalityArrivalRouteStopHandled(pawn, ticksGame);
+                        }
+                    }
+                    continue;
+                }
+                if (PawnAlreadyGoingTo(pawn, safeCell))
                 {
                     continue;
                 }
                 // Own the brief exposed walk so Hospitality outfit jobs cannot make guests stop to change helmets in vacuum.
-                Job job = JobMaker.MakeJob(JobDefOf.Goto, safeCell);
-                job.locomotionUrgency = LocomotionUrgency.Sprint;
+                Job job = ServiceGotoJob(safeCell, false, LocomotionUrgency.Sprint);
                 if (pawn.CurJob != null)
                 {
                     pawn.jobs.EndCurrentJob(JobCondition.Incompletable);
@@ -787,6 +821,29 @@ namespace SpaceServices
                 pawn.jobs.TryTakeOrderedJob(job, JobTag.Misc);
                 ServiceDebugUtility.LogThrottled(ServiceLogIntegration.Hospitality, "hospitality-vac-transit-" + pawn.thingIDNumber, "Forced Hospitality guest vacuum transit (" + (reason ?? "service") + "): " + ServiceDebugUtility.PawnAuditSummary(pawn) + " -> " + safeCell, GenDate.TicksPerHour);
             }
+        }
+
+        private static bool HospitalityArrivalRouteStopRecentlyHandled(Pawn pawn, int ticksGame)
+        {
+            if (pawn == null)
+            {
+                return true;
+            }
+            int handledTick;
+            if (!HospitalityArrivalRouteStopTickByPawn.TryGetValue(pawn.thingIDNumber, out handledTick))
+            {
+                return false;
+            }
+            return ticksGame <= handledTick + HospitalityArrivalRouteStopCooldownTicks;
+        }
+
+        private static void MarkHospitalityArrivalRouteStopHandled(Pawn pawn, int ticksGame)
+        {
+            if (pawn == null)
+            {
+                return;
+            }
+            HospitalityArrivalRouteStopTickByPawn[pawn.thingIDNumber] = ticksGame;
         }
 
         private static bool HospitalityPawnNeedsVacuumGear(Map map, ServiceGroupRecord record, Pawn pawn)
@@ -821,7 +878,7 @@ namespace SpaceServices
 
         private static void GuardHospitalityGuestsFromVacuum(Map map, ServiceGroupRecord record)
         {
-            if (map == null || record == null || record.pawns == null)
+            if (map == null || record == null || record.serviceKind != "hospitality" || record.pawns == null)
             {
                 return;
             }
@@ -837,13 +894,24 @@ namespace SpaceServices
                 {
                     continue;
                 }
-                IntVec3 safeCell = FindHospitalitySafeCell(map, record.reservedPad, pawn, false);
-                if (!safeCell.IsValid || safeCell == pawn.Position)
+                IntVec3 safeCell = FindHospitalityRouteSafeCell(map, pawn, false);
+                if (!safeCell.IsValid)
+                {
+                    safeCell = FindHospitalitySafeCell(map, record.reservedPad, pawn, false, true);
+                }
+                if (!safeCell.IsValid)
                 {
                     continue;
                 }
-                Job job = JobMaker.MakeJob(JobDefOf.Goto, safeCell);
-                job.locomotionUrgency = LocomotionUrgency.Jog;
+                if (safeCell == pawn.Position)
+                {
+                    if (unsafeDestination && pawn.CurJob != null)
+                    {
+                        pawn.jobs.EndCurrentJob(JobCondition.Incompletable);
+                    }
+                    continue;
+                }
+                Job job = ServiceGotoJob(safeCell, false, LocomotionUrgency.Jog);
                 pawn.jobs.TryTakeOrderedJob(job, JobTag.Misc);
             }
         }
@@ -874,12 +942,20 @@ namespace SpaceServices
             return !ServiceEnvironmentUtility.IsSafeForPawn(pawn, map, target.Cell);
         }
 
-        private static IntVec3 FindHospitalitySafeCell(Map map, Thing pad, Pawn pawn, bool requireAtmosphere)
+        private static IntVec3 FindHospitalitySafeCell(Map map, Thing pad, Pawn pawn, bool requireAtmosphere, bool preferGuestArea)
         {
-            IntVec3 guestAreaCell = FindHospitalityGuestAreaSafeCell(map, pad, pawn, requireAtmosphere);
-            if (guestAreaCell.IsValid)
+            if (preferGuestArea)
             {
-                return guestAreaCell;
+                IntVec3 guestAreaCell = FindHospitalityGuestAreaSafeCell(map, pad, pawn, requireAtmosphere);
+                if (guestAreaCell.IsValid)
+                {
+                    return guestAreaCell;
+                }
+            }
+            IntVec3 nearPawn = BestSafeReachableCell(GenRadial.RadialCellsAround(pawn.Position, HospitalitySafeCellSearchRadius, true), map, pawn, pawn.Position, requireAtmosphere);
+            if (nearPawn.IsValid)
+            {
+                return nearPawn;
             }
             if (pad != null && pad.Spawned)
             {
@@ -889,13 +965,137 @@ namespace SpaceServices
                     return nearPad;
                 }
             }
-            IntVec3 nearPawn = BestSafeReachableCell(GenRadial.RadialCellsAround(pawn.Position, HospitalitySafeCellSearchRadius, true), map, pawn, pawn.Position, requireAtmosphere);
-            if (nearPawn.IsValid)
+            if (!preferGuestArea)
             {
-                return nearPawn;
+                IntVec3 guestAreaCell = FindHospitalityGuestAreaSafeCell(map, pad, pawn, requireAtmosphere);
+                if (guestAreaCell.IsValid)
+                {
+                    return guestAreaCell;
+                }
             }
             Room room = pad != null && pad.Spawned ? pad.Position.GetRoom(map) : null;
             return room == null ? IntVec3.Invalid : BestSafeReachableCell(room.Cells, map, pawn, pad.Position, requireAtmosphere);
+        }
+
+        private static IntVec3 FindHospitalityRouteSafeCell(Map map, Pawn pawn, bool requireAtmosphere)
+        {
+            Area area = HospitalityGuestArea(map, pawn);
+            if (map == null || pawn == null || !pawn.Spawned || area == null || area.Map != map || area.TrueCount == 0)
+            {
+                return IntVec3.Invalid;
+            }
+
+            List<IntVec3> cells = new List<IntVec3>(HospitalityRouteSafeCellScanLimit + 2);
+            AddHospitalityRouteCell(cells, pawn.Position);
+            if (pawn.pather != null)
+            {
+                AddHospitalityRouteCell(cells, pawn.pather.nextCell);
+                PawnPath currentPath = pawn.pather.curPath;
+                if (currentPath != null && currentPath.Found)
+                {
+                    currentPath.PeekNextCells(HospitalityRouteSafeCellScanLimit, cells);
+                }
+            }
+
+            IntVec3 routeCell = FirstHospitalityRouteSafeCell(cells, map, pawn, area, requireAtmosphere);
+            if (routeCell.IsValid)
+            {
+                return routeCell;
+            }
+
+            IntVec3 target = CurrentJobTargetCell(pawn, map);
+            if (!target.IsValid)
+            {
+                return IntVec3.Invalid;
+            }
+
+            PawnPath path = null;
+            try
+            {
+                path = map.pathFinder.FindPathNow(pawn.Position, target, TraverseParms.For(pawn), peMode: PathEndMode.OnCell);
+                if (path == null || !path.Found)
+                {
+                    return IntVec3.Invalid;
+                }
+
+                cells.Clear();
+                AddHospitalityRouteCell(cells, pawn.Position);
+                path.PeekNextCells(HospitalityRouteSafeCellScanLimit, cells);
+                return FirstHospitalityRouteSafeCell(cells, map, pawn, area, requireAtmosphere);
+            }
+            finally
+            {
+                path?.ReleaseToPool();
+            }
+        }
+
+        private static void AddHospitalityRouteCell(List<IntVec3> cells, IntVec3 cell)
+        {
+            if (cells == null || !cell.IsValid || cells.Contains(cell))
+            {
+                return;
+            }
+            cells.Add(cell);
+        }
+
+        private static IntVec3 FirstHospitalityRouteSafeCell(List<IntVec3> cells, Map map, Pawn pawn, Area area, bool requireAtmosphere)
+        {
+            foreach (IntVec3 cell in cells ?? Enumerable.Empty<IntVec3>())
+            {
+                if (IsHospitalityRouteSafeStopCell(cell, map, pawn, area, requireAtmosphere))
+                {
+                    return cell;
+                }
+            }
+            return IntVec3.Invalid;
+        }
+
+        private static bool IsHospitalityRouteSafeStopCell(IntVec3 cell, Map map, Pawn pawn, Area area, bool requireAtmosphere)
+        {
+            if (map == null || pawn == null || area == null || area.Map != map || !cell.IsValid || !cell.InBounds(map) || !cell.Standable(map) || !area[cell])
+            {
+                return false;
+            }
+            Pawn occupyingPawn = cell.GetFirstPawn(map);
+            if (occupyingPawn != null && occupyingPawn != pawn)
+            {
+                return false;
+            }
+            return IsHospitalitySafeCellCandidate(cell, map, pawn, requireAtmosphere, requireAtmosphere ? 0f : VacSuitUtility.VacuumResistance(pawn));
+        }
+
+        private static IntVec3 CurrentJobTargetCell(Pawn pawn, Map map)
+        {
+            Job job = pawn == null ? null : pawn.CurJob;
+            if (job == null || map == null)
+            {
+                return IntVec3.Invalid;
+            }
+            if (TargetCellUnsafeForPawn(job.targetA, pawn, map))
+            {
+                return job.targetA.Cell;
+            }
+            if (TargetCellUnsafeForPawn(job.targetB, pawn, map))
+            {
+                return job.targetB.Cell;
+            }
+            if (TargetCellUnsafeForPawn(job.targetC, pawn, map))
+            {
+                return job.targetC.Cell;
+            }
+            if (job.targetA.IsValid && job.targetA.Cell.IsValid && job.targetA.Cell.InBounds(map))
+            {
+                return job.targetA.Cell;
+            }
+            if (job.targetB.IsValid && job.targetB.Cell.IsValid && job.targetB.Cell.InBounds(map))
+            {
+                return job.targetB.Cell;
+            }
+            if (job.targetC.IsValid && job.targetC.Cell.IsValid && job.targetC.Cell.InBounds(map))
+            {
+                return job.targetC.Cell;
+            }
+            return IntVec3.Invalid;
         }
 
         private static IntVec3 FindHospitalityGuestAreaSafeCell(Map map, Thing pad, Pawn pawn, bool requireAtmosphere)
@@ -915,7 +1115,12 @@ namespace SpaceServices
                     return nearPad;
                 }
             }
-            return BestSafeReachableCell(AreaCells(GenRadial.RadialCellsAround(pawn.Position, HospitalityAreaSafeCellSearchRadius, true), area, map), map, pawn, pawn.Position, requireAtmosphere);
+            IntVec3 nearPawn = BestSafeReachableCell(AreaCells(GenRadial.RadialCellsAround(pawn.Position, HospitalityAreaSafeCellSearchRadius, true), area, map), map, pawn, pawn.Position, requireAtmosphere);
+            if (nearPawn.IsValid)
+            {
+                return nearPawn;
+            }
+            return BestSafeReachableCell(AreaCells(area.ActiveCells, area, map), map, pawn, pawn.Position, requireAtmosphere);
         }
 
         private static IEnumerable<IntVec3> AreaCells(IEnumerable<IntVec3> cells, Area area, Map map)
@@ -1022,14 +1227,7 @@ namespace SpaceServices
                 AddSafeCellCandidate(candidates, cell, origin);
             }
 
-            foreach (IntVec3 cell in candidates)
-            {
-                if (cell == pawn.Position || pawn.CanReach(cell, PathEndMode.OnCell, Danger.Deadly))
-                {
-                    return cell;
-                }
-            }
-            return IntVec3.Invalid;
+            return BestPathReachableCell(candidates, map, pawn);
         }
 
         private static IntVec3 BestCachedSafeReachableCell(List<IntVec3> candidates, Map map, Pawn pawn, IntVec3 origin)
@@ -1038,18 +1236,60 @@ namespace SpaceServices
             {
                 return IntVec3.Invalid;
             }
-            foreach (IntVec3 cell in candidates.OrderBy(cell => cell.DistanceToSquared(origin)).Take(HospitalitySafeCellReachabilityChecks))
+            return BestPathReachableCell(candidates.OrderBy(cell => cell.DistanceToSquared(origin)).Take(HospitalitySafeCellReachabilityChecks), map, pawn);
+        }
+
+        private static IntVec3 BestPathReachableCell(IEnumerable<IntVec3> candidates, Map map, Pawn pawn)
+        {
+            if (candidates == null || map == null || pawn == null)
+            {
+                return IntVec3.Invalid;
+            }
+            IntVec3 best = IntVec3.Invalid;
+            float bestPathCost = float.MaxValue;
+            int bestDistance = int.MaxValue;
+            foreach (IntVec3 cell in candidates)
             {
                 if (!cell.InBounds(map) || !cell.Standable(map) || (cell.GetFirstPawn(map) != null && cell != pawn.Position))
                 {
                     continue;
                 }
-                if (cell == pawn.Position || pawn.CanReach(cell, PathEndMode.OnCell, Danger.Deadly))
+                if (cell == pawn.Position)
                 {
                     return cell;
                 }
+                float pathCost = PathCostToCell(map, pawn, cell);
+                if (pathCost < 0f)
+                {
+                    continue;
+                }
+                int distance = cell.DistanceToSquared(pawn.Position);
+                if (pathCost < bestPathCost || (pathCost == bestPathCost && distance < bestDistance))
+                {
+                    best = cell;
+                    bestPathCost = pathCost;
+                    bestDistance = distance;
+                }
             }
-            return IntVec3.Invalid;
+            return best;
+        }
+
+        private static float PathCostToCell(Map map, Pawn pawn, IntVec3 cell)
+        {
+            PawnPath path = null;
+            try
+            {
+                path = map.pathFinder.FindPathNow(pawn.Position, cell, TraverseParms.For(pawn), peMode: PathEndMode.OnCell);
+                if (path == null || !path.Found)
+                {
+                    return -1f;
+                }
+                return path.TotalCost;
+            }
+            finally
+            {
+                path?.ReleaseToPool();
+            }
         }
 
         private static bool IsHospitalitySafeCellCandidate(IntVec3 cell, Map map, Pawn pawn, bool requireAtmosphere, float resistance)
@@ -1316,6 +1556,17 @@ namespace SpaceServices
                 return;
             }
 
+            if (!TryClearPadFootprintForServiceShuttle(record.reservedPad, record.serviceKind, "pickup service group " + record.id, out string clearReason))
+            {
+                ServiceDebugUtility.LogThrottled(ServiceDebugUtility.IntegrationForServiceKind(record.serviceKind), "departure-pad-occupied-" + record.id, "Pickup shuttle delayed while clearing pad for service group " + record.id + ": " + clearReason, 250);
+                if (record.state != "departing")
+                {
+                    record.state = "departing";
+                    record.departureRequestedTick = Find.TickManager.TicksGame;
+                }
+                return;
+            }
+
             ShuttleVisual visual = ShuttleVisual.Resolve(record.serviceKind, record.pickupShuttleVisualDefName);
             if (visual == null)
             {
@@ -1328,10 +1579,128 @@ namespace SpaceServices
             record.pickupShuttleTouchdownTick = Find.TickManager.TicksGame + ServiceShuttleUtility.ArrivalTouchdownDelayTicks;
             record.pickupShuttleThingDefName = visual.shipThingDef.defName;
             record.pickupShuttleVisualDefName = visual.id;
+            int staleShuttles = ServiceShuttleUtility.CleanupServiceShuttlesNear(record.reservedPad.Map, record.reservedPad.Position, 8f);
+            if (staleShuttles > 0)
+            {
+                ServiceDebugUtility.LogAudit("Cleaned stale service shuttle visuals before pickup spawn count=" + staleShuttles + " record=" + RecordAudit(record));
+            }
             ServiceShuttleUtility.SpawnArrival(record.reservedPad.Map, record.reservedPad.Position, visual);
             MarkRecordDirty(record.reservedPad.Map, record, "pickup shuttle inbound");
             ServiceDebugUtility.Log("Pickup shuttle inbound for " + record.serviceKind + " service group " + record.id + ": " + reason);
             ServiceDebugUtility.LogAudit("BeginPickupShuttle " + RecordAudit(record) + " touchdownTick=" + record.pickupShuttleTouchdownTick + " ship=" + record.pickupShuttleThingDefName + " visual=" + record.pickupShuttleVisualDefName + " reason=" + (reason ?? "none"));
+        }
+
+        public static bool TryClearPadFootprintForServiceShuttle(Thing pad, string serviceKind, string context, out string reason)
+        {
+            reason = null;
+            Map map = pad == null ? null : pad.Map;
+            if (map == null || pad.Destroyed)
+            {
+                reason = "service pad unavailable";
+                return false;
+            }
+
+            CellRect padRect = pad.OccupiedRect();
+            List<Pawn> pawns = padRect.Cells
+                .Select(cell => cell.GetFirstPawn(map))
+                .Where(pawn => pawn != null && !pawn.Destroyed && pawn.Spawned)
+                .Distinct()
+                .ToList();
+            foreach (Pawn pawn in pawns)
+            {
+                if (!TryMovePawnOffPadFootprint(pawn, pad, padRect, out IntVec3 target))
+                {
+                    reason = pawn.LabelShortCap + " is blocking the landing pad";
+                    return false;
+                }
+                ServiceDebugUtility.LogAudit(ServiceDebugUtility.IntegrationForServiceKind(serviceKind), "Cleared pawn from service pad footprint pawn=" + ServiceDebugUtility.PawnAuditSummary(pawn) + " target=" + target + " context=" + (context ?? "service shuttle"));
+            }
+            return true;
+        }
+
+        private static bool TryMovePawnOffPadFootprint(Pawn pawn, Thing pad, CellRect padRect, out IntVec3 target)
+        {
+            target = IntVec3.Invalid;
+            Map map = pad == null ? null : pad.Map;
+            if (pawn == null || !pawn.Spawned || map == null)
+            {
+                return false;
+            }
+            if (!padRect.Contains(pawn.Position))
+            {
+                target = pawn.Position;
+                return true;
+            }
+            target = BestPadClearanceCell(pawn, pad, padRect);
+            if (!target.IsValid)
+            {
+                return false;
+            }
+
+            Rot4 rotation = pawn.Rotation;
+            IntVec3 oldPosition = pawn.Position;
+            try
+            {
+                pawn.DeSpawn(DestroyMode.Vanish);
+                GenSpawn.Spawn(pawn, target, map, rotation, WipeMode.Vanish, false);
+                pawn.Notify_Teleported();
+                return true;
+            }
+            catch (Exception ex)
+            {
+                if (!pawn.Spawned && oldPosition.IsValid)
+                {
+                    try
+                    {
+                        GenSpawn.Spawn(pawn, oldPosition, map, rotation, WipeMode.Vanish, false);
+                    }
+                    catch
+                    {
+                        // The warning below is the actionable failure; avoid masking it with recovery noise.
+                    }
+                }
+                ServiceDebugUtility.LogWarning(ServiceLogIntegration.Core, "Could not clear pawn from pickup pad before shuttle arrival: " + ex.GetType().Name + " " + ex.Message);
+                return false;
+            }
+        }
+
+        private static IntVec3 BestPadClearanceCell(Pawn pawn, Thing pad, CellRect padRect)
+        {
+            Map map = pad == null ? null : pad.Map;
+            if (map == null || pawn == null)
+            {
+                return IntVec3.Invalid;
+            }
+            IntVec3 best = IntVec3.Invalid;
+            int bestScore = int.MaxValue;
+            for (int radius = 1; radius <= 4; radius++)
+            {
+                foreach (IntVec3 cell in padRect.ExpandedBy(radius).Cells)
+                {
+                    if (padRect.Contains(cell) ||
+                        !cell.InBounds(map) ||
+                        !cell.Standable(map) ||
+                        cell.GetFirstPawn(map) != null ||
+                        !ServiceEnvironmentUtility.IsSafeForPawn(pawn, map, cell))
+                    {
+                        continue;
+                    }
+                    bool sameRoom = SameRoomAsPad(pad, cell);
+                    int score = cell.DistanceToSquared(pawn.Position) +
+                        (sameRoom ? 0 : 1000) +
+                        (radius * 100);
+                    if (score < bestScore)
+                    {
+                        best = cell;
+                        bestScore = score;
+                    }
+                }
+                if (best.IsValid)
+                {
+                    return best;
+                }
+            }
+            return best;
         }
 
         private static Thing TryReserveBestDeparturePad(Map map, ServiceUse use, ServiceGroupRecord record)
@@ -1647,6 +2016,15 @@ namespace SpaceServices
                 Find.TickManager.TicksGame > record.departureRequestedTick + HospitalityDepartureHardTimeoutTicks;
         }
 
+        private static bool PickupTimedOut(Map map, ServiceGroupRecord record)
+        {
+            if (HospitalityPickupTimedOut(map, record))
+            {
+                return true;
+            }
+            return HospitalPickupTimedOut(map, record);
+        }
+
         private static bool HospitalityPickupTimedOut(Map map, ServiceGroupRecord record)
         {
             if (record == null ||
@@ -1661,6 +2039,23 @@ namespace SpaceServices
                 return false;
             }
             DepartureUtility.CompleteDeparture(map, record, "hospitality pickup timeout fallback");
+            return true;
+        }
+
+        private static bool HospitalPickupTimedOut(Map map, ServiceGroupRecord record)
+        {
+            if (record == null ||
+                record.serviceKind != "hospital" ||
+                record.pickupShuttleTouchdownTick <= 0 ||
+                Find.TickManager.TicksGame <= record.pickupShuttleTouchdownTick + PickupBoardingHardTimeoutTicks)
+            {
+                return false;
+            }
+            if (!ServiceEnvironmentUtility.IsPadSafeForPawnsAtTarget(record.reservedPad, record.pawns, DepartureVacuumSuitTarget(), out string _))
+            {
+                return false;
+            }
+            DepartureUtility.CompleteDeparture(map, record, "hospital pickup timeout fallback");
             return true;
         }
 
@@ -1700,6 +2095,121 @@ namespace SpaceServices
                 }
             }
             return true;
+        }
+
+        private static bool HospitalPickupReadyForDownedFallback(ServiceGroupRecord record)
+        {
+            if (record == null || record.serviceKind != "hospital" || record.pawns == null || record.reservedPad == null)
+            {
+                return false;
+            }
+            List<Pawn> active = record.pawns
+                .Where(pawn => pawn != null && !pawn.Destroyed && !ServicePawnUtility.IsPlayerOwnedPawn(pawn) && pawn.Spawned)
+                .ToList();
+            if (active.Count == 0)
+            {
+                return false;
+            }
+            bool hasDownedNearPad = false;
+            foreach (Pawn pawn in active)
+            {
+                if (PawnAtPickupShuttle(pawn, record.reservedPad))
+                {
+                    continue;
+                }
+                if (pawn.Downed && PawnNearDeparturePad(pawn, record.reservedPad))
+                {
+                    hasDownedNearPad = true;
+                    continue;
+                }
+                return false;
+            }
+            return hasDownedNearPad;
+        }
+
+        private static int BoardReadyPawns(Map map, ServiceGroupRecord record)
+        {
+            if (record == null || record.pawns == null || record.reservedPad == null)
+            {
+                return 0;
+            }
+            List<Pawn> boarding = record.pawns
+                .Where(pawn => pawn != null &&
+                    pawn.Spawned &&
+                    !pawn.Destroyed &&
+                    !pawn.Downed &&
+                    PawnAtPickupShuttle(pawn, record.reservedPad))
+                .Distinct()
+                .ToList();
+            foreach (Pawn pawn in boarding)
+            {
+                ServiceDebugUtility.LogAudit("BoardReadyPawns extracting pawn=" + ServiceDebugUtility.PawnAuditSummary(pawn) + " record=" + RecordAudit(record));
+                DepartureUtility.TryAutoExtract(map ?? pawn.MapHeld, new[] { pawn }, "service pawn boarded pickup shuttle");
+            }
+            if (boarding.Count == 0)
+            {
+                ServiceDebugUtility.LogThrottled(
+                    ServiceDebugUtility.IntegrationForServiceKind(record.serviceKind),
+                    "boarding-wait-" + record.id,
+                    "Pickup boarding waiting for service group " + record.id + ": " + BoardingStatusSummary(record),
+                    250);
+            }
+            return boarding.Count;
+        }
+
+        public static bool NotifyPawnBoardedPickupShuttle(Pawn pawn)
+        {
+            if (pawn == null)
+            {
+                return false;
+            }
+            if (!TryFindRecordForPawn(pawn, out Map map, out ServiceGroupRecord record) || record == null)
+            {
+                ServiceDebugUtility.LogAudit("BoardServiceShuttle completed for untracked pawn=" + ServiceDebugUtility.PawnAuditSummary(pawn));
+                return false;
+            }
+            if (record.state != "boardingPickup" || record.reservedPad == null)
+            {
+                ServiceDebugUtility.LogAudit("BoardServiceShuttle ignored state/pad pawn=" + ServiceDebugUtility.PawnAuditSummary(pawn) + " record=" + RecordAudit(record));
+                return false;
+            }
+            if (!PawnAtPickupShuttle(pawn, record.reservedPad))
+            {
+                ServiceDebugUtility.LogAudit("BoardServiceShuttle reached target outside boarding footprint pawn=" + ServiceDebugUtility.PawnAuditSummary(pawn) + " record=" + RecordAudit(record));
+                return false;
+            }
+            if (!ReservedPadCanServe(record, record.serviceKind == "hospitality" ? ServiceUse.Guest : ServiceUse.Patient, out string blockedReason))
+            {
+                ServiceDebugUtility.Log("Service pickup boarding job waiting: " + blockedReason);
+                return false;
+            }
+            Map extractionMap = map ?? pawn.MapHeld ?? record.reservedPad.Map;
+            ServiceDebugUtility.LogAudit("BoardServiceShuttle extracting pawn=" + ServiceDebugUtility.PawnAuditSummary(pawn) + " record=" + RecordAudit(record));
+            bool extracted = DepartureUtility.TryAutoExtract(extractionMap, new[] { pawn }, "service pawn boarded pickup shuttle");
+            if (extracted && ReadyForBoardingCompletion(record))
+            {
+                DepartureUtility.CompleteDeparture(extractionMap, record, "service pawns boarded pickup shuttle");
+            }
+            return extracted;
+        }
+
+        private static string BoardingStatusSummary(ServiceGroupRecord record)
+        {
+            if (record == null || record.pawns == null || record.reservedPad == null)
+            {
+                return "missing record, pawns, or reserved pad";
+            }
+            CellRect rect = PickupBoardingRect(record.reservedPad);
+            return "rect=" + rect + " pad=" + ServiceDebugUtility.ThingAuditSummary(record.reservedPad) + " pawns=" + string.Join("; ", record.pawns
+                .Where(pawn => pawn != null)
+                .Select(pawn =>
+                    pawn.LabelShortCap +
+                    " spawned=" + pawn.Spawned +
+                    " downed=" + pawn.Downed +
+                    " pos=" + (pawn.Spawned ? pawn.Position.ToString() : "unspawned") +
+                    " inRect=" + (pawn.Spawned && rect.Contains(pawn.Position)) +
+                    " sameRoom=" + (pawn.Spawned && SameRoomAsPad(record.reservedPad, pawn.Position)) +
+                    " job=" + (pawn.CurJobDef == null ? "null" : pawn.CurJobDef.defName)));
         }
 
         private static void GuideDepartingPawnsToPad(ServiceGroupRecord record)
@@ -1744,7 +2254,7 @@ namespace SpaceServices
                     continue;
                 }
                 ServiceDebugUtility.LogAudit("GuideDepartingPawnsToPad ordered waitCell=" + waitCell + " pawn=" + ServiceDebugUtility.PawnAuditSummary(pawn) + " record=" + RecordAudit(record));
-                pawn.jobs.TryTakeOrderedJob(ServiceGotoJob(waitCell, bypassGuestArea), JobTag.Misc);
+                pawn.jobs.TryTakeOrderedJob(ServiceGotoJob(waitCell, bypassGuestArea, LocomotionUrgency.Jog), JobTag.Misc);
             }
         }
 
@@ -1786,7 +2296,7 @@ namespace SpaceServices
                     continue;
                 }
                 ServiceDebugUtility.LogAudit("GuideBoardingPawnsToShuttle ordered boardCell=" + boardCell + " pawn=" + ServiceDebugUtility.PawnAuditSummary(pawn) + " record=" + RecordAudit(record));
-                pawn.jobs.TryTakeOrderedJob(ServiceGotoJob(boardCell, bypassGuestArea), JobTag.Misc);
+                pawn.jobs.TryTakeOrderedJob(ServiceBoardingJob(boardCell, bypassGuestArea), JobTag.Misc);
             }
         }
 
@@ -1824,7 +2334,7 @@ namespace SpaceServices
             {
                 return false;
             }
-            return PickupBoardingRect(pad).Contains(pawn.Position);
+            return PickupBoardingRect(pad).Contains(pawn.Position) && SameRoomAsPad(pad, pawn.Position);
         }
 
         private static bool PadReachableForPawns(Thing pad, IEnumerable<Pawn> pawns, bool boarding, bool bypassGuestArea, out string reason)
@@ -1868,12 +2378,12 @@ namespace SpaceServices
             {
                 return IntVec3.Invalid;
             }
-            return BestReachableCell(PickupBoardingRect(pad), pad, pawn, bypassGuestArea, false);
+            return BestReachableBoardingCell(PickupBoardingRect(pad), pad, pawn);
         }
 
         private static CellRect PickupBoardingRect(Thing pad)
         {
-            // Boarding is based on the shuttle's center, not the full service pad footprint.
+            // Boarding is based on the shuttle footprint, not the full pad or pre-touchdown staging ring.
             return CellRect.CenteredOn(pad.Position, 5, 5);
         }
 
@@ -1931,6 +2441,40 @@ namespace SpaceServices
             return bestReachable.IsValid || !bypassGuestArea ? bestReachable : bestFallback;
         }
 
+        private static IntVec3 BestReachableBoardingCell(CellRect searchRect, Thing pad, Pawn pawn)
+        {
+            Map map = pad == null ? null : pad.Map;
+            if (map == null || pawn == null)
+            {
+                return IntVec3.Invalid;
+            }
+            IntVec3 best = IntVec3.Invalid;
+            int bestPadDist = int.MaxValue;
+            int bestPawnDist = int.MaxValue;
+
+            foreach (IntVec3 cell in searchRect.Cells)
+            {
+                if (!cell.InBounds(map) ||
+                    !cell.Standable(map) ||
+                    !SameRoomAsPad(pad, cell) ||
+                    (cell.GetFirstPawn(map) != null && cell != pawn.Position) ||
+                    !pawn.CanReach(cell, PathEndMode.OnCell, Danger.Deadly))
+                {
+                    continue;
+                }
+                int padDist = cell.DistanceToSquared(pad.Position);
+                int pawnDist = cell.DistanceToSquared(pawn.Position);
+                if (padDist < bestPadDist || (padDist == bestPadDist && pawnDist < bestPawnDist))
+                {
+                    best = cell;
+                    bestPadDist = padDist;
+                    bestPawnDist = pawnDist;
+                }
+            }
+
+            return best;
+        }
+
         private static bool BetterCell(int pawnDist, int padDist, int bestPawnDist, int bestPadDist)
         {
             return pawnDist < bestPawnDist || (pawnDist == bestPawnDist && padDist < bestPadDist);
@@ -1939,7 +2483,12 @@ namespace SpaceServices
         private static bool PawnAlreadyGoingTo(Pawn pawn, IntVec3 cell)
         {
             Job job = pawn == null ? null : pawn.CurJob;
-            return job != null && job.def == JobDefOf.Goto && job.targetA.IsValid && job.targetA.Cell == cell;
+            return job != null &&
+                (job.def == JobDefOf.Goto ||
+                    job.def == ServiceJobDefUtility.ServiceGoto ||
+                    job.def == ServiceJobDefUtility.BoardServiceShuttle) &&
+                job.targetA.IsValid &&
+                job.targetA.Cell == cell;
         }
 
         public static List<ServiceDepartureBlock> BlockedDepartures()
@@ -2290,15 +2839,19 @@ namespace SpaceServices
             return record != null && record.serviceKind == "hospitality";
         }
 
-        private static Job ServiceGotoJob(IntVec3 cell, bool bypassGuestArea)
+        private static Job ServiceGotoJob(IntVec3 cell, bool bypassGuestArea, LocomotionUrgency urgency)
         {
-            Job job = JobMaker.MakeJob(JobDefOf.Goto, cell);
+            JobDef serviceGotoDef = ServiceJobDefUtility.ServiceGoto;
+            Job job = JobMaker.MakeJob(serviceGotoDef ?? JobDefOf.Goto, cell);
+            job.locomotionUrgency = urgency;
+            return job;
+        }
+
+        private static Job ServiceBoardingJob(IntVec3 cell, bool bypassGuestArea)
+        {
+            JobDef boardJobDef = ServiceJobDefUtility.BoardServiceShuttle;
+            Job job = JobMaker.MakeJob(boardJobDef ?? JobDefOf.Goto, cell);
             job.locomotionUrgency = LocomotionUrgency.Jog;
-            if (bypassGuestArea)
-            {
-                // Hospitality guest areas are for the stay, not the controlled shuttle transfer.
-                Reflect.SetMember(job, "playerForced", true);
-            }
             return job;
         }
 

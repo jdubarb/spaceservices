@@ -632,6 +632,13 @@ namespace SpaceServices
                     ReleaseArrivalReservation(incident);
                     continue;
                 }
+                if (!ServiceLifecycleUtility.TryClearPadFootprintForServiceShuttle(incident.pad, "hospitality", "hospitality arrival touchdown", out string clearReason))
+                {
+                    incident.touchdownTick = Find.TickManager.TicksGame + 250;
+                    pendingHospitalityIncidents.Add(incident);
+                    ServiceDebugUtility.LogThrottled(ServiceLogIntegration.Hospitality, "hospitality-touchdown-pad-occupied-" + incident.reservationId, "Hospitality visitor touchdown delayed because the service pad could not be cleared: " + clearReason, 250);
+                    continue;
+                }
 
                 ServiceShuttleUtility.CleanupTouchdownShuttle(map, incident.pad.Position, incident.shuttleThingDefName);
                 incident.parms.spawnCenter = incident.pad.Position;
@@ -762,6 +769,11 @@ namespace SpaceServices
             parms.sendLetter = true;
 
             ShuttleVisual visual = ShuttleVisual.Resolve("hospitality", null);
+            if (!ServiceLifecycleUtility.TryClearPadFootprintForServiceShuttle(pad, "hospitality", "fallback hospitality arrival scheduling", out string clearReason))
+            {
+                reason = "service pad could not be cleared: " + clearReason;
+                return false;
+            }
             if (!ScheduleHospitalityIncident(worker, parms, pad, visual == null || visual.shipThingDef == null ? null : visual.shipThingDef.defName, visual == null ? null : visual.id))
             {
                 reason = "could not reserve service pad";

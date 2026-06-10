@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Defs>
+  <JobDef>
+    <defName>JDB_BoardServiceShuttle</defName>
+    <driverClass>SpaceServices.JobDriver_BoardServiceShuttle</driverClass>
+    <reportString>boarding shuttle.</reportString>
+    <casualInterruptible>false</casualInterruptible>
+  </JobDef>
+
+  <JobDef>
+    <defName>JDB_ServiceGoto</defName>
+    <driverClass>SpaceServices.JobDriver_ServiceGoto</driverClass>
+    <reportString>moving to service destination.</reportString>
+    <casualInterruptible>false</casualInterruptible>
+  </JobDef>
+</Defs>
