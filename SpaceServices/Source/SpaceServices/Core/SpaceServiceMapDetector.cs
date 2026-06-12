@@ -63,6 +63,10 @@ namespace SpaceServices
             {
                 result.allowReasons.Add("tile layer is space:" + layerDef);
             }
+            if (IsExplicitServiceLayer(layerDef))
+            {
+                result.allowReasons.Add("explicit service layer:" + layerDef);
+            }
 
             string biomeDef = Reflect.DefName(map.Biome);
             if (Reflect.BoolMember(map.Biome, "inVacuum"))
@@ -91,8 +95,12 @@ namespace SpaceServices
             {
                 result.allowReasons.Add("stationary space parent:" + parentType);
             }
+            if (ContainsAny(parentType, "LayeredAtmosphereOrbit.AtmosphereMapParent", "LayeredAtmosphereOrbit.FloatingIslandMapParent", "DeepOrbit.BigAsteroidMapParent"))
+            {
+                result.allowReasons.Add("explicit service parent:" + parentType);
+            }
 
-            if (Reflect.BoolFromNested(map, "Tile", "LayerDef", "isSpace") == false && ContainsAny(layerDef, "SkyIsland", "Troposphere", "Stratosphere", "Mesosphere"))
+            if (Reflect.BoolFromNested(map, "Tile", "LayerDef", "isSpace") == false && !IsExplicitServiceLayer(layerDef) && ContainsAny(layerDef, "SkyIsland", "Troposphere", "Stratosphere", "Mesosphere"))
             {
                 result.blockReasons.Add("non-vacuum atmospheric or sky layer");
             }
@@ -165,6 +173,18 @@ namespace SpaceServices
             return parentDef == "Gravship" ||
                 parentType == "RimWorld.Planet.Gravship" ||
                 parentType == "RimWorld.Gravship";
+        }
+
+        private static bool IsExplicitServiceLayer(string layerDef)
+        {
+            return layerDef == "LAO_Troposphere" ||
+                layerDef == "LAO_Stratosphere" ||
+                layerDef == "LAO_Mesosphere" ||
+                layerDef == "LAO_HighOrbit" ||
+                layerDef == "LAO_Surface_Luna" ||
+                layerDef == "Orbit2" ||
+                layerDef == "Moon" ||
+                layerDef == "MoonReal";
         }
 
         private static bool TypeOrBaseNameContains(object obj, string name)
