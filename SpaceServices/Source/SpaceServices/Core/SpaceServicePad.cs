@@ -250,7 +250,7 @@ namespace SpaceServices
         {
             try
             {
-                return SpaceServiceMapDetector.Evaluate(map);
+                return SpaceServiceMapDetector.EvaluateServiceAccess(map);
             }
             catch (Exception ex)
             {
@@ -325,9 +325,9 @@ namespace SpaceServices
 
         private bool IsGenerallyUsable(out string reason)
         {
-            if (!SpaceServiceMapDetector.IsServiceEligible(parent.Map))
+            if (!SpaceServiceMapDetector.IsServiceActive(parent.Map))
             {
-                reason = "map is not space-service eligible";
+                reason = "map is not enabled for Space Services";
                 return false;
             }
             if (!string.IsNullOrEmpty(reservedForGroup))
@@ -865,6 +865,21 @@ namespace SpaceServices
                     yield return building;
                 }
             }
+        }
+
+        public static bool HasAnyServicePadBuilding(Map map)
+        {
+            if (map == null)
+            {
+                return false;
+            }
+            SpaceServicesMapComponent comp = map.GetComponent<SpaceServicesMapComponent>();
+            List<Thing> cachedPads = comp == null ? null : comp.CachedServicePadBuildings();
+            if (cachedPads != null)
+            {
+                return cachedPads.Any(IsActivePadBuilding);
+            }
+            return map.listerBuildings != null && map.listerBuildings.allBuildingsColonist.Any(IsActivePadBuilding);
         }
 
         public static bool IsActivePadBuilding(Thing pad)

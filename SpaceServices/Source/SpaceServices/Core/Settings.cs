@@ -15,7 +15,7 @@ namespace SpaceServices
 {
     public class SpaceServicesMod : Mod
     {
-        private const float SettingsViewHeight = 900f;
+        private const float SettingsViewHeight = 950f;
         private static Vector2 settingsScrollPosition;
 
         public static SpaceServicesSettings Settings;
@@ -81,6 +81,11 @@ namespace SpaceServices
             Checkbox(listing, "JDB_SpaceServices_Settings_BlockVGEAsteroidShower", ref Settings.blockVgeAsteroidShower);
 
             Section(listing, "JDB_SpaceServices_Settings_SectionExperimental");
+            Checkbox(listing, "JDB_SpaceServices_Settings_GroundsideServicePads", ref Settings.enableGroundsideServicePads);
+            if (Settings.enableGroundsideServicePads)
+            {
+                Settings.groundsideHospitalityShuttleShare = PercentSlider(listing, "JDB_SpaceServices_Settings_GroundsideHospitalityShuttleShare", Settings.groundsideHospitalityShuttleShare);
+            }
             Checkbox(listing, "JDB_SpaceServices_Settings_MedPodBridge", ref Settings.medPodServiceBridge);
             Checkbox(listing, "JDB_SpaceServices_Settings_SuppressMassCasualtyPreDropEffects", ref Settings.suppressMassCasualtyPreDropEffects);
             listing.End();
@@ -117,6 +122,14 @@ namespace SpaceServices
             float next = listing.SliderLabeled(translationKey.Translate(rounded.ToString("0.00")), rounded, 0.5f, 5f, 0.5f, (translationKey + "Desc").Translate());
             return SpaceServicesSettings.QuantizeIntervalDays(next);
         }
+
+        private static float PercentSlider(Listing_Standard listing, string translationKey, float value)
+        {
+            float rounded = SpaceServicesSettings.QuantizeRate(value);
+            int percent = Mathf.RoundToInt(rounded * 100f);
+            float next = listing.SliderLabeled(translationKey.Translate(percent.ToString()), rounded, 0f, 1f, 0.5f, (translationKey + "Desc").Translate());
+            return SpaceServicesSettings.QuantizeRate(next);
+        }
     }
 
     public class SpaceServicesSettings : ModSettings
@@ -145,6 +158,8 @@ namespace SpaceServices
         public bool allowModdedShuttleVisuals = true;
         public bool disablePatientGamblingAddictions = true;
         public bool blockVgeAsteroidShower = true;
+        public bool enableGroundsideServicePads = false;
+        public float groundsideHospitalityShuttleShare = 1f;
         public bool medPodServiceBridge = false;
         public bool suppressMassCasualtyPreDropEffects = false;
 
@@ -185,6 +200,9 @@ namespace SpaceServices
             Scribe_Values.Look(ref allowModdedShuttleVisuals, "allowModdedShuttleVisuals", true);
             Scribe_Values.Look(ref disablePatientGamblingAddictions, "disablePatientGamblingAddictions", true);
             Scribe_Values.Look(ref blockVgeAsteroidShower, "blockVgeAsteroidShower", true);
+            Scribe_Values.Look(ref enableGroundsideServicePads, "enableGroundsideServicePads", false);
+            Scribe_Values.Look(ref groundsideHospitalityShuttleShare, "groundsideHospitalityShuttleShare", 1f);
+            groundsideHospitalityShuttleShare = QuantizeRate(groundsideHospitalityShuttleShare);
             Scribe_Values.Look(ref medPodServiceBridge, "medPodServiceBridge", false);
             Scribe_Values.Look(ref suppressMassCasualtyPreDropEffects, "suppressMassCasualtyPreDropEffects", false);
         }

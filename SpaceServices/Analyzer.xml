@@ -59,7 +59,7 @@
       <li>SpaceServices.HospitalityPatchHandlers:CreateLordPostfix</li>
       <li>SpaceServices.HospitalityPatchHandlers:GuestLeavePrefix</li>
       <li>SpaceServices.HospitalityPatchHandlers:OptimizeApparelGuestPrefix</li>
-      <li>SpaceServices.HospitalityIncidentGate:EstimatedBedDemand</li>
+      <li>SpaceServices.HospitalityIncidentGate:EstimatedBedDemandForIncident</li>
       <li>SpaceServices.HospitalityBedUtility:Report</li>
       <li>SpaceServices.HospitalityBedUtility:PrepareGuestsForServiceDeparture</li>
       <li>SpaceServices.HospitalityBedUtility:GuestBeds</li>

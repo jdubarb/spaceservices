@@ -41,7 +41,7 @@ namespace SpaceServices
 
         private static int CleanupLegacyPassengerShuttleSkyfallers(Map map)
         {
-            if (!SpaceServiceMapDetector.IsServiceEligible(map))
+            if (!SpaceServiceMapDetector.IsServiceActive(map))
             {
                 return 0;
             }
@@ -80,7 +80,7 @@ namespace SpaceServices
 
         private static int CleanupOrphanedServiceShuttlePayloads(Map map)
         {
-            if (!SpaceServiceMapDetector.IsServiceEligible(map))
+            if (!SpaceServiceMapDetector.IsServiceActive(map))
             {
                 return 0;
             }

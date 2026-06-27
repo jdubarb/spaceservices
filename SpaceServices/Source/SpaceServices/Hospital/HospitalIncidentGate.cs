@@ -53,11 +53,11 @@ namespace SpaceServices
             {
                 return false;
             }
-            if (SpaceServiceMapDetector.IsServiceEligible(map) && ServicePadUtility.CountServicePads(map, ServiceUse.Patient) <= 0)
+            if (SpaceServiceMapDetector.IsServiceActive(map) && ServicePadUtility.CountServicePads(map, ServiceUse.Patient) <= 0)
             {
                 return false;
             }
-            if (SpaceServiceMapDetector.IsServiceEligible(map) && applyPriorityThrottle && !ServicePadUtility.PriorityThrottleAllows(map, ServiceUse.Patient, out _))
+            if (SpaceServiceMapDetector.IsServiceActive(map) && applyPriorityThrottle && !ServicePadUtility.PriorityThrottleAllows(map, ServiceUse.Patient, out _))
             {
                 return false;
             }

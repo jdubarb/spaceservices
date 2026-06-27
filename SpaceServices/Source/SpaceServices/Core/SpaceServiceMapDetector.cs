@@ -114,6 +114,44 @@ namespace SpaceServices
             return map != null && CachedOrEvaluate(map).allowed;
         }
 
+        public static bool IsServiceActive(Map map)
+        {
+            if (map == null)
+            {
+                return false;
+            }
+            if (IsServiceEligible(map))
+            {
+                return true;
+            }
+            return IsGroundsideServiceActive(map);
+        }
+
+        public static SpaceServiceEligibility EvaluateServiceAccess(Map map)
+        {
+            SpaceServiceEligibility result = Evaluate(map);
+            if (!result.allowed && IsGroundsideServiceActive(map))
+            {
+                result.allowed = true;
+                result.allowReasons.Add("experimental groundside service pads");
+            }
+            return result;
+        }
+
+        public static bool IsGroundsideServiceActive(Map map)
+        {
+            if (SpaceServicesMod.Settings == null || !SpaceServicesMod.Settings.enableGroundsideServicePads)
+            {
+                return false;
+            }
+            SpaceServiceEligibility eligibility = CachedOrEvaluate(map);
+            if (eligibility.allowed || eligibility.blockReasons.Count > 0 || eligibility.allowReasons.Count > 0)
+            {
+                return false;
+            }
+            return ServicePadUtility.HasAnyServicePadBuilding(map);
+        }
+
         private static SpaceServiceEligibility CachedOrEvaluate(Map map)
         {
             int tick = Find.TickManager == null ? 0 : Find.TickManager.TicksGame;

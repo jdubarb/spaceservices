@@ -37,6 +37,7 @@ namespace SpaceServices
         private List<string> trafficRateProgressKeys;
         private List<float> trafficRateProgressValues;
         private int lastServiceArrivalTick = -999999;
+        internal const float MinimumHospitalityVisitorPoints = 40f;
         public int debugHospitalPatientLimit = -1;
         public int debugHospitalityGroupLimit = -1;
         public int debugHospitalityPawnLimit = -1;
@@ -213,7 +214,7 @@ namespace SpaceServices
             nextDebugTick = Find.TickManager.TicksGame + GenDate.TicksPerDay;
             if (SpaceServicesMod.Settings != null && SpaceServicesMod.Settings.debugLogging)
             {
-                SpaceServiceEligibility eligibility = SpaceServiceMapDetector.Evaluate(map);
+                SpaceServiceEligibility eligibility = SpaceServiceMapDetector.EvaluateServiceAccess(map);
                 ServiceDebugUtility.LogVerbose(ServiceLogIntegration.Core, eligibility.ToLogString(map));
             }
         }
@@ -520,26 +521,31 @@ namespace SpaceServices
             pendingShuttleArrivals.Add(arrival);
         }
 
-        public bool ScheduleHospitalityIncident(object worker, IncidentParms parms, Thing pad, string shuttleThingDefName, string shuttleVisualDefName)
+        public bool ScheduleHospitalityIncident(object worker, IncidentParms parms, Thing pad, string shuttleThingDefName, string shuttleVisualDefName, out string reason)
         {
+            reason = null;
             if (worker == null || parms == null || pad == null || pad.Destroyed || !pad.Spawned)
             {
+                reason = "invalid scheduled visitor input";
                 ServiceDebugUtility.LogAudit("ScheduleHospitalityIncident rejected invalid input worker=" + (worker != null) + " parms=" + (parms != null) + " pad=" + ServiceDebugUtility.ThingAuditSummary(pad));
                 return false;
             }
-            int expectedBedDemand = HospitalityIncidentGate.EstimatedBedDemand(IncidentDefName(worker), worker);
+            int expectedBedDemand = HospitalityIncidentGate.EstimatedBedDemandForIncident(IncidentDefName(worker), worker, parms, map);
             if (HospitalityIncidentGate.RequiresGuestBedCapacity() && HospitalityBedUtility.Report(map).freeBeds < expectedBedDemand)
             {
+                reason = "not enough free guest beds, need " + expectedBedDemand + " (" + HospitalityBedUtility.Report(map).ToSummary() + ")";
                 ServiceDebugUtility.LogAudit("ScheduleHospitalityIncident rejected beds need=" + expectedBedDemand + " " + HospitalityBedUtility.Report(map).ToSummary());
                 return false;
             }
             if (ServiceDangerUtility.HospitalityTrafficBlocked(map, out string dangerReason))
             {
+                reason = dangerReason;
                 ServiceDebugUtility.LogAudit("ScheduleHospitalityIncident rejected danger=" + dangerReason);
                 return false;
             }
             if (ServiceDangerUtility.ArrivalTrafficBlocked(map, "hospitality", out string trafficReason))
             {
+                reason = trafficReason;
                 ServiceDebugUtility.LogAudit("ScheduleHospitalityIncident rejected traffic hazard=" + trafficReason);
                 return false;
             }
@@ -547,20 +553,25 @@ namespace SpaceServices
             CompSpaceServicePad comp = pad.TryGetComp<CompSpaceServicePad>();
             if (comp == null || !comp.TryReserve(reservationId))
             {
+                reason = comp == null ? "pad is not a service pad" : "pad already reserved";
                 ServiceDebugUtility.LogAudit("ScheduleHospitalityIncident rejected reservation id=" + reservationId + " pad=" + ServiceDebugUtility.ThingAuditSummary(pad) + " comp=" + (comp != null));
                 return false;
             }
+            IncidentParms savedParms = CloneHospitalityParms(parms, map, pad);
             // The Hospitality incident still does the actual pawn generation. We only delay it until the
             // shuttle visual reaches touchdown, so any native faction/guest setup remains intact.
             pendingHospitalityIncidents.Add(new ScheduledHospitalityIncident
             {
                 worker = worker,
-                parms = parms,
+                parms = savedParms,
                 pad = pad,
                 incidentDef = Reflect.GetMember(worker, "def") as IncidentDef,
-                faction = parms.faction,
-                spawnCenter = parms.spawnCenter,
-                sendLetter = parms.sendLetter,
+                faction = savedParms.faction,
+                spawnCenter = savedParms.spawnCenter,
+                sendLetter = savedParms.sendLetter,
+                points = savedParms.points,
+                pawnCount = savedParms.pawnCount,
+                pawnKind = savedParms.pawnKind,
                 reservationId = reservationId,
                 incidentDefName = IncidentDefName(worker),
                 expectedBedDemand = expectedBedDemand,
@@ -570,6 +581,27 @@ namespace SpaceServices
             });
             ServiceDebugUtility.LogAudit("ScheduleHospitalityIncident queued id=" + reservationId + " incident=" + IncidentDefName(worker) + " beds=" + expectedBedDemand + " pad=" + ServiceDebugUtility.ThingAuditSummary(pad) + " touchdownTick=" + (Find.TickManager.TicksGame + ServiceShuttleUtility.ArrivalTouchdownDelayTicks));
             return true;
+        }
+
+        private static IncidentParms CloneHospitalityParms(IncidentParms source, Map map, Thing pad)
+        {
+            IncidentParms clone = new IncidentParms
+            {
+                target = map,
+                faction = source == null ? null : source.faction,
+                spawnCenter = pad != null && !pad.Destroyed ? pad.Position : source == null ? IntVec3.Invalid : source.spawnCenter,
+                sendLetter = source == null || source.sendLetter,
+                points = Math.Max(source == null ? 0f : source.points, MinimumHospitalityVisitorPoints),
+                pawnCount = source == null ? 0 : source.pawnCount,
+                pawnKind = source == null ? null : source.pawnKind
+            };
+            if (source != null)
+            {
+                clone.quest = source.quest;
+                clone.raidArrivalMode = source.raidArrivalMode;
+                clone.raidStrategy = source.raidStrategy;
+            }
+            return clone;
         }
 
         private void TickPendingHospitalityIncidents()
@@ -589,14 +621,18 @@ namespace SpaceServices
                 incident.EnsureRuntime(map);
                 if (incident.pad == null || incident.pad.Destroyed || !incident.pad.Spawned || incident.worker == null || incident.parms == null)
                 {
-                    ServiceDebugUtility.LogAudit("TickPendingHospitalityIncidents dropping invalid pending incident reservation=" + incident.reservationId + " pad=" + ServiceDebugUtility.ThingAuditSummary(incident.pad) + " worker=" + (incident.worker != null) + " parms=" + (incident.parms != null));
+                    string invalidReason = "scheduled visitor data became invalid";
+                    ServiceDebugUtility.LogAudit("TickPendingHospitalityIncidents dropping invalid pending incident reservation=" + incident.reservationId + " reason=" + invalidReason + " pad=" + ServiceDebugUtility.ThingAuditSummary(incident.pad) + " worker=" + (incident.worker != null) + " parms=" + (incident.parms != null));
+                    Messages.Message("Space Services: visitor arrival waved off, " + invalidReason, incident.pad, MessageTypeDefOf.RejectInput, false);
                     ReleaseArrivalReservation(incident);
                     continue;
                 }
-                if (!HospitalityStillEnabledForMap(map) || !PadStillUsableForGuests(incident.pad))
+                string padReason = null;
+                if (!HospitalityStillEnabledForMap(map) || !PadStillUsableForGuests(incident.pad, out padReason))
                 {
-                    ServiceDebugUtility.LogAudit("TickPendingHospitalityIncidents canceled unusable pad reservation=" + incident.reservationId + " pad=" + ServiceDebugUtility.ThingAuditSummary(incident.pad));
-                    Messages.Message("Space Services: visitor arrival canceled, landing pad is no longer usable", incident.pad, MessageTypeDefOf.RejectInput, false);
+                    string reason = !HospitalityStillEnabledForMap(map) ? "hospitality disabled or map is not enabled" : padReason ?? "landing pad is no longer usable";
+                    ServiceDebugUtility.LogAudit("TickPendingHospitalityIncidents canceled unusable pad reservation=" + incident.reservationId + " reason=" + reason + " pad=" + ServiceDebugUtility.ThingAuditSummary(incident.pad));
+                    Messages.Message("Space Services: visitor arrival canceled, " + reason, incident.pad, MessageTypeDefOf.RejectInput, false);
                     ServiceShuttleUtility.CleanupTouchdownShuttle(map, incident.pad.Position, incident.shuttleThingDefName);
                     ServiceShuttleUtility.SpawnDeparture(map, incident.pad.Position, "hospitality", incident.shuttleVisualDefName);
                     ReleaseArrivalReservation(incident);
@@ -624,7 +660,7 @@ namespace SpaceServices
                 int expectedBedDemand = Math.Max(1, incident.expectedBedDemand);
                 if (HospitalityIncidentGate.RequiresGuestBedCapacity() && beds.freeBeds < expectedBedDemand)
                 {
-                    Messages.Message("Space Services: visitor arrival canceled, no free guest beds", incident.pad, MessageTypeDefOf.RejectInput, false);
+                    Messages.Message("Space Services: visitor arrival canceled, need " + expectedBedDemand + " free guest beds (" + beds.ToSummary() + ")", incident.pad, MessageTypeDefOf.RejectInput, false);
                     ServiceDebugUtility.LogAudit("TickPendingHospitalityIncidents canceled beds reservation=" + incident.reservationId + " need=" + expectedBedDemand + " " + beds.ToSummary());
                     ServiceDebugUtility.LogThrottled("hospitality-touchdown-beds-" + (incident.incidentDefName ?? ""), "Hospitality visitor arrival canceled at touchdown: need " + expectedBedDemand + ", " + beds.ToSummary(), GenDate.TicksPerHour);
                     ServiceShuttleUtility.CleanupTouchdownShuttle(map, incident.pad.Position, incident.shuttleThingDefName);
@@ -635,6 +671,11 @@ namespace SpaceServices
                 if (!ServiceLifecycleUtility.TryClearPadFootprintForServiceShuttle(incident.pad, "hospitality", "hospitality arrival touchdown", out string clearReason))
                 {
                     incident.touchdownTick = Find.TickManager.TicksGame + 250;
+                    if (Find.TickManager.TicksGame - incident.lastTouchdownDelayMessageTick >= GenDate.TicksPerHour)
+                    {
+                        incident.lastTouchdownDelayMessageTick = Find.TickManager.TicksGame;
+                        Messages.Message("Space Services: visitor shuttle waiting, " + clearReason, incident.pad, MessageTypeDefOf.RejectInput, false);
+                    }
                     pendingHospitalityIncidents.Add(incident);
                     ServiceDebugUtility.LogThrottled(ServiceLogIntegration.Hospitality, "hospitality-touchdown-pad-occupied-" + incident.reservationId, "Hospitality visitor touchdown delayed because the service pad could not be cleared: " + clearReason, 250);
                     continue;
@@ -647,12 +688,14 @@ namespace SpaceServices
                 // This context tells Hospitality spawn hooks which service pad owns the native spawn.
                 HospitalityDelayedIncidentContext.Push(map, incident.pad);
                 bool executed = false;
+                string executionFailureReason = null;
                 try
                 {
                     MethodInfo method = AccessTools.Method(incident.worker.GetType(), "TryExecuteWorker");
                     if (method == null)
                     {
-                        ServiceDebugUtility.LogWarning(ServiceLogIntegration.Hospitality, "Delayed Hospitality visitor arrival failed: TryExecuteWorker not found on " + incident.worker.GetType().FullName);
+                        executionFailureReason = "Hospitality TryExecuteWorker not found";
+                        ServiceDebugUtility.LogWarning(ServiceLogIntegration.Hospitality, "Delayed Hospitality visitor arrival failed: " + executionFailureReason + " on " + incident.worker.GetType().FullName);
                     }
                     else
                     {
@@ -660,17 +703,21 @@ namespace SpaceServices
                         executed = result is bool && (bool)result;
                         if (!executed)
                         {
-                            ServiceDebugUtility.LogWarning(ServiceLogIntegration.Hospitality, "Delayed Hospitality visitor arrival waved off: TryExecuteWorker returned false for " + (incident.incidentDefName ?? "unknown"));
+                            string report = HospitalityIncidentGate.ReadinessReport(incident.incidentDefName ?? "VisitorGroup", map, incident.worker);
+                            executionFailureReason = report == "ready" ? "Hospitality rejected the visitor group after touchdown; see the log for faction and points details" : "Hospitality rejected the visitor group: " + report;
+                            ServiceDebugUtility.LogWarning(ServiceLogIntegration.Hospitality, "Delayed Hospitality visitor arrival waved off: TryExecuteWorker returned false for " + (incident.incidentDefName ?? "unknown") + ", report=" + report + ", points=" + incident.parms.points + ", faction=" + (incident.parms.faction == null ? "null" : incident.parms.faction.Name));
                         }
                     }
                 }
                 catch (TargetInvocationException ex)
                 {
                     Exception inner = ex.InnerException ?? ex;
+                    executionFailureReason = "Hospitality failed: " + inner.GetType().Name + " " + inner.Message;
                     ServiceDebugUtility.LogWarning(ServiceLogIntegration.Hospitality, "Delayed Hospitality visitor arrival failed: " + inner.GetType().Name + " " + inner.Message);
                 }
                 catch (Exception ex)
                 {
+                    executionFailureReason = "Hospitality failed: " + ex.GetType().Name + " " + ex.Message;
                     ServiceDebugUtility.LogWarning(ServiceLogIntegration.Hospitality, "Delayed Hospitality visitor arrival failed: " + ex.GetType().Name + " " + ex.Message);
                 }
                 finally
@@ -679,7 +726,7 @@ namespace SpaceServices
                 }
                 if (!executed)
                 {
-                    Messages.Message("Space Services: visitor arrival waved off", incident.pad, MessageTypeDefOf.RejectInput, false);
+                    Messages.Message("Space Services: visitor arrival waved off, " + (executionFailureReason ?? "unknown Hospitality rejection"), incident.pad, MessageTypeDefOf.RejectInput, false);
                 }
                 ServiceShuttleUtility.SpawnDeparture(map, incident.pad.Position, "hospitality", incident.shuttleVisualDefName);
             }
@@ -730,6 +777,12 @@ namespace SpaceServices
                 reason = "visitor shuttle already inbound";
                 return false;
             }
+            if (!ServiceIncidentUtility.ShouldRouteGroundsideHospitalityThroughService(map))
+            {
+                reason = "groundside native Hospitality selected";
+                ServiceDebugUtility.LogVerbose(ServiceLogIntegration.Hospitality, "Skipped fallback Hospitality service visit because groundside shuttle share rolled native.");
+                return true;
+            }
 
             IncidentDef incidentDef = DefDatabase<IncidentDef>.GetNamedSilentFail("VisitorGroup");
             IncidentWorker worker = incidentDef == null ? null : incidentDef.Worker;
@@ -750,7 +803,7 @@ namespace SpaceServices
                 reason = HospitalityIncidentGate.ReadinessReport(incidentDef.defName, map, worker);
                 return false;
             }
-            if (!TryFindHospitalityFaction(out Faction faction))
+            if (!TryFindHospitalityFaction(worker, map, out Faction faction))
             {
                 reason = "no friendly humanlike guest faction";
                 return false;
@@ -774,9 +827,9 @@ namespace SpaceServices
                 reason = "service pad could not be cleared: " + clearReason;
                 return false;
             }
-            if (!ScheduleHospitalityIncident(worker, parms, pad, visual == null || visual.shipThingDef == null ? null : visual.shipThingDef.defName, visual == null ? null : visual.id))
+            if (!ScheduleHospitalityIncident(worker, parms, pad, visual == null || visual.shipThingDef == null ? null : visual.shipThingDef.defName, visual == null ? null : visual.id, out string scheduleReason))
             {
-                reason = "could not reserve service pad";
+                reason = scheduleReason ?? "could not reserve service pad";
                 return false;
             }
 
@@ -786,10 +839,10 @@ namespace SpaceServices
             return true;
         }
 
-        private static bool TryFindHospitalityFaction(out Faction faction)
+        private static bool TryFindHospitalityFaction(object worker, Map map, out Faction faction)
         {
             List<Faction> candidates = Find.FactionManager.AllFactionsListForReading
-                .Where(f => f != null && !f.IsPlayer && !f.defeated && !f.temporary && f.def != null && f.def.humanlikeFaction && !f.def.hidden && !f.HostileTo(Faction.OfPlayer))
+                .Where(f => IsFallbackHospitalityFactionCandidate(worker, map, f))
                 .ToList();
             if (candidates.Count == 0)
             {
@@ -798,6 +851,76 @@ namespace SpaceServices
             }
             faction = candidates[Rand.Range(0, candidates.Count)];
             return true;
+        }
+
+        private static bool IsFallbackHospitalityFactionCandidate(object worker, Map map, Faction faction)
+        {
+            if (faction == null || faction.IsPlayer || faction.defeated || faction.temporary || faction.def == null || !faction.def.humanlikeFaction || faction.def.hidden || faction.HostileTo(Faction.OfPlayer))
+            {
+                return false;
+            }
+            if (faction.def.pawnGroupMakers.NullOrEmpty() || !faction.def.pawnGroupMakers.Any(maker => maker != null && maker.kindDef == PawnGroupKindDefOf.Peaceful))
+            {
+                return false;
+            }
+            if (HospitalityWorkerAcceptsFaction(worker, map, faction, out bool accepted))
+            {
+                return accepted;
+            }
+            return true;
+        }
+
+        private static bool HospitalityWorkerAcceptsFaction(object worker, Map map, Faction faction, out bool accepted)
+        {
+            accepted = false;
+            if (worker == null || faction == null)
+            {
+                return false;
+            }
+            foreach (MethodInfo method in worker.GetType().GetMethods(BindingFlags.Instance | BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic).Where(method => method.Name == "FactionCanBeGroupSource"))
+            {
+                ParameterInfo[] parameters = method.GetParameters();
+                object[] args = new object[parameters.Length];
+                bool supported = true;
+                for (int i = 0; i < parameters.Length; i++)
+                {
+                    Type type = parameters[i].ParameterType;
+                    if (type == typeof(Faction))
+                    {
+                        args[i] = faction;
+                    }
+                    else if (type == typeof(Map))
+                    {
+                        args[i] = map;
+                    }
+                    else if (type == typeof(IncidentParms))
+                    {
+                        args[i] = new IncidentParms { target = map, faction = faction, points = MinimumHospitalityVisitorPoints };
+                    }
+                    else
+                    {
+                        supported = false;
+                        break;
+                    }
+                }
+                if (!supported)
+                {
+                    continue;
+                }
+                try
+                {
+                    object result = method.Invoke(method.IsStatic ? null : worker, args);
+                    if (result is bool)
+                    {
+                        accepted = (bool)result;
+                        return true;
+                    }
+                }
+                catch
+                {
+                }
+            }
+            return false;
         }
 
         private void ScheduleNextHospitalityServiceVisit(int delayTicks)
@@ -830,10 +953,20 @@ namespace SpaceServices
             return Math.Max(GenDate.TicksPerHour, Mathf.RoundToInt(variedDays * GenDate.TicksPerDay));
         }
 
-        private static bool PadStillUsableForGuests(Thing pad)
+        private static bool PadStillUsableForGuests(Thing pad, out string reason)
         {
+            reason = null;
             CompSpaceServicePad comp = pad == null ? null : pad.TryGetComp<CompSpaceServicePad>();
-            return comp != null && comp.MeetsUseRequirements(ServiceUse.Guest);
+            if (comp == null)
+            {
+                reason = "landing pad is no longer a service pad";
+                return false;
+            }
+            if (!comp.MeetsUseRequirements(ServiceUse.Guest, out reason))
+            {
+                return false;
+            }
+            return true;
         }
 
         private static bool HospitalityStillEnabledForMap(Map map)
@@ -842,7 +975,7 @@ namespace SpaceServices
             {
                 return false;
             }
-            return map != null && SpaceServiceMapDetector.IsServiceEligible(map);
+            return map != null && SpaceServiceMapDetector.IsServiceActive(map);
         }
 
         private static void ReleaseArrivalReservation(ScheduledHospitalityIncident incident)
@@ -910,12 +1043,16 @@ namespace SpaceServices
         public Faction faction;
         public IntVec3 spawnCenter;
         public bool sendLetter = true;
+        public float points;
+        public int pawnCount;
+        public PawnKindDef pawnKind;
         public string reservationId;
         public string incidentDefName;
         public int expectedBedDemand;
         public string shuttleThingDefName;
         public string shuttleVisualDefName;
         public int touchdownTick;
+        public int lastTouchdownDelayMessageTick = -999999;
 
         public void ExposeData()
         {
@@ -924,12 +1061,16 @@ namespace SpaceServices
             Scribe_References.Look(ref pad, "pad");
             Scribe_Values.Look(ref spawnCenter, "spawnCenter", IntVec3.Invalid);
             Scribe_Values.Look(ref sendLetter, "sendLetter", true);
+            Scribe_Values.Look(ref points, "points", 0f);
+            Scribe_Values.Look(ref pawnCount, "pawnCount", 0);
+            Scribe_Defs.Look(ref pawnKind, "pawnKind");
             Scribe_Values.Look(ref reservationId, "reservationId");
             Scribe_Values.Look(ref incidentDefName, "incidentDefName");
             Scribe_Values.Look(ref expectedBedDemand, "expectedBedDemand", 1);
             Scribe_Values.Look(ref shuttleThingDefName, "shuttleThingDefName");
             Scribe_Values.Look(ref shuttleVisualDefName, "shuttleVisualDefName");
             Scribe_Values.Look(ref touchdownTick, "touchdownTick", 0);
+            Scribe_Values.Look(ref lastTouchdownDelayMessageTick, "lastTouchdownDelayMessageTick", -999999);
             if (Scribe.mode == LoadSaveMode.PostLoadInit && incidentDef == null && !string.IsNullOrEmpty(incidentDefName))
             {
                 incidentDef = DefDatabase<IncidentDef>.GetNamedSilentFail(incidentDefName);
@@ -957,6 +1098,9 @@ namespace SpaceServices
             parms.faction = faction;
             parms.spawnCenter = pad != null && !pad.Destroyed ? pad.Position : spawnCenter;
             parms.sendLetter = sendLetter;
+            parms.points = Math.Max(points, SpaceServicesMapComponent.MinimumHospitalityVisitorPoints);
+            parms.pawnCount = pawnCount;
+            parms.pawnKind = pawnKind;
         }
     }
 }

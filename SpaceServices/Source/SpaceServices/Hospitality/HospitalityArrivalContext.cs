@@ -126,6 +126,64 @@ namespace SpaceServices
         }
     }
 
+    public static class HospitalityGroundsideNativeContext
+    {
+        private sealed class Request
+        {
+            public Map map;
+        }
+
+        private static readonly Stack<Request> Requests = new Stack<Request>();
+
+        public static void Push(Map map)
+        {
+            if (map != null)
+            {
+                Requests.Push(new Request { map = map });
+            }
+        }
+
+        public static void Pop(Map map)
+        {
+            if (Requests.Count > 0 && Requests.Peek().map == map)
+            {
+                Requests.Pop();
+            }
+        }
+
+        public static bool IsActive(Map map)
+        {
+            foreach (Request request in Requests)
+            {
+                if (request != null && request.map == map)
+                {
+                    return true;
+                }
+            }
+            return false;
+        }
+
+        public static Action WrapAction(Map map, Action action)
+        {
+            if (action == null || map == null)
+            {
+                return action;
+            }
+            return delegate
+            {
+                Push(map);
+                try
+                {
+                    action();
+                }
+                finally
+                {
+                    Pop(map);
+                }
+            };
+        }
+    }
+
     public static class HospitalityDelayedIncidentContext
     {
         private sealed class Request

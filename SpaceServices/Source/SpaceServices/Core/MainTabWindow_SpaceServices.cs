@@ -51,7 +51,7 @@ namespace SpaceServices
         private static void DrawOverview(Listing_Standard listing, Map map)
         {
             SpaceServicesMapComponent comp = map.GetComponent<SpaceServicesMapComponent>();
-            SpaceServiceEligibility eligibility = SpaceServiceMapDetector.Evaluate(map);
+            SpaceServiceEligibility eligibility = SpaceServiceMapDetector.EvaluateServiceAccess(map);
             listing.Label("JDB_SpaceServices_Panel_MapStatus".Translate(eligibility.allowed ? "eligible" : "blocked"));
             if (!eligibility.allowed && eligibility.blockReasons.Count > 0)
             {
@@ -107,7 +107,7 @@ namespace SpaceServices
             float width = (row.width - 8f) / 2f;
             if (Widgets.ButtonText(new Rect(row.x, row.y, width, row.height), "JDB_SpaceServices_Panel_ReportMap".Translate()))
             {
-                SpaceServiceEligibility eligibility = SpaceServiceMapDetector.Evaluate(map);
+                SpaceServiceEligibility eligibility = SpaceServiceMapDetector.EvaluateServiceAccess(map);
                 ServiceDebugUtility.Log(ServiceLogIntegration.Core, eligibility.ToLogString(map));
                 Messages.Message(eligibility.allowed ? "Space Services: map eligible" : "Space Services: map blocked", MessageTypeDefOf.NeutralEvent, false);
             }

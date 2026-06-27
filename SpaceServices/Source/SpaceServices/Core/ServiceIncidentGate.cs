@@ -162,6 +162,24 @@ namespace SpaceServices
             return TrafficRateFor(incidentDefName).ToString("0.00") + "x";
         }
 
+        public static bool ShouldRouteGroundsideHospitalityThroughService(Map map)
+        {
+            if (!SpaceServiceMapDetector.IsGroundsideServiceActive(map))
+            {
+                return true;
+            }
+            float share = SpaceServicesMod.Settings == null ? 1f : SpaceServicesSettings.QuantizeRate(SpaceServicesMod.Settings.groundsideHospitalityShuttleShare);
+            if (share <= 0f)
+            {
+                return false;
+            }
+            if (share >= 1f)
+            {
+                return true;
+            }
+            return Rand.Chance(share);
+        }
+
         public static bool TryConsumeSharedTrafficSlot(Map map, string reason)
         {
             if (IsDebugIncidentExecution())

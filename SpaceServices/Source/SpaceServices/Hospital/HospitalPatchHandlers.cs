@@ -31,7 +31,7 @@ namespace SpaceServices
                 return;
             }
             Map map = OptionalPatchUtility.FindMap(__args);
-            if (map != null && SpaceServiceMapDetector.IsServiceEligible(map) && ServicePadUtility.TryFindServicePadCell(map, ServiceUse.Patient, out IntVec3 cell))
+            if (map != null && SpaceServiceMapDetector.IsServiceActive(map) && ServicePadUtility.TryFindServicePadCell(map, ServiceUse.Patient, out IntVec3 cell))
             {
                 __result = cell;
             }
@@ -43,7 +43,7 @@ namespace SpaceServices
             {
                 return;
             }
-            if (map == null || !SpaceServiceMapDetector.IsServiceEligible(map))
+            if (map == null || !SpaceServiceMapDetector.IsServiceActive(map))
             {
                 return;
             }
@@ -57,7 +57,7 @@ namespace SpaceServices
                 return true;
             }
             Map map = parms == null ? null : parms.target as Map;
-            if (map == null || !SpaceServiceMapDetector.IsServiceEligible(map))
+            if (map == null || !SpaceServiceMapDetector.IsServiceActive(map))
             {
                 return true;
             }
@@ -90,7 +90,7 @@ namespace SpaceServices
             {
                 return;
             }
-            if (map == null || !SpaceServiceMapDetector.IsServiceEligible(map))
+            if (map == null || !SpaceServiceMapDetector.IsServiceActive(map))
             {
                 return;
             }
@@ -108,7 +108,7 @@ namespace SpaceServices
                 return;
             }
             Map map = OptionalPatchUtility.FindMap(__args);
-            if (map == null || !SpaceServiceMapDetector.IsServiceEligible(map))
+            if (map == null || !SpaceServiceMapDetector.IsServiceActive(map))
             {
                 HospitalMassCasualtyVisualContext.Push(false);
                 HospitalLandingRedirectContext.Push(null, IntVec3.Invalid, null);
@@ -149,7 +149,7 @@ namespace SpaceServices
                     IntVec3 cell = hasArrivalCell ? arrivalCell : pawn != null && pawn.Spawned ? pawn.Position : IntVec3.Invalid;
                     VacSuitUtility.SuitPawnForEnvironment(pawn, map, cell);
                 }
-                if (map != null && pawns.Count > 0 && SpaceServiceMapDetector.IsServiceEligible(map))
+                if (map != null && pawns.Count > 0 && SpaceServiceMapDetector.IsServiceActive(map))
                 {
                     ServiceLifecycleUtility.RegisterPawns(map, "hospital", pawns);
                 }
@@ -182,7 +182,7 @@ namespace SpaceServices
             {
                 return true;
             }
-            if (map == null || !SpaceServiceMapDetector.IsServiceEligible(map))
+            if (map == null || !SpaceServiceMapDetector.IsServiceActive(map))
             {
                 return true;
             }
@@ -237,7 +237,7 @@ namespace SpaceServices
             {
                 return;
             }
-            if (!__result || pawn == null || pawn.Map == null || !SpaceServiceMapDetector.IsServiceEligible(pawn.Map))
+            if (!__result || pawn == null || pawn.Map == null || !SpaceServiceMapDetector.IsServiceActive(pawn.Map))
             {
                 return;
             }
@@ -256,7 +256,7 @@ namespace SpaceServices
             {
                 return;
             }
-            if (__result != null || pawn == null || pawn.Map == null || !SpaceServiceMapDetector.IsServiceEligible(pawn.Map))
+            if (__result != null || pawn == null || pawn.Map == null || !SpaceServiceMapDetector.IsServiceActive(pawn.Map))
             {
                 return;
             }
@@ -299,7 +299,7 @@ namespace SpaceServices
             {
                 return;
             }
-            if (pawn == null || pawn.Map == null || !SpaceServiceMapDetector.IsServiceEligible(pawn.Map))
+            if (pawn == null || pawn.Map == null || !SpaceServiceMapDetector.IsServiceActive(pawn.Map))
             {
                 return;
             }
@@ -604,7 +604,7 @@ namespace SpaceServices
                     return;
                 }
                 Map map = parms.target as Map;
-                if (map == null || !SpaceServiceMapDetector.IsServiceEligible(map))
+                if (map == null || !SpaceServiceMapDetector.IsServiceActive(map))
                 {
                     return;
                 }

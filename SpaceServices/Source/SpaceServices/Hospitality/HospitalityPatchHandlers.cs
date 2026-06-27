@@ -25,7 +25,7 @@ namespace SpaceServices
                 return true;
             }
             Map map = parms == null ? null : parms.target as Map;
-            if (map == null || !SpaceServiceMapDetector.IsServiceEligible(map))
+            if (map == null || !SpaceServiceMapDetector.IsServiceActive(map))
             {
                 return true;
             }
@@ -33,6 +33,20 @@ namespace SpaceServices
 
             IncidentDef incident = Reflect.GetMember(__instance, "def") as IncidentDef;
             string incidentDefName = incident == null ? "VisitorGroup" : incident.defName;
+            if (HospitalityDelayedIncidentContext.TryGetPad(map, out Thing delayedPad))
+            {
+                parms.spawnCenter = delayedPad.Position;
+                HospitalityArrivalContext.Push(map, delayedPad, true);
+                ServiceDebugUtility.LogAudit("Hospitality VisitorGroup executing delayed touchdown pad=" + ServiceDebugUtility.ThingAuditSummary(delayedPad));
+                return true;
+            }
+            if (!ServiceIncidentUtility.ShouldRouteGroundsideHospitalityThroughService(map))
+            {
+                HospitalityGroundsideNativeContext.Push(map);
+                ServiceDebugUtility.LogAudit("Hospitality VisitorGroup passing through native groundside arrival by shuttle-share roll.");
+                return true;
+            }
+
             if (!HospitalityIncidentGate.CanAcceptHospitalityIncident(incidentDefName, map, __instance, false))
             {
                 string report = HospitalityIncidentGate.ReadinessReport(incidentDefName, map, __instance);
@@ -40,14 +54,6 @@ namespace SpaceServices
                 ServiceDebugUtility.LogThrottled("hospitality-block-" + incidentDefName + "-" + report, "Hospitality visitor incident blocked: " + report, GenDate.TicksPerHour);
                 __result = false;
                 return false;
-            }
-
-            if (HospitalityDelayedIncidentContext.TryGetPad(map, out Thing delayedPad))
-            {
-                parms.spawnCenter = delayedPad.Position;
-                HospitalityArrivalContext.Push(map, delayedPad, true);
-                ServiceDebugUtility.LogAudit("Hospitality VisitorGroup executing delayed touchdown pad=" + ServiceDebugUtility.ThingAuditSummary(delayedPad));
-                return true;
             }
 
             if (!ServiceIncidentUtility.TrafficRateAllows(incidentDefName, map))
@@ -69,7 +75,8 @@ namespace SpaceServices
                 }
                 parms.spawnCenter = pad.Position;
                 SpaceServicesMapComponent comp = map.GetComponent<SpaceServicesMapComponent>();
-                if (comp != null && comp.ScheduleHospitalityIncident(__instance, parms, pad, visual.shipThingDef == null ? null : visual.shipThingDef.defName, visual.id))
+                string scheduleReason = null;
+                if (comp != null && comp.ScheduleHospitalityIncident(__instance, parms, pad, visual.shipThingDef == null ? null : visual.shipThingDef.defName, visual.id, out scheduleReason))
                 {
                     ServiceDebugUtility.LogAudit("Hospitality VisitorGroup scheduled shuttle arrival pad=" + ServiceDebugUtility.ThingAuditSummary(pad) + " visual=" + (visual.shipThingDef == null ? "none" : visual.shipThingDef.defName));
                     ServiceShuttleUtility.SpawnArrival(map, pad.Position, visual);
@@ -77,6 +84,7 @@ namespace SpaceServices
                     __result = true;
                     return false;
                 }
+                ServiceDebugUtility.LogThrottled(ServiceLogIntegration.Hospitality, "hospitality-arrival-schedule-rejected-" + incidentDefName, "Hospitality visitor shuttle not scheduled: " + (scheduleReason ?? "unknown reason"), GenDate.TicksPerHour);
             }
 
             if (ServicePadUtility.TryFindNearestServicePadCell(map, ServiceUse.Guest, parms == null ? IntVec3.Invalid : parms.spawnCenter, out IntVec3 cell))
@@ -95,10 +103,11 @@ namespace SpaceServices
                 return;
             }
             Map map = parms == null ? null : parms.target as Map;
-            if (map != null && SpaceServiceMapDetector.IsServiceEligible(map))
+            if (map != null && SpaceServiceMapDetector.IsServiceActive(map))
             {
                 HospitalityArrivalContext.FinalizeArrival(map);
                 HospitalityArrivalContext.Pop(map);
+                HospitalityGroundsideNativeContext.Pop(map);
             }
         }
 
@@ -113,21 +122,29 @@ namespace SpaceServices
                 return;
             }
             Map map = parms == null ? null : parms.target as Map;
-            if (map != null && SpaceServiceMapDetector.IsServiceEligible(map))
+            if (map != null && SpaceServiceMapDetector.IsServiceActive(map))
             {
                 HospitalityArrivalContext.Pop(map);
+                HospitalityGroundsideNativeContext.Pop(map);
             }
         }
 
-        public static bool AskForSafetyPrefix(IncidentParms parms, Action allow)
+        public static bool AskForSafetyPrefix(IncidentParms parms, ref Action allow, ref Action refuse, ref Action dontAskAgain)
         {
             if (SpaceServicesMod.Settings != null && !SpaceServicesMod.Settings.enableHospitality)
             {
                 return true;
             }
             Map map = parms == null ? null : parms.target as Map;
-            if (map == null || !SpaceServiceMapDetector.IsServiceEligible(map))
+            if (map == null || !SpaceServiceMapDetector.IsServiceActive(map))
             {
+                return true;
+            }
+            if (HospitalityGroundsideNativeContext.IsActive(map))
+            {
+                allow = HospitalityGroundsideNativeContext.WrapAction(map, allow);
+                refuse = HospitalityGroundsideNativeContext.WrapAction(map, refuse);
+                dontAskAgain = HospitalityGroundsideNativeContext.WrapAction(map, dontAskAgain);
                 return true;
             }
             if (!HospitalityIncidentGate.CanAcceptHospitalityIncident("VisitorGroup", map, null, false))
@@ -146,7 +163,10 @@ namespace SpaceServices
             {
                 return;
             }
-            if (map != null && SpaceServiceMapDetector.IsServiceEligible(map) && ServicePadUtility.TryFindNearestServicePadCell(map, ServiceUse.Guest, parms == null ? IntVec3.Invalid : parms.spawnCenter, out IntVec3 cell))
+            if (map != null &&
+                SpaceServiceMapDetector.IsServiceActive(map) &&
+                !HospitalityGroundsideNativeContext.IsActive(map) &&
+                ServicePadUtility.TryFindNearestServicePadCell(map, ServiceUse.Guest, parms == null ? IntVec3.Invalid : parms.spawnCenter, out IntVec3 cell))
             {
                 parms.spawnCenter = cell;
             }
@@ -158,8 +178,12 @@ namespace SpaceServices
             {
                 return;
             }
-            if (map != null && SpaceServiceMapDetector.IsServiceEligible(map))
+            if (map != null && SpaceServiceMapDetector.IsServiceActive(map))
             {
+                if (HospitalityGroundsideNativeContext.IsActive(map))
+                {
+                    return;
+                }
                 HospitalityArrivalContext.FinalizeArrival(map);
                 HospitalityArrivalContext.Pop(map);
             }
@@ -171,8 +195,12 @@ namespace SpaceServices
             {
                 return;
             }
-            if (__exception != null && map != null && SpaceServiceMapDetector.IsServiceEligible(map))
+            if (__exception != null && map != null && SpaceServiceMapDetector.IsServiceActive(map))
             {
+                if (HospitalityGroundsideNativeContext.IsActive(map))
+                {
+                    return;
+                }
                 HospitalityArrivalContext.Pop(map);
             }
         }
@@ -183,7 +211,11 @@ namespace SpaceServices
             {
                 return;
             }
-            if (map == null || !SpaceServiceMapDetector.IsServiceEligible(map))
+            if (map == null || !SpaceServiceMapDetector.IsServiceActive(map))
+            {
+                return;
+            }
+            if (HospitalityGroundsideNativeContext.IsActive(map))
             {
                 return;
             }
@@ -191,7 +223,10 @@ namespace SpaceServices
             {
                 location = cell;
             }
-            VacSuitUtility.SuitPawnForEnvironment(pawn, map, location);
+            if (SpaceServiceMapDetector.IsServiceEligible(map))
+            {
+                VacSuitUtility.SuitPawnForEnvironment(pawn, map, location);
+            }
             ServiceDebugUtility.LogAudit("Hospitality SpawnVisitor prefix pawn=" + ServiceDebugUtility.PawnAuditSummary(pawn) + " location=" + location);
         }
 
@@ -201,7 +236,11 @@ namespace SpaceServices
             {
                 return;
             }
-            if (map == null || !SpaceServiceMapDetector.IsServiceEligible(map))
+            if (map == null || !SpaceServiceMapDetector.IsServiceActive(map))
+            {
+                return;
+            }
+            if (HospitalityGroundsideNativeContext.IsActive(map))
             {
                 return;
             }
@@ -233,7 +272,11 @@ namespace SpaceServices
             {
                 return;
             }
-            if (map == null || !SpaceServiceMapDetector.IsServiceEligible(map))
+            if (map == null || !SpaceServiceMapDetector.IsServiceActive(map))
+            {
+                return;
+            }
+            if (HospitalityGroundsideNativeContext.IsActive(map))
             {
                 return;
             }

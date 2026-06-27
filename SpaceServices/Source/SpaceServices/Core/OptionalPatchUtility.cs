@@ -18,7 +18,7 @@ namespace SpaceServices
         public static void SuitPawnsInArgsPostfix(MethodBase __originalMethod, object[] __args)
         {
             Map map = FindMap(__args);
-            if (map == null || !SpaceServiceMapDetector.IsServiceEligible(map))
+            if (map == null || !SpaceServiceMapDetector.IsServiceActive(map))
             {
                 return;
             }

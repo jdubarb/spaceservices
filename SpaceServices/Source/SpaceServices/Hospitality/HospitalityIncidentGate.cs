@@ -26,7 +26,7 @@ namespace SpaceServices
             {
                 return false;
             }
-            if (map == null || !SpaceServiceMapDetector.IsServiceEligible(map))
+            if (map == null || !SpaceServiceMapDetector.IsServiceActive(map))
             {
                 return false;
             }
@@ -46,7 +46,7 @@ namespace SpaceServices
             {
                 return false;
             }
-            int demand = EstimatedBedDemand(incidentDefName, worker);
+            int demand = EstimatedBedDemandForIncident(incidentDefName, worker, null, map);
             if (!ServiceDebugLimits.HospitalityAllows(map, 1, demand, out _))
             {
                 return false;
@@ -69,7 +69,7 @@ namespace SpaceServices
             {
                 return "no target map";
             }
-            SpaceServiceEligibility eligibility = SpaceServiceMapDetector.Evaluate(map);
+            SpaceServiceEligibility eligibility = SpaceServiceMapDetector.EvaluateServiceAccess(map);
             if (!eligibility.allowed)
             {
                 return string.Join(", ", eligibility.blockReasons.ToArray());
@@ -94,7 +94,7 @@ namespace SpaceServices
             if (RequiresGuestBedCapacity())
             {
                 HospitalityBedReport beds = HospitalityBedUtility.Report(map);
-                int demand = EstimatedBedDemand(incidentDefName, worker);
+                int demand = EstimatedBedDemandForIncident(incidentDefName, worker, null, map);
                 if (!ServiceDebugLimits.HospitalityAllows(map, 1, demand, out string limitReason))
                 {
                     return limitReason;
@@ -106,7 +106,7 @@ namespace SpaceServices
             }
             else
             {
-                int demand = EstimatedBedDemand(incidentDefName, worker);
+                int demand = EstimatedBedDemandForIncident(incidentDefName, worker, null, map);
                 if (!ServiceDebugLimits.HospitalityAllows(map, 1, demand, out string limitReason))
                 {
                     return limitReason;
@@ -122,6 +122,15 @@ namespace SpaceServices
 
         public static int EstimatedBedDemand(string incidentDefName, object worker)
         {
+            return EstimatedBedDemandForIncident(incidentDefName, worker, null, null);
+        }
+
+        public static int EstimatedBedDemandForIncident(string incidentDefName, object worker, IncidentParms parms, Map map)
+        {
+            if (parms != null && parms.pawnCount > 0)
+            {
+                return parms.pawnCount;
+            }
             int max = IntMember(worker, "maxGuestGroupSize");
             if (max > 0)
             {
@@ -129,8 +138,9 @@ namespace SpaceServices
             }
             if (!string.IsNullOrEmpty(incidentDefName) && incidentDefName.IndexOf("VisitorGroup", StringComparison.OrdinalIgnoreCase) >= 0)
             {
-                // Hospitality does not always expose group size up front; reserve for a normal full group.
-                return 5;
+                // Hospitality normally rolls its size during spawn. Do not call that early because
+                // it would consume RNG or force the size; reserve a small practical buffer instead.
+                return 2;
             }
             return 1;
         }

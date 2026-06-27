@@ -22,7 +22,7 @@ namespace SpaceServices
             {
                 return false;
             }
-            if (!SpaceServiceMapDetector.IsServiceEligible(pawn.MapHeld))
+            if (!SpaceServiceMapDetector.IsServiceActive(pawn.MapHeld))
             {
                 return false;
             }
