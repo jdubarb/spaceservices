@@ -23,10 +23,12 @@ namespace SpaceServices
             comp?.NotifyServicePadPlaced(this, respawningAfterLoad);
             ServicePadUtility.RequestLifecycleTickSoon(map, "service pad spawned");
             ServicePadPrebuildModeUtility.ApplyPendingMode(this);
+            GetComp<CompSpaceServicePad>()?.MaintainCornerGlowers();
         }
 
         public override void DeSpawn(DestroyMode mode = DestroyMode.Vanish)
         {
+            GetComp<CompSpaceServicePad>()?.DestroyCornerGlowers();
             Map oldMap = Map;
             IntVec3 oldPosition = Position;
             oldMap?.GetComponent<SpaceServicesMapComponent>()?.NotifyServicePadUnavailable(this, oldPosition, "service pad despawned");
@@ -38,7 +40,9 @@ namespace SpaceServices
         protected override void DrawAt(Vector3 drawLoc, bool flip = false)
         {
             base.DrawAt(drawLoc, flip);
-            GetComp<CompSpaceServicePad>()?.DrawModeOverlay(drawLoc);
+            CompSpaceServicePad servicePad = GetComp<CompSpaceServicePad>();
+            servicePad?.DrawModeOverlay(drawLoc);
+            servicePad?.DrawCornerBeaconOverlays(drawLoc);
         }
     }
 
@@ -54,6 +58,7 @@ namespace SpaceServices
     public class CompSpaceServicePad : ThingComp
     {
         private const float OverlayDrawSize = 1.55f;
+        private const float CornerBeaconOffset = 3.175f;
         private static readonly Vector2 OverlaySize = new Vector2(OverlayDrawSize, OverlayDrawSize);
         private static readonly Color OverlayTint = new Color(0.72f, 0.78f, 0.8f, 0.62f);
         private static readonly Material HospitalOverlayMat = MaterialPool.MatFrom("Things/Building/SpaceServices/ServiceLandingPad_Hospital", ShaderDatabase.Transparent, OverlayTint);
@@ -61,6 +66,18 @@ namespace SpaceServices
         private static readonly Texture2D SharedIcon = ContentFinder<Texture2D>.Get("Things/Building/SpaceServices/ServiceLandingPad");
         private static readonly Texture2D HospitalIcon = ContentFinder<Texture2D>.Get("Things/Building/SpaceServices/ServiceLandingPad_Hospital");
         private static readonly Texture2D HospitalityIcon = ContentFinder<Texture2D>.Get("Things/Building/SpaceServices/ServiceLandingPad_Hospitality");
+        private static readonly IntVec3[] CornerGlowOffsets =
+        {
+            new IntVec3(-3, 0, -3),
+            new IntVec3(-3, 0, 3),
+            new IntVec3(3, 0, -3),
+            new IntVec3(3, 0, 3)
+        };
+        private static ThingDef shipLandingBeaconDef;
+        private static ThingDef redCornerGlowDef;
+        private static ThingDef greenCornerGlowDef;
+        private static bool checkedShipLandingBeaconDef;
+        private static bool checkedCornerGlowDefs;
 
         public ServicePadMode activeMode = ServicePadMode.Shared;
         private bool legacyAllowGuests = true;
@@ -94,6 +111,12 @@ namespace SpaceServices
                     modeVersion = 3;
                 }
             }
+        }
+
+        public override void CompTickRare()
+        {
+            base.CompTickRare();
+            MaintainCornerGlowers();
         }
 
         public bool IsUsableFor(ServiceUse use)
@@ -621,6 +644,160 @@ namespace SpaceServices
             Vector3 drawPos = baseDrawPos;
             drawPos.y = AltitudeLayer.FloorEmplacement.AltitudeFor() + 0.03f;
             Graphics.DrawMesh(MeshPool.GridPlane(OverlaySize), drawPos, Quaternion.identity, overlay, 0);
+        }
+
+        public void DrawCornerBeaconOverlays(Vector3 baseDrawPos)
+        {
+            Graphic beaconGraphic = ShipLandingBeaconGraphic;
+            if (beaconGraphic == null)
+            {
+                return;
+            }
+            DrawCornerBeacon(beaconGraphic, baseDrawPos, -CornerBeaconOffset, -CornerBeaconOffset);
+            DrawCornerBeacon(beaconGraphic, baseDrawPos, -CornerBeaconOffset, CornerBeaconOffset);
+            DrawCornerBeacon(beaconGraphic, baseDrawPos, CornerBeaconOffset, -CornerBeaconOffset);
+            DrawCornerBeacon(beaconGraphic, baseDrawPos, CornerBeaconOffset, CornerBeaconOffset);
+        }
+
+        private void DrawCornerBeacon(Graphic beaconGraphic, Vector3 baseDrawPos, float xOffset, float zOffset)
+        {
+            Vector3 drawPos = baseDrawPos;
+            drawPos.x += xOffset;
+            drawPos.z += zOffset;
+            drawPos.y = AltitudeLayer.Building.AltitudeFor() + 0.08f;
+            beaconGraphic.Draw(drawPos, Rot4.North, parent);
+        }
+
+        private static Graphic ShipLandingBeaconGraphic
+        {
+            get
+            {
+                if (!checkedShipLandingBeaconDef)
+                {
+                    checkedShipLandingBeaconDef = true;
+                    shipLandingBeaconDef = DefDatabase<ThingDef>.GetNamedSilentFail("ShipLandingBeacon");
+                }
+                return shipLandingBeaconDef?.graphicData?.Graphic;
+            }
+        }
+
+        public void MaintainCornerGlowers()
+        {
+            if (parent?.Map == null || parent.Destroyed)
+            {
+                return;
+            }
+            if (!HasPower)
+            {
+                DestroyCornerGlowers();
+                return;
+            }
+            ThingDef desiredDef = CornerGlowDef;
+            if (desiredDef == null)
+            {
+                return;
+            }
+            foreach (IntVec3 offset in CornerGlowOffsets)
+            {
+                IntVec3 cell = parent.Position + offset;
+                if (!cell.InBounds(parent.Map))
+                {
+                    continue;
+                }
+                DestroyCornerGlowersAt(cell, exceptDef: desiredDef);
+                if (CornerGlowerAt(cell, desiredDef) == null)
+                {
+                    GenSpawn.Spawn(ThingMaker.MakeThing(desiredDef), cell, parent.Map);
+                }
+            }
+        }
+
+        public void DestroyCornerGlowers()
+        {
+            if (parent?.Map == null)
+            {
+                return;
+            }
+            foreach (IntVec3 offset in CornerGlowOffsets)
+            {
+                IntVec3 cell = parent.Position + offset;
+                if (cell.InBounds(parent.Map))
+                {
+                    DestroyCornerGlowersAt(cell);
+                }
+            }
+        }
+
+        private ThingDef CornerGlowDef => ShipLandingBeaconGraphic == null ? RedCornerGlowDef : GreenCornerGlowDef;
+
+        private static ThingDef RedCornerGlowDef
+        {
+            get
+            {
+                EnsureCornerGlowDefs();
+                return redCornerGlowDef;
+            }
+        }
+
+        private static ThingDef GreenCornerGlowDef
+        {
+            get
+            {
+                EnsureCornerGlowDefs();
+                return greenCornerGlowDef;
+            }
+        }
+
+        private static void EnsureCornerGlowDefs()
+        {
+            if (checkedCornerGlowDefs)
+            {
+                return;
+            }
+            checkedCornerGlowDefs = true;
+            redCornerGlowDef = DefDatabase<ThingDef>.GetNamedSilentFail("JDB_ServiceLandingPadCornerGlowRed");
+            greenCornerGlowDef = DefDatabase<ThingDef>.GetNamedSilentFail("JDB_ServiceLandingPadCornerGlowGreen");
+        }
+
+        private bool HasPower
+        {
+            get
+            {
+                CompPowerTrader power = parent?.TryGetComp<CompPowerTrader>();
+                return power == null || power.PowerOn;
+            }
+        }
+
+        private void DestroyCornerGlowersAt(IntVec3 cell, ThingDef exceptDef = null)
+        {
+            List<Thing> things = cell.GetThingList(parent.Map);
+            for (int i = things.Count - 1; i >= 0; i--)
+            {
+                Thing thing = things[i];
+                if (IsServicePadCornerGlower(thing) && thing.def != exceptDef)
+                {
+                    thing.Destroy();
+                }
+            }
+        }
+
+        private Thing CornerGlowerAt(IntVec3 cell, ThingDef def)
+        {
+            List<Thing> things = cell.GetThingList(parent.Map);
+            for (int i = 0; i < things.Count; i++)
+            {
+                if (things[i].def == def)
+                {
+                    return things[i];
+                }
+            }
+            return null;
+        }
+
+        private static bool IsServicePadCornerGlower(Thing thing)
+        {
+            ThingDef def = thing == null ? null : thing.def;
+            return def != null && (def == RedCornerGlowDef || def == GreenCornerGlowDef);
         }
 
         private void SetActiveMode(ServicePadMode mode)

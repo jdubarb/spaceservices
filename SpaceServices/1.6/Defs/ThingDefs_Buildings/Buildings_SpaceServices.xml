@@ -14,6 +14,7 @@
     <altitudeLayer>FloorEmplacement</altitudeLayer>
     <passability>Standable</passability>
     <size>(7,7)</size>
+    <tickerType>Rare</tickerType>
     <rotatable>false</rotatable>
     <scatterableOnMapGen>false</scatterableOnMapGen>
     <terrainAffordanceNeeded>Heavy</terrainAffordanceNeeded>
@@ -52,5 +53,29 @@
     <researchPrerequisites>
       <li>Electricity</li>
     </researchPrerequisites>
+  </ThingDef>
+
+  <ThingDef ParentName="EtherealThingBase">
+    <defName>JDB_ServiceLandingPadCornerGlowRed</defName>
+    <label>service pad red corner glow</label>
+    <thingClass>ThingWithComps</thingClass>
+    <comps>
+      <li Class="CompProperties_Glower">
+        <glowRadius>2</glowRadius>
+        <glowColor>(255, 44, 32, 0)</glowColor>
+      </li>
+    </comps>
+  </ThingDef>
+
+  <ThingDef ParentName="EtherealThingBase">
+    <defName>JDB_ServiceLandingPadCornerGlowGreen</defName>
+    <label>service pad green corner glow</label>
+    <thingClass>ThingWithComps</thingClass>
+    <comps>
+      <li Class="CompProperties_Glower">
+        <glowRadius>2</glowRadius>
+        <glowColor>(164, 255, 138, 0)</glowColor>
+      </li>
+    </comps>
   </ThingDef>
 </Defs>
