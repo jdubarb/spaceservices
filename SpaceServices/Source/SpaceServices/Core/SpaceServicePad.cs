@@ -54,11 +54,24 @@ namespace SpaceServices
         }
     }
 
+    public class ServicePadCornerGlow : ThingWithComps
+    {
+        public Vector3 drawOffset;
+
+        public override Vector3 DrawPos => base.DrawPos + drawOffset;
+
+        public override void ExposeData()
+        {
+            base.ExposeData();
+            Scribe_Values.Look(ref drawOffset, "drawOffset");
+        }
+    }
+
     [StaticConstructorOnStartup]
     public class CompSpaceServicePad : ThingComp
     {
         private const float OverlayDrawSize = 1.55f;
-        private const float CornerBeaconOffset = 3.175f;
+        private const float CornerBeaconInset = 0.325f;
         private static readonly Vector2 OverlaySize = new Vector2(OverlayDrawSize, OverlayDrawSize);
         private static readonly Color OverlayTint = new Color(0.72f, 0.78f, 0.8f, 0.62f);
         private static readonly Material HospitalOverlayMat = MaterialPool.MatFrom("Things/Building/SpaceServices/ServiceLandingPad_Hospital", ShaderDatabase.Transparent, OverlayTint);
@@ -66,14 +79,8 @@ namespace SpaceServices
         private static readonly Texture2D SharedIcon = ContentFinder<Texture2D>.Get("Things/Building/SpaceServices/ServiceLandingPad");
         private static readonly Texture2D HospitalIcon = ContentFinder<Texture2D>.Get("Things/Building/SpaceServices/ServiceLandingPad_Hospital");
         private static readonly Texture2D HospitalityIcon = ContentFinder<Texture2D>.Get("Things/Building/SpaceServices/ServiceLandingPad_Hospitality");
-        private static readonly IntVec3[] CornerGlowOffsets =
-        {
-            new IntVec3(-3, 0, -3),
-            new IntVec3(-3, 0, 3),
-            new IntVec3(3, 0, -3),
-            new IntVec3(3, 0, 3)
-        };
         private static ThingDef shipLandingBeaconDef;
+        private static Graphic shipLandingBeaconGraphic;
         private static ThingDef redCornerGlowDef;
         private static ThingDef greenCornerGlowDef;
         private static bool checkedShipLandingBeaconDef;
@@ -648,15 +655,20 @@ namespace SpaceServices
 
         public void DrawCornerBeaconOverlays(Vector3 baseDrawPos)
         {
+            if (!HasPower)
+            {
+                return;
+            }
             Graphic beaconGraphic = ShipLandingBeaconGraphic;
             if (beaconGraphic == null)
             {
                 return;
             }
-            DrawCornerBeacon(beaconGraphic, baseDrawPos, -CornerBeaconOffset, -CornerBeaconOffset);
-            DrawCornerBeacon(beaconGraphic, baseDrawPos, -CornerBeaconOffset, CornerBeaconOffset);
-            DrawCornerBeacon(beaconGraphic, baseDrawPos, CornerBeaconOffset, -CornerBeaconOffset);
-            DrawCornerBeacon(beaconGraphic, baseDrawPos, CornerBeaconOffset, CornerBeaconOffset);
+            Vector2 offset = CornerBeaconOffset;
+            DrawCornerBeacon(beaconGraphic, baseDrawPos, -offset.x, -offset.y);
+            DrawCornerBeacon(beaconGraphic, baseDrawPos, -offset.x, offset.y);
+            DrawCornerBeacon(beaconGraphic, baseDrawPos, offset.x, -offset.y);
+            DrawCornerBeacon(beaconGraphic, baseDrawPos, offset.x, offset.y);
         }
 
         private void DrawCornerBeacon(Graphic beaconGraphic, Vector3 baseDrawPos, float xOffset, float zOffset)
@@ -676,8 +688,13 @@ namespace SpaceServices
                 {
                     checkedShipLandingBeaconDef = true;
                     shipLandingBeaconDef = DefDatabase<ThingDef>.GetNamedSilentFail("ShipLandingBeacon");
+                    shipLandingBeaconGraphic = shipLandingBeaconDef?.graphicData?.Graphic;
+                    if (shipLandingBeaconGraphic == null && ContentFinder<Texture2D>.Get("Things/Building/Misc/ShipLandingBeacon", false) != null)
+                    {
+                        shipLandingBeaconGraphic = GraphicDatabase.Get<Graphic_Single>("Things/Building/Misc/ShipLandingBeacon", ShaderDatabase.Cutout, Vector2.one, Color.white);
+                    }
                 }
-                return shipLandingBeaconDef?.graphicData?.Graphic;
+                return shipLandingBeaconGraphic;
             }
         }
 
@@ -697,17 +714,23 @@ namespace SpaceServices
             {
                 return;
             }
-            foreach (IntVec3 offset in CornerGlowOffsets)
+            foreach (CornerGlowPlacement placement in CornerGlowPlacements())
             {
-                IntVec3 cell = parent.Position + offset;
+                IntVec3 cell = parent.Position + placement.cellOffset;
                 if (!cell.InBounds(parent.Map))
                 {
                     continue;
                 }
                 DestroyCornerGlowersAt(cell, exceptDef: desiredDef);
-                if (CornerGlowerAt(cell, desiredDef) == null)
+                Thing glower = CornerGlowerAt(cell, desiredDef);
+                if (glower == null)
                 {
-                    GenSpawn.Spawn(ThingMaker.MakeThing(desiredDef), cell, parent.Map);
+                    glower = GenSpawn.Spawn(ThingMaker.MakeThing(desiredDef), cell, parent.Map);
+                }
+                ServicePadCornerGlow cornerGlow = glower as ServicePadCornerGlow;
+                if (cornerGlow != null)
+                {
+                    cornerGlow.drawOffset = placement.drawOffset;
                 }
             }
         }
@@ -718,7 +741,7 @@ namespace SpaceServices
             {
                 return;
             }
-            foreach (IntVec3 offset in CornerGlowOffsets)
+            foreach (IntVec3 offset in CornerGlowOffsets())
             {
                 IntVec3 cell = parent.Position + offset;
                 if (cell.InBounds(parent.Map))
@@ -729,6 +752,38 @@ namespace SpaceServices
         }
 
         private ThingDef CornerGlowDef => ShipLandingBeaconGraphic == null ? RedCornerGlowDef : GreenCornerGlowDef;
+
+        private Vector2 CornerBeaconOffset
+        {
+            get
+            {
+                IntVec2 size = parent != null && parent.def != null ? parent.def.size : new IntVec2(7, 7);
+                return new Vector2(size.x / 2f - CornerBeaconInset, size.z / 2f - CornerBeaconInset);
+            }
+        }
+
+        private IEnumerable<CornerGlowPlacement> CornerGlowPlacements()
+        {
+            IntVec2 size = parent != null && parent.def != null ? parent.def.size : new IntVec2(7, 7);
+            int x = System.Math.Max(1, size.x / 2);
+            int z = System.Math.Max(1, size.z / 2);
+            Vector2 beaconOffset = CornerBeaconOffset;
+            yield return CornerGlowPlacement.For(-x, -z, -beaconOffset.x, -beaconOffset.y);
+            yield return CornerGlowPlacement.For(-x, z, -beaconOffset.x, beaconOffset.y);
+            yield return CornerGlowPlacement.For(x, -z, beaconOffset.x, -beaconOffset.y);
+            yield return CornerGlowPlacement.For(x, z, beaconOffset.x, beaconOffset.y);
+        }
+
+        private IEnumerable<IntVec3> CornerGlowOffsets()
+        {
+            IntVec2 size = parent != null && parent.def != null ? parent.def.size : new IntVec2(7, 7);
+            int x = System.Math.Max(1, size.x / 2);
+            int z = System.Math.Max(1, size.z / 2);
+            yield return new IntVec3(-x, 0, -z);
+            yield return new IntVec3(-x, 0, z);
+            yield return new IntVec3(x, 0, -z);
+            yield return new IntVec3(x, 0, z);
+        }
 
         private static ThingDef RedCornerGlowDef
         {
@@ -798,6 +853,21 @@ namespace SpaceServices
         {
             ThingDef def = thing == null ? null : thing.def;
             return def != null && (def == RedCornerGlowDef || def == GreenCornerGlowDef);
+        }
+
+        private struct CornerGlowPlacement
+        {
+            public IntVec3 cellOffset;
+            public Vector3 drawOffset;
+
+            public static CornerGlowPlacement For(int cellX, int cellZ, float drawX, float drawZ)
+            {
+                return new CornerGlowPlacement
+                {
+                    cellOffset = new IntVec3(cellX, 0, cellZ),
+                    drawOffset = new Vector3(drawX - cellX, 0f, drawZ - cellZ)
+                };
+            }
         }
 
         private void SetActiveMode(ServicePadMode mode)

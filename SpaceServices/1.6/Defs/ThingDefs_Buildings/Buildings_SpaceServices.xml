@@ -58,7 +58,7 @@
   <ThingDef ParentName="EtherealThingBase">
     <defName>JDB_ServiceLandingPadCornerGlowRed</defName>
     <label>service pad red corner glow</label>
-    <thingClass>ThingWithComps</thingClass>
+    <thingClass>SpaceServices.ServicePadCornerGlow</thingClass>
     <comps>
       <li Class="CompProperties_Glower">
         <glowRadius>2</glowRadius>
@@ -70,7 +70,7 @@
   <ThingDef ParentName="EtherealThingBase">
     <defName>JDB_ServiceLandingPadCornerGlowGreen</defName>
     <label>service pad green corner glow</label>
-    <thingClass>ThingWithComps</thingClass>
+    <thingClass>SpaceServices.ServicePadCornerGlow</thingClass>
     <comps>
       <li Class="CompProperties_Glower">
         <glowRadius>2</glowRadius>
