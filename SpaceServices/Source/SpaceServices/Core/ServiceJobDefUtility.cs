@@ -6,6 +6,7 @@ namespace SpaceServices
     public static class ServiceJobDefUtility
     {
         private static JobDef boardServiceShuttle;
+        private static JobDef serviceDepartureHold;
         private static JobDef serviceGoto;
 
         public static JobDef BoardServiceShuttle
@@ -29,6 +30,18 @@ namespace SpaceServices
                     serviceGoto = DefDatabase<JobDef>.GetNamedSilentFail("JDB_ServiceGoto");
                 }
                 return serviceGoto;
+            }
+        }
+
+        public static JobDef ServiceDepartureHold
+        {
+            get
+            {
+                if (serviceDepartureHold == null)
+                {
+                    serviceDepartureHold = DefDatabase<JobDef>.GetNamedSilentFail("JDB_ServiceDepartureHold");
+                }
+                return serviceDepartureHold;
             }
         }
     }

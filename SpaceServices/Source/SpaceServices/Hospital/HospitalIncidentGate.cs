@@ -15,7 +15,9 @@ namespace SpaceServices
 {
     public static class HospitalIncidentGate
     {
-        public static bool CanAcceptHospitalIncident(string incidentDefName, Map map, bool applyPriorityThrottle = true)
+        private const int MinimumMassCasualtyPatients = 3;
+
+        public static bool CanAcceptHospitalIncident(string incidentDefName, Map map, bool applyPriorityThrottle = true, IncidentParms parms = null)
         {
             object hospital = FindHospitalComponent(map);
             if (hospital == null)
@@ -39,12 +41,11 @@ namespace SpaceServices
             {
                 return false;
             }
-            // Hospital mass casualties overfill hard; require room for the whole minimum batch.
-            if (incidentDefName == "MassCasualtyEvent" && freeBeds < 3)
+            if (incidentDefName == "MassCasualtyEvent" && freeBeds < MinimumMassCasualtyPatients)
             {
                 return false;
             }
-            int incomingPatients = incidentDefName == "MassCasualtyEvent" ? 3 : 1;
+            int incomingPatients = IncomingPatientCount(incidentDefName, freeBeds, parms);
             if (!ServiceDebugLimits.HospitalAllows(map, incidentDefName, incomingPatients, out _))
             {
                 return false;
@@ -61,6 +62,27 @@ namespace SpaceServices
             {
                 return false;
             }
+            return true;
+        }
+
+        public static bool TryPrepareMassCasualtyPawnCount(Map map, IncidentParms parms, out string reason)
+        {
+            reason = null;
+            if (map == null || parms == null)
+            {
+                reason = "missing map or incident parms";
+                return false;
+            }
+
+            int freeBeds = EffectiveFreeMedicalBeds(map);
+            if (freeBeds < MinimumMassCasualtyPatients)
+            {
+                reason = "not enough free medical beds, need " + MinimumMassCasualtyPatients + " (freeBeds=" + freeBeds + ")";
+                return false;
+            }
+
+            int requested = parms.pawnCount;
+            parms.pawnCount = requested > 0 ? Mathf.Min(requested, freeBeds) : freeBeds;
             return true;
         }
 
@@ -90,7 +112,8 @@ namespace SpaceServices
 
         private static string DebugLimitReport(Map map, string incidentDefName)
         {
-            int incomingPatients = incidentDefName == "MassCasualtyEvent" ? 3 : 1;
+            int freeBeds = EffectiveFreeMedicalBeds(map);
+            int incomingPatients = IncomingPatientCount(incidentDefName, freeBeds, null);
             return ServiceDebugLimits.HospitalAllows(map, incidentDefName, incomingPatients, out string reason) ? "" : ", " + reason;
         }
 
@@ -124,10 +147,29 @@ namespace SpaceServices
             }
         }
 
+        public static int EffectiveFreeMedicalBeds(Map map)
+        {
+            object hospital = FindHospitalComponent(map);
+            return hospital == null ? -1 : EffectiveFreeMedicalBeds(hospital, map);
+        }
+
         private static int EffectiveFreeMedicalBeds(object hospital, Map map)
         {
             // Hospital's own hospital-bed flag remains authoritative, including for MedPods.
             return CallInt(hospital, "FreeMedicalBeds", -1);
+        }
+
+        private static int IncomingPatientCount(string incidentDefName, int freeBeds, IncidentParms parms)
+        {
+            if (incidentDefName == "MassCasualtyEvent")
+            {
+                if (parms != null && parms.pawnCount > 0)
+                {
+                    return Mathf.Min(parms.pawnCount, Mathf.Max(1, freeBeds));
+                }
+                return Mathf.Max(1, freeBeds);
+            }
+            return 1;
         }
 
         private static bool CallBool(object target, string methodName, bool fallback)

@@ -73,7 +73,7 @@ namespace SpaceServices
         private const float OverlayDrawSize = 1.55f;
         private const float CornerBeaconInset = 0.325f;
         private static readonly Vector2 OverlaySize = new Vector2(OverlayDrawSize, OverlayDrawSize);
-        private static readonly Color OverlayTint = new Color(0.72f, 0.78f, 0.8f, 0.62f);
+        private static readonly Color OverlayTint = new Color(0.72f, 0.78f, 0.8f, 0.76f);
         private static readonly Material HospitalOverlayMat = MaterialPool.MatFrom("Things/Building/SpaceServices/ServiceLandingPad_Hospital", ShaderDatabase.Transparent, OverlayTint);
         private static readonly Material HospitalityOverlayMat = MaterialPool.MatFrom("Things/Building/SpaceServices/ServiceLandingPad_Hospitality", ShaderDatabase.Transparent, OverlayTint);
         private static readonly Texture2D SharedIcon = ContentFinder<Texture2D>.Get("Things/Building/SpaceServices/ServiceLandingPad");
@@ -117,17 +117,20 @@ namespace SpaceServices
                     MigrateLegacyModeFlags();
                     modeVersion = 3;
                 }
+                EnsureActiveModeSupported();
             }
         }
 
         public override void CompTickRare()
         {
             base.CompTickRare();
+            EnsureActiveModeSupported();
             MaintainCornerGlowers();
         }
 
         public bool IsUsableFor(ServiceUse use)
         {
+            EnsureActiveModeSupported();
             if (!string.IsNullOrEmpty(reservedForGroup))
             {
                 return false;
@@ -143,6 +146,7 @@ namespace SpaceServices
 
         public bool MeetsUseRequirements(ServiceUse use, out string reason)
         {
+            EnsureActiveModeSupported();
             reason = null;
             if (parent == null || parent.Destroyed || parent.Map == null)
             {
@@ -178,6 +182,7 @@ namespace SpaceServices
 
         public bool MeetsDepartureRequirements(ServiceUse use, out string reason)
         {
+            EnsureActiveModeSupported();
             reason = null;
             if (parent == null || parent.Destroyed || parent.Map == null)
             {
@@ -207,6 +212,7 @@ namespace SpaceServices
 
         public bool MeetsOperationalRequirements(out string reason)
         {
+            EnsureActiveModeSupported();
             reason = null;
             if (parent == null || parent.Destroyed || parent.Map == null)
             {
@@ -243,6 +249,7 @@ namespace SpaceServices
 
         public override string CompInspectStringExtra()
         {
+            EnsureActiveModeSupported();
             if (parent == null || parent.Map == null)
             {
                 return null;
@@ -257,22 +264,23 @@ namespace SpaceServices
                 bool usable = SafeGenerallyUsable(out string usableReason);
 
                 builder.AppendLine("Space Services");
-                builder.AppendLine("Mode: " + ModeLabel());
-                builder.AppendLine("Reservation: " + ReservationLabel());
+                builder.AppendLine("Mode: " + DisplayLabel(ModeLabel()));
+                builder.AppendLine("Reservation: " + DisplayLabel(ReservationLabel()));
                 if (IsMarkedForDeconstruction())
                 {
-                    builder.AppendLine("Status: inactive, marked for deconstruction");
+                    builder.AppendLine("Status: Inactive, Marked For Deconstruction");
                 }
-                builder.AppendLine("Vacuum exposed: " + (vacuum > 0.001f ? "yes (" + vacuum.ToStringPercent() + ")" : "no"));
-                builder.AppendLine("Roof accessible: " + (roofAccessible ? "yes, " + SafeRoofAccessReport() : "no, " + roofReason));
-                builder.AppendLine("Map: " + (eligibility.allowed ? "eligible" : "blocked"));
-                builder.Append("Overall: " + (usable ? "usable" : "not usable, " + usableReason));
+                builder.AppendLine("Vacuum Exposed: " + (vacuum > 0.001f ? "Yes (" + vacuum.ToStringPercent() + ")" : "No"));
+                builder.AppendLine("Roof Accessible: " + (roofAccessible ? "Yes, " + DisplayLabel(SafeRoofAccessReport()) : "No, " + DisplayLabel(roofReason)));
+                builder.AppendLine("Map: " + (eligibility.allowed ? "Eligible" : "Blocked"));
+                builder.AppendLine("Traffic: " + DisplayLabel(TrafficStatus()));
+                builder.Append("Overall: " + (usable ? "Usable" : "Not Usable, " + DisplayLabel(usableReason)));
                 return builder.ToString().TrimEnd();
             }
             catch (Exception ex)
             {
                 Log.Warning("[Space Services] Service pad inspect failed: " + ex.Message);
-                return "Space Services\nStatus unavailable; see log.";
+                return "Space Services\nStatus Unavailable; See Log.";
             }
         }
 
@@ -288,6 +296,47 @@ namespace SpaceServices
                 fallback.blockReasons.Add("map check failed: " + ex.Message);
                 return fallback;
             }
+        }
+
+        private string TrafficStatus()
+        {
+            try
+            {
+                string reason;
+                if (ServiceTrafficBlockedForUse(ServiceUse.Patient, "hospital", out reason) ||
+                    ServiceTrafficBlockedForUse(ServiceUse.Guest, "hospitality", out reason))
+                {
+                    return "blocked, " + reason;
+                }
+            }
+            catch (Exception ex)
+            {
+                return "status check failed: " + ex.Message;
+            }
+            return "clear";
+        }
+
+        private bool ServiceTrafficBlockedForUse(ServiceUse use, string serviceKind, out string reason)
+        {
+            reason = null;
+            Map map = parent == null ? null : parent.Map;
+            if (map == null)
+            {
+                return false;
+            }
+            if (AllowsUse(use) && ServiceDangerUtility.ArrivalTrafficBlocked(map, serviceKind, out reason))
+            {
+                return true;
+            }
+            if (AllowsDepartureUse(use) && ServiceDangerUtility.DepartureShuttleBlocked(map, serviceKind, out reason))
+            {
+                return true;
+            }
+            if (use == ServiceUse.Guest && AllowsDepartureUse(use) && ServiceDangerUtility.HospitalityTrafficBlocked(map, out reason))
+            {
+                return true;
+            }
+            return false;
         }
 
         private float SafeMaxVacuum()
@@ -509,6 +558,11 @@ namespace SpaceServices
                 ClearWatchedReservation("service record has no active pawns");
                 return true;
             }
+            if (ServiceLifecycleUtility.IsActiveDepartureState(record))
+            {
+                ServiceDebugUtility.LogThrottled("watchdog-kept-departure-" + reservedForGroup, "Space Services reservation watchdog left active departure reservation intact: " + reservedForGroup, GenDate.TicksPerDay);
+                return false;
+            }
             if (record.serviceKind != "hospital")
             {
                 ServiceLifecycleUtility.ClearGroupReservation(parent.Map, record.id, "pad reservation watchdog timeout");
@@ -545,8 +599,18 @@ namespace SpaceServices
             return "reserved for " + GenDate.ToStringTicksToPeriod(ticks);
         }
 
+        private static string DisplayLabel(string text)
+        {
+            if (string.IsNullOrEmpty(text))
+            {
+                return text;
+            }
+            return string.Join(" ", text.Split(' ').Select(part => part.CapitalizeFirst()).ToArray());
+        }
+
         public override IEnumerable<Gizmo> CompGetGizmosExtra()
         {
+            EnsureActiveModeSupported();
             foreach (Gizmo gizmo in base.CompGetGizmosExtra())
             {
                 yield return gizmo;
@@ -566,7 +630,7 @@ namespace SpaceServices
                         string oldReservation = reservedForGroup;
                         ForceRelease();
                         ServiceLifecycleUtility.ClearGroupReservation(parent.MapHeld, oldReservation, "dev cleared pad reservation");
-                        Messages.Message("Space Services: pad reservation cleared", parent, MessageTypeDefOf.NeutralEvent, false);
+                        Messages.Message("Space Services: Pad Reservation Cleared", parent, MessageTypeDefOf.NeutralEvent, false);
                     }
                 };
                 yield return new Command_Action
@@ -584,7 +648,7 @@ namespace SpaceServices
             List<Pawn> pawns = DebugSocialFightPawns(map);
             if (pawns.Count < 2)
             {
-                Messages.Message("Space Services: need two spawned humanlike pawns", parent, MessageTypeDefOf.RejectInput, false);
+                Messages.Message("Space Services: Need Two Spawned Humanlike Pawns", parent, MessageTypeDefOf.RejectInput, false);
                 return;
             }
             List<FloatMenuOption> options = new List<FloatMenuOption>();
@@ -614,11 +678,11 @@ namespace SpaceServices
                     string reason;
                     if (ServiceLifecycleUtility.DebugForceSocialFight(initiator, localTarget, out reason))
                     {
-                        Messages.Message("Space Services: " + reason, initiator, MessageTypeDefOf.NeutralEvent, false);
+                        Messages.Message("Space Services: " + DisplayLabel(reason), initiator, MessageTypeDefOf.NeutralEvent, false);
                     }
                     else
                     {
-                        Messages.Message("Space Services: " + (reason ?? "could not force social fight"), initiator, MessageTypeDefOf.RejectInput, false);
+                        Messages.Message("Space Services: " + DisplayLabel(reason ?? "could not force social fight"), initiator, MessageTypeDefOf.RejectInput, false);
                     }
                 }));
             }
@@ -655,10 +719,6 @@ namespace SpaceServices
 
         public void DrawCornerBeaconOverlays(Vector3 baseDrawPos)
         {
-            if (!HasPower)
-            {
-                return;
-            }
             Graphic beaconGraphic = ShipLandingBeaconGraphic;
             if (beaconGraphic == null)
             {
@@ -872,6 +932,7 @@ namespace SpaceServices
 
         private void SetActiveMode(ServicePadMode mode)
         {
+            mode = SupportedMode(mode);
             if (activeMode == mode)
             {
                 return;
@@ -890,13 +951,36 @@ namespace SpaceServices
         {
             if (Prioritizes(ServiceUse.Patient))
             {
+                if (FallbackOverlayFor(ServiceUse.Patient) && SpaceServicesMod.Settings != null && !SpaceServicesMod.Settings.showHospitalFallbackPadOverlay)
+                {
+                    return null;
+                }
                 return HospitalOverlayMat;
             }
             if (Prioritizes(ServiceUse.Guest))
             {
+                if (FallbackOverlayFor(ServiceUse.Guest) && SpaceServicesMod.Settings != null && !SpaceServicesMod.Settings.showHospitalityFallbackPadOverlay)
+                {
+                    return null;
+                }
                 return HospitalityOverlayMat;
             }
             return null;
+        }
+
+        private bool FallbackOverlayFor(ServiceUse use)
+        {
+            if (activeMode == ServicePadMode.Shared ||
+                activeMode == ServicePadMode.HospitalPriority ||
+                activeMode == ServicePadMode.HospitalityPriority ||
+                activeMode == ServicePadMode.DeparturesOnly)
+            {
+                return false;
+            }
+            bool hospital = HospitalModeAvailable();
+            bool hospitality = HospitalityModeAvailable();
+            return (use == ServiceUse.Patient && activeMode == ServicePadMode.HospitalOnly && hospital && !hospitality) ||
+                (use == ServiceUse.Guest && activeMode == ServicePadMode.HospitalityOnly && hospitality && !hospital);
         }
 
         public bool AllowsUse(ServiceUse use)
@@ -1004,6 +1088,53 @@ namespace SpaceServices
             SyncLegacyModeFlags();
         }
 
+        private void EnsureActiveModeSupported()
+        {
+            ServicePadMode supportedMode = SupportedMode(activeMode);
+            if (supportedMode == activeMode)
+            {
+                return;
+            }
+            activeMode = supportedMode;
+            SyncLegacyModeFlags();
+            WakeLifecycle("service pad mode gated by active integrations");
+        }
+
+        private static ServicePadMode SupportedMode(ServicePadMode mode)
+        {
+            bool hospital = HospitalModeAvailable();
+            bool hospitality = HospitalityModeAvailable();
+            if (mode == ServicePadMode.DeparturesOnly)
+            {
+                return mode;
+            }
+            if (hospital && hospitality)
+            {
+                return mode;
+            }
+            if (hospital)
+            {
+                return ServicePadMode.HospitalOnly;
+            }
+            if (hospitality)
+            {
+                return ServicePadMode.HospitalityOnly;
+            }
+            return ServicePadMode.DeparturesOnly;
+        }
+
+        private static bool HospitalModeAvailable()
+        {
+            return (SpaceServicesMod.Settings == null || SpaceServicesMod.Settings.enableHospital) &&
+                HospitalPatches.HospitalApiAvailable();
+        }
+
+        private static bool HospitalityModeAvailable()
+        {
+            return (SpaceServicesMod.Settings == null || SpaceServicesMod.Settings.enableHospitality) &&
+                HospitalityBedUtility.DelayGuestApiAvailable();
+        }
+
         private void SyncLegacyModeFlags()
         {
             legacyAllowPatients = AllowsUse(ServiceUse.Patient);
@@ -1023,11 +1154,22 @@ namespace SpaceServices
 
         public static IEnumerable<Gizmo> ModeCommands(Func<ServicePadMode> getter, Action<ServicePadMode> setter)
         {
-            yield return ModeCommand(ServicePadMode.HospitalOnly, "JDB_SpaceServices_Gizmo_ModeHospitalOnly", "JDB_SpaceServices_Gizmo_ModeHospitalOnlyDesc", HospitalIcon, getter, setter);
-            yield return ModeCommand(ServicePadMode.HospitalityOnly, "JDB_SpaceServices_Gizmo_ModeHospitalityOnly", "JDB_SpaceServices_Gizmo_ModeHospitalityOnlyDesc", HospitalityIcon, getter, setter);
-            yield return ModeCommand(ServicePadMode.Shared, "JDB_SpaceServices_Gizmo_ModeShared", "JDB_SpaceServices_Gizmo_ModeSharedDesc", SharedIcon, getter, setter);
-            yield return ModeCommand(ServicePadMode.HospitalPriority, "JDB_SpaceServices_Gizmo_ModeHospitalPriority", "JDB_SpaceServices_Gizmo_ModeHospitalPriorityDesc", HospitalIcon, getter, setter);
-            yield return ModeCommand(ServicePadMode.HospitalityPriority, "JDB_SpaceServices_Gizmo_ModeHospitalityPriority", "JDB_SpaceServices_Gizmo_ModeHospitalityPriorityDesc", HospitalityIcon, getter, setter);
+            bool hospital = HospitalModeAvailable();
+            bool hospitality = HospitalityModeAvailable();
+            if (hospital)
+            {
+                yield return ModeCommand(ServicePadMode.HospitalOnly, "JDB_SpaceServices_Gizmo_ModeHospitalOnly", "JDB_SpaceServices_Gizmo_ModeHospitalOnlyDesc", HospitalIcon, getter, setter);
+            }
+            if (hospitality)
+            {
+                yield return ModeCommand(ServicePadMode.HospitalityOnly, "JDB_SpaceServices_Gizmo_ModeHospitalityOnly", "JDB_SpaceServices_Gizmo_ModeHospitalityOnlyDesc", HospitalityIcon, getter, setter);
+            }
+            if (hospital && hospitality)
+            {
+                yield return ModeCommand(ServicePadMode.Shared, "JDB_SpaceServices_Gizmo_ModeShared", "JDB_SpaceServices_Gizmo_ModeSharedDesc", SharedIcon, getter, setter);
+                yield return ModeCommand(ServicePadMode.HospitalPriority, "JDB_SpaceServices_Gizmo_ModeHospitalPriority", "JDB_SpaceServices_Gizmo_ModeHospitalPriorityDesc", HospitalIcon, getter, setter);
+                yield return ModeCommand(ServicePadMode.HospitalityPriority, "JDB_SpaceServices_Gizmo_ModeHospitalityPriority", "JDB_SpaceServices_Gizmo_ModeHospitalityPriorityDesc", HospitalityIcon, getter, setter);
+            }
             yield return ModeCommand(ServicePadMode.DeparturesOnly, "JDB_SpaceServices_Gizmo_ModeDeparturesOnly", "JDB_SpaceServices_Gizmo_ModeDeparturesOnlyDesc", SharedIcon, getter, setter);
         }
 

@@ -95,7 +95,7 @@ namespace SpaceServices
             {
                 result.allowReasons.Add("stationary space parent:" + parentType);
             }
-            if (ContainsAny(parentType, "LayeredAtmosphereOrbit.AtmosphereMapParent", "LayeredAtmosphereOrbit.FloatingIslandMapParent", "DeepOrbit.BigAsteroidMapParent"))
+            if (ContainsAny(parentType, "LayeredAtmosphereOrbit.AtmosphereMapParent", "LayeredAtmosphereOrbit.FloatingIslandMapParent", "DeepOrbit.BigAsteroidMapParent", "Avatar.SkyIslandParent"))
             {
                 result.allowReasons.Add("explicit service parent:" + parentType);
             }
@@ -220,6 +220,7 @@ namespace SpaceServices
                 layerDef == "LAO_Mesosphere" ||
                 layerDef == "LAO_HighOrbit" ||
                 layerDef == "LAO_Surface_Luna" ||
+                layerDef == "Avatar_SkyIslandsLayer" ||
                 layerDef == "Orbit2" ||
                 layerDef == "Moon" ||
                 layerDef == "MoonReal";

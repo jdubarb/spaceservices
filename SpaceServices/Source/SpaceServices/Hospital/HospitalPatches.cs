@@ -15,6 +15,23 @@ namespace SpaceServices
 {
     public static class HospitalPatches
     {
+        private static bool checkedHospitalApi;
+        private static bool hospitalApiAvailable;
+
+        public static bool HospitalApiAvailable()
+        {
+            if (checkedHospitalApi)
+            {
+                return hospitalApiAvailable;
+            }
+            checkedHospitalApi = true;
+            hospitalApiAvailable =
+                AccessTools.TypeByName("Hospital.IncidentWorker_PatientArrives") != null ||
+                AccessTools.TypeByName("Hospital.IncidentHelper") != null ||
+                AccessTools.TypeByName("Hospital.HospitalMapComponent") != null;
+            return hospitalApiAvailable;
+        }
+
         public static void Install(Harmony harmony)
         {
             if (SpaceServicesMod.Settings != null && !SpaceServicesMod.Settings.enableHospital)
@@ -32,6 +49,24 @@ namespace SpaceServices
                 }
                 MethodInfo landing = patientUtility.GetMethods(AccessTools.all).FirstOrDefault(m => m.Name == "TryFindSafeLandingSpotCloseToColony" && m.ReturnType == typeof(IntVec3));
                 OptionalModPatches.PatchIfExists(harmony, landing, typeof(HospitalPatchHandlers), postfix: nameof(HospitalPatchHandlers.HospitalLandingSpotPostfix));
+            }
+            Type surgeryUtility = AccessTools.TypeByName("Hospital.Utilities.SurgeryUtility") ?? AccessTools.TypeByName("Hospital.SurgeryUtility");
+            if (surgeryUtility != null)
+            {
+                MethodInfo addRandomSurgeryBill = AccessTools.Method(surgeryUtility, "AddRandomSurgeryBill");
+                if (addRandomSurgeryBill != null)
+                {
+                    try
+                    {
+                        harmony.Patch(addRandomSurgeryBill,
+                            prefix: new HarmonyMethod(typeof(HospitalPatchHandlers), nameof(HospitalPatchHandlers.SurgeryAddRandomBillPrefix)),
+                            transpiler: new HarmonyMethod(typeof(HospitalPatchHandlers), nameof(HospitalPatchHandlers.SurgeryMapHeldFallbackTranspiler)));
+                    }
+                    catch (Exception ex)
+                    {
+                        Log.Warning("[Space Services] Could not patch Hospital surgery map fallback: " + ex.Message);
+                    }
+                }
             }
             Type incidentHelper = AccessTools.TypeByName("Hospital.IncidentHelper");
             if (incidentHelper != null)
@@ -61,7 +96,7 @@ namespace SpaceServices
             {
                 OptionalModPatches.PatchIfExists(harmony, AccessTools.Method(hospitalComponent, "PatientLeaves"), typeof(HospitalPatchHandlers), postfix: nameof(HospitalPatchHandlers.HospitalPatientDeparturePostfix));
                 OptionalModPatches.PatchIfExists(harmony, AccessTools.Method(hospitalComponent, "DismissPatient"), typeof(HospitalPatchHandlers), postfix: nameof(HospitalPatchHandlers.HospitalPatientDeparturePostfix));
-                OptionalModPatches.PatchIfExists(harmony, AccessTools.Method(hospitalComponent, "PatientLeftTheMap"), typeof(HospitalPatchHandlers), postfix: nameof(HospitalPatchHandlers.HospitalPatientGonePostfix));
+                OptionalModPatches.PatchIfExists(harmony, AccessTools.Method(hospitalComponent, "PatientLeftTheMap"), typeof(HospitalPatchHandlers), prefix: nameof(HospitalPatchHandlers.HospitalPatientGonePrefix), postfix: nameof(HospitalPatchHandlers.HospitalPatientGonePostfix));
                 OptionalModPatches.PatchIfExists(harmony, AccessTools.Method(hospitalComponent, "PatientDied"), typeof(HospitalPatchHandlers), prefix: nameof(HospitalPatchHandlers.HospitalPatientDiedPrefix), postfix: nameof(HospitalPatchHandlers.HospitalPatientDiedPostfix));
             }
             Type sentAwayTrigger = AccessTools.TypeByName("Hospital.Trigger_SentAway");

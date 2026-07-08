@@ -51,7 +51,7 @@ namespace SpaceServices
             SpawnSkyfaller(map, cell, visual, false);
         }
 
-        public static bool TryReplaceDropPodWithArrivalShuttle(IntVec3 cell, Map map, ActiveTransporterInfo info, Faction faction, bool showArrival, bool showDeparture)
+        public static bool TryReplaceDropPodWithArrivalShuttle(IntVec3 cell, Map map, ActiveTransporterInfo info, Faction faction, bool showArrival, bool showDeparture, string serviceKind = "hospital")
         {
             if (map == null || info == null || info.innerContainer == null || !cell.IsValid)
             {
@@ -69,7 +69,7 @@ namespace SpaceServices
             {
                 return false;
             }
-            ShuttleVisual visual = ShuttleVisual.Resolve("hospital", null);
+            ShuttleVisual visual = ShuttleVisual.Resolve(serviceKind, null);
             if (showArrival && visual == null)
             {
                 return false;
@@ -86,7 +86,7 @@ namespace SpaceServices
             {
                 SpawnSkyfaller(map, cell, visual, true);
             }
-            comp.ScheduleShuttleArrival(cell, visual == null || visual.shipThingDef == null ? null : visual.shipThingDef.defName, visual == null ? null : visual.id, things, showDeparture);
+            comp.ScheduleShuttleArrival(cell, visual == null || visual.shipThingDef == null ? null : visual.shipThingDef.defName, visual == null ? null : visual.id, things, showDeparture, serviceKind);
             return true;
         }
 
@@ -103,6 +103,12 @@ namespace SpaceServices
                 {
                     continue;
                 }
+                if (!string.IsNullOrEmpty(arrival.serviceKind) && ServiceDangerUtility.ArrivalTrafficBlocked(map, arrival.serviceKind, out string trafficReason))
+                {
+                    arrival.touchdownTick = Find.TickManager.TicksGame + 250;
+                    ServiceDebugUtility.LogThrottled(ServiceDebugUtility.IntegrationForServiceKind(arrival.serviceKind), "pending-arrival-traffic-blocked-" + map.uniqueID + "-" + arrival.cell, "Service arrival waiting for traffic hazard to clear: " + trafficReason, GenDate.TicksPerHour);
+                    continue;
+                }
                 if (arrival.showDeparture)
                 {
                     CleanupTouchdownShuttle(map, arrival.cell, arrival.shuttleThingDefName);
@@ -110,7 +116,7 @@ namespace SpaceServices
                 SpawnContents(map, arrival.cell, arrival.things);
                 if (arrival.showDeparture)
                 {
-                    SpawnDeparture(map, arrival.cell, null, arrival.shuttleVisualDefName);
+                    SpawnDeparture(map, arrival.cell, arrival.serviceKind, arrival.shuttleVisualDefName);
                 }
                 arrivals.RemoveAt(i);
             }
@@ -192,6 +198,32 @@ namespace SpaceServices
                 return 0;
             }
             return CleanupMatchingServiceShuttles(map, thing => thing.Position.InHorDistOf(cell, radius));
+        }
+
+        public static int CleanupServiceShuttlesForPad(Thing pad, ShuttleVisual visual)
+        {
+            Map map = pad == null ? null : pad.Map;
+            if (map == null || pad.Destroyed)
+            {
+                return 0;
+            }
+            return CleanupServiceShuttlesForFootprint(map, pad.OccupiedRect().ExpandedBy(1), visual);
+        }
+
+        public static int CleanupServiceShuttlesForPadFootprint(Map map, IntVec3 center, IntVec2 size, ShuttleVisual visual)
+        {
+            if (map == null || !center.IsValid)
+            {
+                return 0;
+            }
+            int width = Math.Max(1, size.x);
+            int height = Math.Max(1, size.z);
+            return CleanupServiceShuttlesForFootprint(map, CellRect.CenteredOn(center, width, height).ExpandedBy(1), visual);
+        }
+
+        private static int CleanupServiceShuttlesForFootprint(Map map, CellRect rect, ShuttleVisual visual)
+        {
+            return CleanupMatchingServiceShuttles(map, thing => rect.Contains(thing.Position));
         }
 
         public static int CleanupAllServiceShuttles(Map map)

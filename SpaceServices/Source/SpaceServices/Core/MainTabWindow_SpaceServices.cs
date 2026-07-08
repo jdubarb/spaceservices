@@ -109,7 +109,7 @@ namespace SpaceServices
             {
                 SpaceServiceEligibility eligibility = SpaceServiceMapDetector.EvaluateServiceAccess(map);
                 ServiceDebugUtility.Log(ServiceLogIntegration.Core, eligibility.ToLogString(map));
-                Messages.Message(eligibility.allowed ? "Space Services: map eligible" : "Space Services: map blocked", MessageTypeDefOf.NeutralEvent, false);
+                Messages.Message(eligibility.allowed ? "Space Services: Map Eligible" : "Space Services: Map Blocked", MessageTypeDefOf.NeutralEvent, false);
             }
             if (Widgets.ButtonText(new Rect(row.x + width + 8f, row.y, width, row.height), "JDB_SpaceServices_Panel_ClearReservations".Translate()))
             {
@@ -120,7 +120,7 @@ namespace SpaceServices
             if (Widgets.ButtonText(new Rect(row.x, row.y, width, row.height), "JDB_SpaceServices_Panel_RemoveShuttles".Translate()))
             {
                 int removed = ServiceShuttleUtility.CleanupAllServiceShuttles(map);
-                Messages.Message("Space Services: removed " + removed + " service shuttles", MessageTypeDefOf.NeutralEvent, false);
+                Messages.Message("Space Services: Removed " + removed + " Service Shuttles", MessageTypeDefOf.NeutralEvent, false);
             }
             if (Widgets.ButtonText(new Rect(row.x + width + 8f, row.y, width, row.height), "JDB_SpaceServices_Panel_ResetTraffic".Translate()))
             {

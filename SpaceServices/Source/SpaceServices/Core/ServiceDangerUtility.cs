@@ -81,6 +81,13 @@ namespace SpaceServices
 
             HazardConditionInfo info = InfoFor(def);
 
+            // VGE's gravitational anomaly blocks gravship launches, but service pickup shuttles
+            // are not gravship launches and should not strand guests or patients.
+            if (!arrival && info.preventShuttleLaunch && IsServicePickupDeparture(serviceKind) && IsGravshipLaunchOnlyCondition(def))
+            {
+                return false;
+            }
+
             // Vanilla/DLC condition flags are authoritative; custom XML rules fill gaps after these.
             if (info.preventShuttleLaunch && (!arrival || IsShuttleArrivalService(serviceKind)))
             {
@@ -206,6 +213,17 @@ namespace SpaceServices
         {
             return string.Equals(serviceKind, "hospitality", StringComparison.OrdinalIgnoreCase) ||
                 string.Equals(serviceKind, "trade", StringComparison.OrdinalIgnoreCase);
+        }
+
+        private static bool IsServicePickupDeparture(string serviceKind)
+        {
+            return string.Equals(serviceKind, "hospital", StringComparison.OrdinalIgnoreCase) ||
+                string.Equals(serviceKind, "hospitality", StringComparison.OrdinalIgnoreCase);
+        }
+
+        private static bool IsGravshipLaunchOnlyCondition(GameConditionDef def)
+        {
+            return def != null && string.Equals(def.defName, "VGE_GravitationalAnomaly", StringComparison.OrdinalIgnoreCase);
         }
 
         private sealed class TrafficBlockResult

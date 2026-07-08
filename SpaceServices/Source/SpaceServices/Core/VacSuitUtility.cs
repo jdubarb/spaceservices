@@ -73,6 +73,14 @@ namespace SpaceServices
                 return;
             }
             float vacuum = ServiceEnvironmentUtility.GetVacuum(cell, map);
+            if (!ShouldAutoSuitForVacuum(map, cell))
+            {
+                if (SpaceServicesMod.Settings != null && SpaceServicesMod.Settings.allowSealedNoSuitArrivals && ServiceEnvironmentUtility.IsSealedNoSuitArrivalCell(cell, map) && !ShouldProvideSuitForArrival(pawn, map, cell))
+                {
+                    RemoveKnownVacSuit(pawn);
+                }
+                return;
+            }
             float targetVacuum = PracticalVacuumTargetFor(map, vacuum);
             if (VacuumResistance(pawn) + 0.001f < targetVacuum)
             {
@@ -89,6 +97,24 @@ namespace SpaceServices
             {
                 RemoveKnownVacSuit(pawn);
             }
+        }
+
+        public static bool ShouldAutoSuitForVacuum(Map map, IntVec3 cell)
+        {
+            return map != null &&
+                cell.IsValid &&
+                cell.InBounds(map) &&
+                SpaceServiceMapDetector.IsServiceActive(map) &&
+                ServiceEnvironmentUtility.GetVacuum(cell, map) > 0.001f;
+        }
+
+        public static bool ShouldAutoSuitForVacuum(Thing pad)
+        {
+            return pad != null &&
+                !pad.Destroyed &&
+                pad.Map != null &&
+                SpaceServiceMapDetector.IsServiceActive(pad.Map) &&
+                ServiceEnvironmentUtility.GetMaxVacuum(pad) > 0.001f;
         }
 
         private static float PracticalVacuumTargetFor(Map map, float measuredVacuum)

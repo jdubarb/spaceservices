@@ -42,7 +42,10 @@ namespace SpaceServices
             Type guestUtility = AccessTools.TypeByName("Hospitality.Utilities.GuestUtility");
             Type itemUtility = AccessTools.TypeByName("Hospitality.Utilities.ItemUtility");
             Type visitPoint = AccessTools.TypeByName("Hospitality.LordToil_VisitPoint");
+            Type leaveWhenReadyTrigger = AccessTools.TypeByName("Hospitality.Trigger_TicksPassedAndOkayToLeave");
+            Type sentAwayTrigger = AccessTools.TypeByName("Hospitality.Trigger_SentAway");
             Type guestApparelOptimizer = AccessTools.TypeByName("Hospitality.JobGiver_OptimizeApparel_Guest");
+            Type nearbyExitAction = AccessTools.TypeByName("Hospitality.TransitionAction_EnsureHaveNearbyExitDestination");
 
             OptionalModPatches.PatchIfExists(harmony, AccessTools.Method(visitorGroup, "TryExecuteWorker"), typeof(HospitalityPatchHandlers), prefix: nameof(HospitalityPatchHandlers.VisitorGroupTryExecutePrefix), postfix: nameof(HospitalityPatchHandlers.VisitorGroupTryExecutePostfix), finalizer: nameof(HospitalityPatchHandlers.VisitorGroupTryExecuteFinalizer));
             OptionalModPatches.PatchIfExists(harmony, AccessTools.Method(selectFaction, "TryExecuteWorker"), typeof(HospitalityPatchHandlers), prefix: nameof(HospitalityPatchHandlers.VisitorGroupTryExecutePrefix), postfix: nameof(HospitalityPatchHandlers.VisitorGroupTryExecutePostfix), finalizer: nameof(HospitalityPatchHandlers.VisitorGroupTryExecuteFinalizer));
@@ -52,8 +55,11 @@ namespace SpaceServices
             OptionalModPatches.PatchIfExists(harmony, AccessTools.Method(spawnUtility, "SpawnVisitor"), typeof(HospitalityPatchHandlers), prefix: nameof(HospitalityPatchHandlers.SpawnVisitorPrefix), postfix: nameof(HospitalityPatchHandlers.SpawnVisitorPostfix));
             OptionalModPatches.PatchIfExists(harmony, AccessTools.Method(guestUtility, "Leave"), typeof(HospitalityPatchHandlers), prefix: nameof(HospitalityPatchHandlers.GuestLeavePrefix));
             OptionalModPatches.PatchIfExists(harmony, AccessTools.Method(itemUtility, "PocketHeadgear"), typeof(HospitalityPatchHandlers), prefix: nameof(HospitalityPatchHandlers.PocketHeadgearPrefix));
-            OptionalModPatches.PatchIfExists(harmony, AccessTools.Method(visitPoint, "Leave"), typeof(HospitalityPatchHandlers), postfix: nameof(HospitalityPatchHandlers.VisitPointLeavePostfix));
+            OptionalModPatches.PatchIfExists(harmony, AccessTools.Method(visitPoint, "Leave"), typeof(HospitalityPatchHandlers), prefix: nameof(HospitalityPatchHandlers.VisitPointLeavePrefix), postfix: nameof(HospitalityPatchHandlers.VisitPointLeavePostfix));
+            OptionalModPatches.PatchIfExists(harmony, AccessTools.Method(leaveWhenReadyTrigger, "ActivateOn"), typeof(HospitalityPatchHandlers), postfix: nameof(HospitalityPatchHandlers.HospitalityLeaveTriggerPostfix));
+            OptionalModPatches.PatchIfExists(harmony, AccessTools.Method(sentAwayTrigger, "ActivateOn"), typeof(HospitalityPatchHandlers), postfix: nameof(HospitalityPatchHandlers.HospitalityLeaveTriggerPostfix));
             OptionalModPatches.PatchIfExists(harmony, AccessTools.Method(guestApparelOptimizer, "TryGiveJob"), typeof(HospitalityPatchHandlers), prefix: nameof(HospitalityPatchHandlers.OptimizeApparelGuestPrefix));
+            OptionalModPatches.PatchIfExists(harmony, AccessTools.Method(nearbyExitAction, "DoAction"), typeof(HospitalityPatchHandlers), prefix: nameof(HospitalityPatchHandlers.NearbyExitDestinationPrefix));
         }
     }
 }

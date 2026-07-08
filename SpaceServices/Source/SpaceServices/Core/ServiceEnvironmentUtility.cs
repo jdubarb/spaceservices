@@ -23,7 +23,8 @@ namespace SpaceServices
         {
             "SMR_VacBarrierRoof",
             "SMR_AdvancedVacBarrierRoof",
-            "CO_VacRoof"
+            "CO_VacRoof",
+            "VGE_VacBarrierRoof"
         };
 
         public static float GetVacuum(IntVec3 cell, Map map)

@@ -7,6 +7,8 @@
       <li>SpaceServices.CompSpaceServicePad</li>
       <li>SpaceServices.ServiceEnvironmentUtility</li>
       <li>SpaceServices.ServiceDangerUtility</li>
+      <li>SpaceServices.ServiceDebugLimits</li>
+      <li>SpaceServices.ServiceDelayLodgerUtility</li>
       <li>SpaceServices.ServiceShuttleUtility</li>
       <li>SpaceServices.ShuttleVisual</li>
       <li>SpaceServices.ServiceShuttleGraphicUtility</li>
@@ -26,6 +28,7 @@
       <li>SpaceServices.Alert_SpaceServicesDepartureBlocked</li>
       <li>SpaceServices.JobDriver_BoardServiceShuttle</li>
       <li>SpaceServices.JobDriver_ServiceGoto</li>
+      <li>SpaceServices.JobDriver_ServiceDepartureHold</li>
       <li>SpaceServices.ServiceJobDefUtility</li>
     </Types>
     <Methods>
@@ -58,18 +61,47 @@
       <li>SpaceServices.HospitalityPatchHandlers:SpawnVisitorPostfix</li>
       <li>SpaceServices.HospitalityPatchHandlers:CreateLordPostfix</li>
       <li>SpaceServices.HospitalityPatchHandlers:GuestLeavePrefix</li>
+      <li>SpaceServices.HospitalityPatchHandlers:HospitalityLeaveTriggerPostfix</li>
+      <li>SpaceServices.HospitalityPatchHandlers:NearbyExitDestinationPrefix</li>
       <li>SpaceServices.HospitalityPatchHandlers:OptimizeApparelGuestPrefix</li>
       <li>SpaceServices.HospitalityIncidentGate:EstimatedBedDemandForIncident</li>
       <li>SpaceServices.HospitalityBedUtility:Report</li>
+      <li>SpaceServices.HospitalityBedUtility:TryFindBedlessServiceGuest</li>
+      <li>SpaceServices.HospitalityBedUtility:NeedsHospitalityBed</li>
+      <li>SpaceServices.HospitalityBedUtility:CompGuest</li>
       <li>SpaceServices.HospitalityBedUtility:PrepareGuestsForServiceDeparture</li>
+      <li>SpaceServices.HospitalityBedUtility:DetachPreparedDepartureGuest</li>
       <li>SpaceServices.HospitalityBedUtility:GuestBeds</li>
       <li>SpaceServices.HospitalPatchHandlers:PatientGoToBedPostfix</li>
       <li>SpaceServices.HospitalPatchHandlers:ShouldSeekMedicalRestPostfix</li>
       <li>SpaceServices.HospitalPatchHandlers:ShouldKeepHospitalPatientForOngoingTreatment</li>
+      <li>SpaceServices.HospitalPatchHandlers:ComputeShouldKeepHospitalPatientForOngoingTreatment</li>
+      <li>SpaceServices.HospitalPatchHandlers:TryGetCachedOngoingTreatmentDecision</li>
+      <li>SpaceServices.HospitalPatchHandlers:HospitalPatientGonePrefix</li>
+      <li>SpaceServices.HospitalPatchHandlers:HospitalPatientGonePostfix</li>
+      <li>SpaceServices.HospitalPatchHandlers:SurgeryAddRandomBillPrefix</li>
+      <li>SpaceServices.HospitalPatchHandlers:CanDebugForceTrackedSurgeryFailure</li>
+      <li>SpaceServices.HospitalPatchHandlers:DebugForceTrackedSurgeryFailure</li>
+      <li>SpaceServices.HospitalPatchHandlers:ShouldRouteSpawnedHospitalPatientRemovalToServiceDeparture</li>
+      <li>SpaceServices.ServicePawnDebugGizmosPatch:Postfix</li>
       <li>SpaceServices.ServiceLifecycleUtility:NextTickInterval</li>
       <li>SpaceServices.ServiceLifecycleUtility:RequestDepartureForPawn</li>
       <li>SpaceServices.ServiceLifecycleUtility:MarkRecordDirty</li>
       <li>SpaceServices.ServiceLifecycleUtility:TryFindRecordForPawn</li>
+      <li>SpaceServices.ServiceLifecycleUtility:ShouldDelayHospitalityLeaveForService</li>
+      <li>SpaceServices.ServiceLifecycleUtility:ShouldDelayHospitalityLordLeaveForService</li>
+      <li>SpaceServices.ServiceLifecycleUtility:ShouldDelayHospitalityLordLeaveForServiceDangerOnly</li>
+      <li>SpaceServices.ServiceLifecycleUtility:ShouldDelayHospitalityLeaveForServiceDangerOnly</li>
+      <li>SpaceServices.ServiceLifecycleUtility:ShouldDelayServicePickup</li>
+      <li>SpaceServices.ServiceLifecycleUtility:ValidateTrackedPawnCurrentJob</li>
+      <li>SpaceServices.ServiceLifecycleUtility:ValidateDepartureHoldCurrentJob</li>
+      <li>SpaceServices.ServiceLifecycleUtility:ValidateCurrentTrackedPawnJob</li>
+      <li>SpaceServices.ServiceLifecycleUtility:ValidateDepartureHoldRecordCurrentJob</li>
+      <li>SpaceServices.ServiceLifecycleUtility:ValidateActiveServiceDepartureCurrentJob</li>
+      <li>SpaceServices.ServiceLifecycleUtility:ValidateActiveHospitalPatientCurrentJob</li>
+      <li>SpaceServices.ServiceLifecycleUtility:FindHospitalPatientSafeCell</li>
+      <li>SpaceServices.ServiceLifecycleUtility:HospitalPatientSafeCell</li>
+      <li>SpaceServices.ServiceLifecycleUtility:IsServiceMovementJob</li>
       <li>SpaceServices.ServiceLifecycleUtility:ShouldSuppressHospitalityVacuumApparelJob</li>
       <li>SpaceServices.ServiceLifecycleUtility:ShouldProtectHospitalityVacuumApparel</li>
       <li>SpaceServices.ServiceLifecycleUtility:Tick</li>
@@ -100,8 +132,13 @@
       <li>SpaceServices.ServiceLifecycleUtility:PathCostToCell</li>
       <li>SpaceServices.ServiceLifecycleUtility:ActiveTrackedPawns</li>
       <li>SpaceServices.ServiceLifecycleUtility:BeginDeparture</li>
+      <li>SpaceServices.ServiceLifecycleUtility:BeginHospitalDeparture</li>
       <li>SpaceServices.ServiceLifecycleUtility:EnsureHospitalityDeparturePrepared</li>
+      <li>SpaceServices.ServiceLifecycleUtility:MaintainPreparedHospitalityDeparture</li>
+      <li>SpaceServices.ServiceLifecycleUtility:EnsureReservedDeparturePad</li>
       <li>SpaceServices.ServiceLifecycleUtility:TryReserveBestDeparturePad</li>
+      <li>SpaceServices.ServiceLifecycleUtility:LogDeparturePadRejections</li>
+      <li>SpaceServices.ServiceLifecycleUtility:DeparturePadRejectionReason</li>
       <li>SpaceServices.ServiceLifecycleUtility:OrderedDeparturePads</li>
       <li>SpaceServices.ServiceLifecycleUtility:DeparturePadScore</li>
       <li>SpaceServices.ServiceLifecycleUtility:PadCanSafelyServe</li>
@@ -109,6 +146,8 @@
       <li>SpaceServices.ServiceLifecycleUtility:DepartureModeFallbackPads</li>
       <li>SpaceServices.ServiceLifecycleUtility:AllowsDepartureModeFallback</li>
       <li>SpaceServices.ServiceLifecycleUtility:ReadyForExtraction</li>
+      <li>SpaceServices.ServiceLifecycleUtility:HospitalReadyForPickupLaunch</li>
+      <li>SpaceServices.ServiceLifecycleUtility:HospitalPatientCanWalkToDeparture</li>
       <li>SpaceServices.ServiceLifecycleUtility:HospitalityReadyForPickupCall</li>
       <li>SpaceServices.ServiceLifecycleUtility:PawnReadyForPickupCall</li>
       <li>SpaceServices.ServiceLifecycleUtility:PickupTimedOut</li>
@@ -126,6 +165,7 @@
       <li>SpaceServices.ServiceLifecycleUtility:GuideDepartingPawnsToPad</li>
       <li>SpaceServices.ServiceLifecycleUtility:GuideBoardingPawnsToShuttle</li>
       <li>SpaceServices.ServiceLifecycleUtility:PawnSafelyStagedForPickup</li>
+      <li>SpaceServices.ServiceLifecycleUtility:PawnAtDepartureWaitCell</li>
       <li>SpaceServices.ServiceLifecycleUtility:PawnNearDeparturePad</li>
       <li>SpaceServices.ServiceLifecycleUtility:PawnAtPickupShuttle</li>
       <li>SpaceServices.ServiceLifecycleUtility:PadReachableForPawns</li>
@@ -133,12 +173,22 @@
       <li>SpaceServices.ServiceLifecycleUtility:PickupBoardingCell</li>
       <li>SpaceServices.ServiceLifecycleUtility:PickupBoardingRect</li>
       <li>SpaceServices.ServiceLifecycleUtility:DepartureWaitCell</li>
+      <li>SpaceServices.ServiceLifecycleUtility:DeparturePickupBlocked</li>
+      <li>SpaceServices.ServiceLifecycleUtility:WaitForDeparturePad</li>
+      <li>SpaceServices.ServiceLifecycleUtility:EnterDepartureHold</li>
+      <li>SpaceServices.ServiceLifecycleUtility:ClearDeferredNativeDepartureJobs</li>
+      <li>SpaceServices.ServiceLifecycleUtility:GuideDepartureHoldPawns</li>
+      <li>SpaceServices.ServiceLifecycleUtility:DepartureHoldWanderCell</li>
+      <li>SpaceServices.ServiceLifecycleUtility:DepartureHoldWanderCandidate</li>
+      <li>SpaceServices.ServiceLifecycleUtility:RandomReachableCell</li>
       <li>SpaceServices.ServiceLifecycleUtility:BestReachableBoardingCell</li>
       <li>SpaceServices.ServiceLifecycleUtility:BetterCell</li>
       <li>SpaceServices.ServiceLifecycleUtility:PawnAlreadyGoingTo</li>
       <li>SpaceServices.ServiceLifecycleUtility:ServiceGotoJob</li>
+      <li>SpaceServices.ServiceLifecycleUtility:ServiceDepartureHoldJob</li>
       <li>SpaceServices.ServiceLifecycleUtility:ServiceBoardingJob</li>
       <li>SpaceServices.ServiceLifecycleUtility:BestReachableCell</li>
+      <li>SpaceServices.ServiceLifecycleUtility:BestReachableStagingFallback</li>
       <li>SpaceServices.ServiceLifecycleUtility:BlockedDepartures</li>
       <li>SpaceServices.ServiceLifecycleUtility:BuildBlockedDepartures</li>
       <li>SpaceServices.ServiceLifecycleUtility:ShouldReportDepartureBlock</li>
@@ -182,6 +232,12 @@
       <li>SpaceServices.ServiceEnvironmentUtility:IsRoofAccessible</li>
       <li>SpaceServices.ServiceEnvironmentUtility:IsSafeForPawn</li>
       <li>SpaceServices.ServiceEnvironmentUtility:IsPadSafeForPawnsAtTarget</li>
+      <li>SpaceServices.ServiceDangerUtility:ArrivalTrafficBlocked</li>
+      <li>SpaceServices.ServiceDangerUtility:DepartureShuttleBlocked</li>
+      <li>SpaceServices.ServiceDangerUtility:ServiceTrafficBlocked</li>
+      <li>SpaceServices.ServiceDangerUtility:ConditionBlocksService</li>
+      <li>SpaceServices.CompSpaceServicePad:DrawCornerBeaconOverlays</li>
+      <li>SpaceServices.CompSpaceServicePad:DrawCornerBeacon</li>
       <li>SpaceServices.DepartureUtility:CompleteDeparture</li>
       <li>SpaceServices.DepartureUtility:TryAutoExtract</li>
       <li>SpaceServices.DepartureUtility:TryExitSpawnedPawn</li>
@@ -191,8 +247,11 @@
       <li>SpaceServices.JobDriver_BoardServiceShuttle:MakeNewToils</li>
       <li>SpaceServices.JobDriver_ServiceGoto:TryMakePreToilReservations</li>
       <li>SpaceServices.JobDriver_ServiceGoto:MakeNewToils</li>
+      <li>SpaceServices.JobDriver_ServiceDepartureHold:TryMakePreToilReservations</li>
+      <li>SpaceServices.JobDriver_ServiceDepartureHold:MakeNewToils</li>
       <li>SpaceServices.ServiceJobDefUtility:get_BoardServiceShuttle</li>
       <li>SpaceServices.ServiceJobDefUtility:get_ServiceGoto</li>
+      <li>SpaceServices.ServiceJobDefUtility:get_ServiceDepartureHold</li>
     </Methods>
   </SpaceServices>
 </Analyzer>

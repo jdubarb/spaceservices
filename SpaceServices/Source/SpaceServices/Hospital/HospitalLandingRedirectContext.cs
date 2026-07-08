@@ -96,6 +96,20 @@ namespace SpaceServices
             return false;
         }
 
+        public static bool TryGetActiveMap(out Map map)
+        {
+            foreach (Request request in Requests)
+            {
+                if (request.map != null && request.cell.IsValid)
+                {
+                    map = request.map;
+                    return true;
+                }
+            }
+            map = null;
+            return false;
+        }
+
         public static bool TryGetForcedCell(Map map, out IntVec3 cell)
         {
             foreach (Request request in Requests)

@@ -15,7 +15,7 @@ namespace SpaceServices
 {
     public class SpaceServicesMod : Mod
     {
-        private const float SettingsViewHeight = 950f;
+        private const float SettingsViewHeight = 1000f;
         private static Vector2 settingsScrollPosition;
 
         public static SpaceServicesSettings Settings;
@@ -45,6 +45,8 @@ namespace SpaceServices
             Checkbox(listing, "JDB_SpaceServices_Settings_HospitalCareMode", ref Settings.hospitalPatientCareMode);
             Checkbox(listing, "JDB_SpaceServices_Settings_Hospitality", ref Settings.enableHospitality);
             Checkbox(listing, "JDB_SpaceServices_Settings_ReplaceExternalTabs", ref Settings.replaceExternalServiceTabs);
+            Checkbox(listing, "JDB_SpaceServices_Settings_ShowHospitalFallbackPadOverlay", ref Settings.showHospitalFallbackPadOverlay);
+            Checkbox(listing, "JDB_SpaceServices_Settings_ShowHospitalityFallbackPadOverlay", ref Settings.showHospitalityFallbackPadOverlay);
 
             Section(listing, "JDB_SpaceServices_Settings_SectionVerbose");
             Checkbox(listing, "JDB_SpaceServices_Settings_DebugLogging", ref Settings.debugLogging);
@@ -78,6 +80,8 @@ namespace SpaceServices
             bool moddedVisualsBefore = Settings.allowModdedShuttleVisuals;
             Checkbox(listing, "JDB_SpaceServices_Settings_ModdedShuttleVisuals", ref Settings.allowModdedShuttleVisuals);
             Checkbox(listing, "JDB_SpaceServices_Settings_DisablePatientGamblingAddictions", ref Settings.disablePatientGamblingAddictions);
+            Checkbox(listing, "JDB_SpaceServices_Settings_BlockHospitalSurgeryScaria", ref Settings.blockHospitalSurgeryScaria);
+            Checkbox(listing, "JDB_SpaceServices_Settings_HoldFailedSurgeryAftercare", ref Settings.holdFailedSurgeryAftercare);
             Checkbox(listing, "JDB_SpaceServices_Settings_BlockVGEAsteroidShower", ref Settings.blockVgeAsteroidShower);
 
             Section(listing, "JDB_SpaceServices_Settings_SectionExperimental");
@@ -143,7 +147,10 @@ namespace SpaceServices
         public bool enableHospital = true;
         public bool hospitalPatientCareMode = true;
         public bool enableHospitality = true;
+        public bool showSpaceServicesTab = true;
         public bool replaceExternalServiceTabs = true;
+        public bool showHospitalFallbackPadOverlay = true;
+        public bool showHospitalityFallbackPadOverlay = false;
         public bool hospitalityRequireGuestBeds = true;
         public bool hospitalityAutoDepartBedlessGuests = true;
         public bool hospitalityVacuumGuard = false;
@@ -157,6 +164,8 @@ namespace SpaceServices
         public bool allowSealedNoSuitArrivals = true;
         public bool allowModdedShuttleVisuals = true;
         public bool disablePatientGamblingAddictions = true;
+        public bool blockHospitalSurgeryScaria = true;
+        public bool holdFailedSurgeryAftercare = true;
         public bool blockVgeAsteroidShower = true;
         public bool enableGroundsideServicePads = false;
         public float groundsideHospitalityShuttleShare = 1f;
@@ -182,7 +191,10 @@ namespace SpaceServices
             Scribe_Values.Look(ref enableHospital, "enableHospital", true);
             Scribe_Values.Look(ref hospitalPatientCareMode, "hospitalPatientCareMode", true);
             Scribe_Values.Look(ref enableHospitality, "enableHospitality", true);
+            Scribe_Values.Look(ref showSpaceServicesTab, "showSpaceServicesTab", true);
             Scribe_Values.Look(ref replaceExternalServiceTabs, "replaceExternalServiceTabs", true);
+            Scribe_Values.Look(ref showHospitalFallbackPadOverlay, "showHospitalFallbackPadOverlay", true);
+            Scribe_Values.Look(ref showHospitalityFallbackPadOverlay, "showHospitalityFallbackPadOverlay", false);
             Scribe_Values.Look(ref hospitalityRequireGuestBeds, "hospitalityRequireGuestBeds", true);
             Scribe_Values.Look(ref hospitalityAutoDepartBedlessGuests, "hospitalityAutoDepartBedlessGuests", true);
             Scribe_Values.Look(ref hospitalityVacuumGuard, "hospitalityVacuumGuard", false);
@@ -199,6 +211,8 @@ namespace SpaceServices
             Scribe_Values.Look(ref allowSealedNoSuitArrivals, "allowSealedNoSuitArrivals", true);
             Scribe_Values.Look(ref allowModdedShuttleVisuals, "allowModdedShuttleVisuals", true);
             Scribe_Values.Look(ref disablePatientGamblingAddictions, "disablePatientGamblingAddictions", true);
+            Scribe_Values.Look(ref blockHospitalSurgeryScaria, "blockHospitalSurgeryScaria", true);
+            Scribe_Values.Look(ref holdFailedSurgeryAftercare, "holdFailedSurgeryAftercare", true);
             Scribe_Values.Look(ref blockVgeAsteroidShower, "blockVgeAsteroidShower", true);
             Scribe_Values.Look(ref enableGroundsideServicePads, "enableGroundsideServicePads", false);
             Scribe_Values.Look(ref groundsideHospitalityShuttleShare, "groundsideHospitalityShuttleShare", 1f);

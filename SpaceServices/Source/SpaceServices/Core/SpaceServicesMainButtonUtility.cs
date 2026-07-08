@@ -54,16 +54,21 @@ namespace SpaceServices
         public static void ApplyServiceTabVisibility(bool refreshCache = true)
         {
             bool showExternal = SpaceServicesMod.Settings != null && !SpaceServicesMod.Settings.replaceExternalServiceTabs;
+            bool showSpaceServices = SpaceServicesMod.Settings == null || SpaceServicesMod.Settings.replaceExternalServiceTabs;
             foreach (MainButtonDef def in DefDatabase<MainButtonDef>.AllDefsListForReading)
             {
                 if (IsReplacedServiceTab(def))
                 {
                     SetMainButtonVisible(def, showExternal);
                 }
+                else if (IsSpaceServicesTab(def))
+                {
+                    SetMainButtonVisible(def, showSpaceServices);
+                }
             }
             if (refreshCache)
             {
-                RefreshMainButtonCache(showExternal);
+                RefreshMainButtonCache(showExternal, showSpaceServices);
             }
         }
 
@@ -136,6 +141,11 @@ namespace SpaceServices
             return tabWindowClassName != null && ReplacedServiceTabWindowNames.Contains(tabWindowClassName);
         }
 
+        private static bool IsSpaceServicesTab(MainButtonDef def)
+        {
+            return def != null && def.defName == "JDB_SpaceServicesMain";
+        }
+
         private static void SetMainButtonVisible(MainButtonDef def, bool visible)
         {
             FieldInfo field = AccessTools.Field(typeof(MainButtonDef), "buttonVisible");
@@ -146,16 +156,13 @@ namespace SpaceServices
             field.SetValue(def, visible);
         }
 
-        private static void RefreshMainButtonCache(bool showExternal)
+        private static void RefreshMainButtonCache(bool showExternal, bool showSpaceServices)
         {
             object buttonsRoot = TryGetUiRoot(() => Find.MainButtonsRoot);
             object tabsRoot = TryGetUiRoot(() => Find.MainTabsRoot);
             InvokeNoArgRefreshMethods(buttonsRoot);
             InvokeNoArgRefreshMethods(tabsRoot);
-            if (!showExternal)
-            {
-                PruneCachedButtonLists(buttonsRoot);
-            }
+            SyncCachedMainButtonList(buttonsRoot);
         }
 
         private static object TryGetUiRoot(Func<object> getter)
@@ -199,41 +206,49 @@ namespace SpaceServices
             }
         }
 
-        private static void PruneCachedButtonLists(object buttonsRoot)
+        private static void SyncCachedMainButtonList(object buttonsRoot)
         {
             if (buttonsRoot == null)
             {
                 return;
             }
-            foreach (FieldInfo field in buttonsRoot.GetType().GetFields(BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic))
+            FieldInfo field = AccessTools.Field(buttonsRoot.GetType(), "allButtonsInOrder");
+            if (field == null)
             {
-                if (!typeof(IList).IsAssignableFrom(field.FieldType))
+                return;
+            }
+            if (!(field.GetValue(buttonsRoot) is IList list))
+            {
+                return;
+            }
+            if (list.IsReadOnly || list.IsFixedSize)
+            {
+                return;
+            }
+            try
+            {
+                list.Clear();
+                foreach (MainButtonDef def in DefDatabase<MainButtonDef>.AllDefsListForReading
+                    .Where(def => def != null && IsMainButtonVisible(def))
+                    .OrderBy(def => def.order))
                 {
-                    continue;
-                }
-                if (!(field.GetValue(buttonsRoot) is IList list))
-                {
-                    continue;
-                }
-                if (list.IsReadOnly || list.IsFixedSize)
-                {
-                    continue;
-                }
-                for (int i = list.Count - 1; i >= 0; i--)
-                {
-                    if (list[i] is MainButtonDef def && IsReplacedServiceTab(def))
-                    {
-                        try
-                        {
-                            list.RemoveAt(i);
-                        }
-                        catch
-                        {
-                            break;
-                        }
-                    }
+                    list.Add(def);
                 }
             }
+            catch
+            {
+                // UI cache details are version-specific. If rebuild fails, the next game restart still gets def visibility.
+            }
+        }
+
+        private static bool IsMainButtonVisible(MainButtonDef def)
+        {
+            FieldInfo field = AccessTools.Field(typeof(MainButtonDef), "buttonVisible");
+            if (field == null)
+            {
+                return true;
+            }
+            return field.GetValue(def) as bool? ?? true;
         }
     }
 }

@@ -135,7 +135,7 @@ namespace SpaceServices
 
         private static void SendPatientArrivalNotice(Pawn pawn)
         {
-            Messages.Message("Space Services: patient arrived", pawn, MessageTypeDefOf.NeutralEvent, false);
+            Messages.Message("Space Services: Patient Arrived", pawn, MessageTypeDefOf.NeutralEvent, false);
         }
     }
 }

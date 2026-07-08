@@ -325,7 +325,7 @@ namespace SpaceServices
                 {
                     continue;
                 }
-                if (record.serviceKind == "hospital" && record.state != "departing" && record.reservedPad != null)
+                if (record.serviceKind == "hospital" && !ServiceLifecycleUtility.IsActiveDepartureState(record) && record.reservedPad != null)
                 {
                     ReleaseServiceRecord(record);
                     record.reservedPad = null;
@@ -339,7 +339,7 @@ namespace SpaceServices
                 int before = record.pawns.Count;
                 record.pawns = record.pawns.Where(pawn => !ServicePawnUtility.IsTerminalPawn(pawn)).Distinct().ToList();
                 removed += before - record.pawns.Count;
-                if (record.serviceKind == "hospital" && hospitalPatients != null)
+                if (record.serviceKind == "hospital" && hospitalPatients != null && !ServiceLifecycleUtility.IsActiveDepartureState(record))
                 {
                     before = record.pawns.Count;
                     record.pawns = record.pawns.Where(pawn => hospitalPatients.Contains(pawn)).ToList();

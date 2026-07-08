@@ -16,6 +16,7 @@ namespace SpaceServices
     public static class HospitalityPatchHandlers
     {
         private static readonly HashSet<Pawn> NativeGuestLeaveAllowed = new HashSet<Pawn>();
+        private static readonly HashSet<Lord> DelayedVisitPointLeaveLords = new HashSet<Lord>();
         private static MethodInfo setNextOptimizeTickMethod;
 
         public static bool VisitorGroupTryExecutePrefix(object __instance, IncidentParms parms, ref bool __result)
@@ -80,7 +81,7 @@ namespace SpaceServices
                 {
                     ServiceDebugUtility.LogAudit("Hospitality VisitorGroup scheduled shuttle arrival pad=" + ServiceDebugUtility.ThingAuditSummary(pad) + " visual=" + (visual.shipThingDef == null ? "none" : visual.shipThingDef.defName));
                     ServiceShuttleUtility.SpawnArrival(map, pad.Position, visual);
-                    Messages.Message("Space Services: visitors inbound", pad, MessageTypeDefOf.SilentInput, false);
+                    Messages.Message("Space Services: Visitors Inbound", pad, MessageTypeDefOf.SilentInput, false);
                     __result = true;
                     return false;
                 }
@@ -302,6 +303,15 @@ namespace SpaceServices
             }
             // Native Hospitality removes guests by walking/despawning them. In space-service maps we
             // intercept that handoff so pickup shuttles can own the departure instead.
+            if (ServiceLifecycleUtility.ShouldDelayHospitalityLeaveForService(pawn, out string delayReason))
+            {
+                ServiceDebugUtility.LogThrottled(
+                    ServiceLogIntegration.Hospitality,
+                    "hospitality-guest-leave-delayed-" + (pawn == null ? -1 : pawn.thingIDNumber),
+                    "Hospitality guest leave delayed until Space Services pickup is available: " + (delayReason ?? "pickup blocked"),
+                    GenDate.TicksPerHour);
+                return false;
+            }
             if (ServiceLifecycleUtility.RequestDepartureForPawn(pawn, "Hospitality marked guest leaving"))
             {
                 ServiceDebugUtility.LogAudit("Hospitality GuestUtility.Leave blocked; Space Services owns departure: " + HospitalityBedUtility.GuestDebugSummary(pawn));
@@ -397,6 +407,44 @@ namespace SpaceServices
             }
         }
 
+        public static void HospitalityLeaveTriggerPostfix(Lord lord, ref bool __result)
+        {
+            if (!__result ||
+                SpaceServicesMod.Settings != null && !SpaceServicesMod.Settings.enableHospitality)
+            {
+                return;
+            }
+            if (!ServiceLifecycleUtility.ShouldDelayHospitalityLordLeaveForService(lord, out string reason))
+            {
+                return;
+            }
+            __result = false;
+            ServiceDebugUtility.LogThrottled(
+                ServiceLogIntegration.Hospitality,
+                "hospitality-lord-leave-delayed-" + (lord == null ? -1 : lord.loadID),
+                "Hospitality visit leave delayed until Space Services pickup is available: " + (reason ?? "pickup blocked"),
+                GenDate.TicksPerHour);
+        }
+
+        public static bool NearbyExitDestinationPrefix(Transition trans)
+        {
+            if (SpaceServicesMod.Settings != null && !SpaceServicesMod.Settings.enableHospitality)
+            {
+                return true;
+            }
+            Lord lord = (trans == null ? null : trans.target as LordToil)?.lord;
+            if (lord == null || lord.ownedPawns == null || lord.ownedPawns.Any(pawn => pawn != null && pawn.Spawned && pawn.Map != null))
+            {
+                return true;
+            }
+            ServiceDebugUtility.LogThrottled(
+                ServiceLogIntegration.Hospitality,
+                "hospitality-empty-lord-nearby-exit-" + (lord == null ? -1 : lord.loadID),
+                "Skipped Hospitality nearby exit selection for an empty or despawned visitor lord.",
+                GenDate.TicksPerHour);
+            return false;
+        }
+
         public static void VisitPointLeavePostfix(object __instance)
         {
             if (SpaceServicesMod.Settings != null && !SpaceServicesMod.Settings.enableHospitality)
@@ -408,11 +456,43 @@ namespace SpaceServices
             {
                 return;
             }
+            if (DelayedVisitPointLeaveLords.Remove(lord))
+            {
+                return;
+            }
             foreach (Pawn pawn in lord.ownedPawns.ToList())
             {
                 // LordToil_VisitPoint.Leave is Hospitality's clearest "visit is over" signal.
                 ServiceLifecycleUtility.RequestDepartureForPawn(pawn, "Hospitality visit ended");
             }
+        }
+
+        public static bool VisitPointLeavePrefix(object __instance)
+        {
+            if (SpaceServicesMod.Settings != null && !SpaceServicesMod.Settings.enableHospitality)
+            {
+                return true;
+            }
+            Lord lord = Reflect.GetMember(__instance, "lord") as Lord;
+            if (lord == null || lord.ownedPawns == null)
+            {
+                return true;
+            }
+            foreach (Pawn pawn in lord.ownedPawns.ToList())
+            {
+                if (ServiceLifecycleUtility.ShouldDelayHospitalityLeaveForService(pawn, out string reason))
+                {
+                    DelayedVisitPointLeaveLords.Add(lord);
+                    ServiceDebugUtility.LogThrottled(
+                        ServiceLogIntegration.Hospitality,
+                        "hospitality-leave-delayed-" + (lord.loadID),
+                        "Hospitality visit leave delayed until Space Services pickup is available: " + (reason ?? "pickup blocked"),
+                        GenDate.TicksPerHour);
+                    return false;
+                }
+            }
+            DelayedVisitPointLeaveLords.Remove(lord);
+            return true;
         }
     }
 }

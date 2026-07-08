@@ -32,13 +32,21 @@ namespace SpaceServices
         private const int StableActivePawnValidationTicks = 10000;
         private const int StableBedlessCheckTicks = 2500;
         private const int StableLeaveStateCheckTicks = 2500;
+        private const int FailedDeparturePadReservationRetryTicks = 600;
         private const int HospitalitySafeCellCacheTicks = 120;
         private const int HospitalityRouteSafeCellScanLimit = 120;
         private const int HospitalityArrivalRouteStopCooldownTicks = 3000;
+        private const int HospitalityDangerLeaveCacheTicks = 60;
+        public const int DepartureHoldWanderJobTicks = 1;
+        private const float DepartureHoldWanderRadius = 14f;
+        private const int DepartureHoldWanderCandidateLimit = 64;
         private static readonly List<ServiceDepartureBlock> CachedDepartureBlocks = new List<ServiceDepartureBlock>();
         private static int cachedDepartureBlocksTick = -999999;
         private static readonly Dictionary<string, CachedHospitalitySafeCells> HospitalitySafeCellCache = new Dictionary<string, CachedHospitalitySafeCells>();
         private static readonly Dictionary<int, int> HospitalityArrivalRouteStopTickByPawn = new Dictionary<int, int>();
+        private static readonly Dictionary<int, CachedHospitalityLeaveDelay> HospitalityDangerLeaveDelayCache = new Dictionary<int, CachedHospitalityLeaveDelay>();
+        private static readonly Dictionary<string, int> DeparturePadRejectionLogTickByRecord = new Dictionary<string, int>();
+        private static readonly HashSet<int> DepartureHoldJobValidationInProgress = new HashSet<int>();
 
         public static int NextTickInterval(List<ServiceGroupRecord> records)
         {
@@ -50,7 +58,21 @@ namespace SpaceServices
             {
                 return 30;
             }
+            if (records != null && records.Any(record => record != null && record.state == "departureHold"))
+            {
+                return 250;
+            }
             return 250;
+        }
+
+        public static void ClearTransientCaches()
+        {
+            HospitalitySafeCellCache.Clear();
+            HospitalityArrivalRouteStopTickByPawn.Clear();
+            HospitalityDangerLeaveDelayCache.Clear();
+            DeparturePadRejectionLogTickByRecord.Clear();
+            CachedDepartureBlocks.Clear();
+            cachedDepartureBlocksTick = -999999;
         }
 
         public static void RegisterPawns(Map map, string kind, IEnumerable<Pawn> pawns)
@@ -178,6 +200,7 @@ namespace SpaceServices
             ReleaseRecord(record);
             record.reservedPad = null;
             record.state = "completed";
+            ServiceDelayLodgerUtility.CleanupRecord(record, QuestEndOutcome.Unknown);
             ServiceDebugUtility.Log("Cleared service group " + groupId + " reservation: " + reason);
             return true;
         }
@@ -193,6 +216,11 @@ namespace SpaceServices
             }
             if (ServicePawnUtility.IsPlayerOwnedPawn(pawn))
             {
+                if (ServiceDelayLodgerUtility.IsDelayLodger(record, pawn))
+                {
+                    BeginDeparture(map, record, reason);
+                    return true;
+                }
                 ReleasePawn(pawn, "pawn became player-owned before service departure");
                 ServiceDebugUtility.LogAudit("RequestDepartureForPawn ignored player-owned pawn=" + ServiceDebugUtility.PawnAuditSummary(pawn) + " reason=" + (reason ?? "none"));
                 return false;
@@ -233,6 +261,7 @@ namespace SpaceServices
             }
             if (record.pawns == null || record.pawns.Count == 0)
             {
+                ServiceDelayLodgerUtility.CleanupRecord(record, QuestEndOutcome.Unknown);
                 ReleaseRecord(record);
                 record.state = "completed";
                 ServiceDebugUtility.Log("Released service group " + record.id + ": " + reason);
@@ -243,6 +272,380 @@ namespace SpaceServices
                 MarkRecordDirty(map, record, "service pawn released");
             }
             return true;
+        }
+
+        public static bool ShouldHoldPawnForServiceDeparture(Pawn pawn)
+        {
+            Map map;
+            ServiceGroupRecord record;
+            return TryFindRecordForPawn(pawn, out map, out record) &&
+                record != null &&
+                record.state == "departureHold";
+        }
+
+        public static bool IsIntentionalDelayLodger(Pawn pawn)
+        {
+            Map map;
+            ServiceGroupRecord record;
+            return TryFindRecordForPawn(pawn, out map, out record) &&
+                ServiceDelayLodgerUtility.IsDelayLodger(record, pawn);
+        }
+
+        public static bool ShouldDelayHospitalityLeaveForService(Pawn pawn, out string reason)
+        {
+            reason = null;
+            Map map;
+            ServiceGroupRecord record;
+            if (!TryFindRecordForPawn(pawn, out map, out record) || !HospitalityLeaveManagedByService(record))
+            {
+                return false;
+            }
+            if (record.state == "pickupInbound" || record.state == "boardingPickup" || record.state == "extracting" || record.state == "completed")
+            {
+                return false;
+            }
+            map = map ?? pawn?.MapHeld ?? pawn?.Map ?? record.reservedPad?.Map ?? record.arrivalPad?.Map;
+            if (map == null)
+            {
+                return false;
+            }
+            return ShouldDelayServicePickup(map, record, out reason);
+        }
+
+        public static bool ShouldDelayHospitalityLordLeaveForService(Lord lord, out string reason)
+        {
+            reason = null;
+            if (lord == null || lord.ownedPawns == null)
+            {
+                return false;
+            }
+            foreach (Pawn pawn in lord.ownedPawns.ToList())
+            {
+                if (ShouldDelayHospitalityLeaveForService(pawn, out reason))
+                {
+                    return true;
+                }
+            }
+            return false;
+        }
+
+        public static bool ShouldDelayHospitalityLordLeaveForServiceDangerOnly(Lord lord, out string reason)
+        {
+            reason = null;
+            if (lord == null || lord.ownedPawns == null)
+            {
+                return false;
+            }
+            int now = Find.TickManager == null ? 0 : Find.TickManager.TicksGame;
+            CachedHospitalityLeaveDelay cached;
+            if (now > 0 &&
+                HospitalityDangerLeaveDelayCache.TryGetValue(lord.loadID, out cached))
+            {
+                if (cached.createdTick > now)
+                {
+                    HospitalityDangerLeaveDelayCache.Clear();
+                }
+                else if (cached.expiresTick > now)
+                {
+                    reason = cached.reason;
+                    return cached.delay;
+                }
+            }
+            bool delay = false;
+            foreach (Pawn pawn in lord.ownedPawns.ToList())
+            {
+                if (ShouldDelayHospitalityLeaveForServiceDangerOnly(pawn, out reason))
+                {
+                    delay = true;
+                    break;
+                }
+            }
+            if (now > 0)
+            {
+                HospitalityDangerLeaveDelayCache[lord.loadID] = new CachedHospitalityLeaveDelay
+                {
+                    delay = delay,
+                    reason = reason,
+                    createdTick = now,
+                    expiresTick = now + HospitalityDangerLeaveCacheTicks
+                };
+            }
+            return delay;
+        }
+
+        private static bool ShouldDelayHospitalityLeaveForServiceDangerOnly(Pawn pawn, out string reason)
+        {
+            reason = null;
+            Map map;
+            ServiceGroupRecord record;
+            if (!TryFindRecordForPawn(pawn, out map, out record) || !HospitalityLeaveManagedByService(record))
+            {
+                return false;
+            }
+            if (record.state == "pickupInbound" || record.state == "boardingPickup" || record.state == "extracting" || record.state == "completed")
+            {
+                return false;
+            }
+            map = map ?? pawn?.MapHeld ?? pawn?.Map ?? record.reservedPad?.Map ?? record.arrivalPad?.Map;
+            if (map == null)
+            {
+                return false;
+            }
+            if (ServiceDangerUtility.DepartureShuttleBlocked(map, record.serviceKind, out reason))
+            {
+                return true;
+            }
+            return record.serviceKind == "hospitality" && ServiceDangerUtility.HospitalityTrafficBlocked(map, out reason);
+        }
+
+        private static bool ShouldDelayServicePickup(Map map, ServiceGroupRecord record, out string reason)
+        {
+            reason = null;
+            if (map == null || record == null)
+            {
+                return false;
+            }
+            if (ServiceDangerUtility.DepartureShuttleBlocked(map, record.serviceKind, out reason))
+            {
+                return true;
+            }
+            if (record.serviceKind == "hospitality" && ServiceDangerUtility.HospitalityTrafficBlocked(map, out reason))
+            {
+                return true;
+            }
+
+            ServiceUse use = DepartureUse(record);
+            if (record.reservedPad != null && !PadCanSafelyServeDeparture(record.reservedPad, use, record, ShouldBypassGuestArea(record)))
+            {
+                ReleaseRecord(record);
+                record.reservedPad = null;
+            }
+            if (record.reservedPad == null)
+            {
+                if (!EnsureReservedDeparturePad(map, record, use))
+                {
+                    reason = "no usable service pad for pickup";
+                    return true;
+                }
+            }
+            return false;
+        }
+
+        private static bool HospitalityLeaveManagedByService(ServiceGroupRecord record)
+        {
+            return record != null &&
+                (record.serviceKind == "hospitality" ||
+                    (record.serviceKind == "hospital" && record.departureHoldHospitalityHandoffDone));
+        }
+
+        public static bool IsActiveDepartureState(ServiceGroupRecord record)
+        {
+            if (record == null)
+            {
+                return false;
+            }
+            return record.state == "departureHold" ||
+                record.state == "departing" ||
+                record.state == "pickupInbound" ||
+                record.state == "boardingPickup";
+        }
+
+        public static void ValidateDepartureHoldCurrentJob(Pawn pawn)
+        {
+            ValidateCurrentTrackedPawnJob(pawn, true);
+        }
+
+        public static void ValidateTrackedPawnCurrentJob(Pawn pawn)
+        {
+            ValidateCurrentTrackedPawnJob(pawn, false);
+        }
+
+        private static void ValidateCurrentTrackedPawnJob(Pawn pawn, bool departureHoldOnly)
+        {
+            if (pawn == null || !pawn.Spawned || pawn.Downed || pawn.jobs == null)
+            {
+                return;
+            }
+            int pawnId = pawn.thingIDNumber;
+            if (DepartureHoldJobValidationInProgress.Contains(pawnId))
+            {
+                return;
+            }
+            DepartureHoldJobValidationInProgress.Add(pawnId);
+            try
+            {
+                Map map;
+                ServiceGroupRecord record;
+                if (!TryFindRecordForPawn(pawn, out map, out record) || record == null)
+                {
+                    return;
+                }
+                if (record.state == "departureHold")
+                {
+                    ValidateDepartureHoldRecordCurrentJob(pawn, map, record);
+                    return;
+                }
+                if (!departureHoldOnly)
+                {
+                    if (ValidateActiveServiceDepartureCurrentJob(pawn, map, record))
+                    {
+                        return;
+                    }
+                    ValidateActiveHospitalPatientCurrentJob(pawn, map, record);
+                }
+            }
+            finally
+            {
+                DepartureHoldJobValidationInProgress.Remove(pawnId);
+            }
+        }
+
+        private static void ValidateDepartureHoldRecordCurrentJob(Pawn pawn, Map map, ServiceGroupRecord record)
+        {
+            if (record == null || record.state != "departureHold")
+            {
+                return;
+            }
+            if (DepartureHoldExternallyManaged(record))
+            {
+                if (record.departureHoldHospitalityHandoffDone)
+                {
+                    RestoreHospitalityVisitLord(pawn.GetLord(), "externally managed departure hold job validation");
+                }
+                ClearServiceDepartureHoldJob(pawn, record, "externally managed departure hold job validation");
+                return;
+            }
+            map = map ?? pawn.Map;
+            if (map == null)
+            {
+                return;
+            }
+            Area area = DepartureHoldArea(map, record, pawn);
+            if (DepartureHoldNeedsIntervention(map, pawn, area))
+            {
+                GuideDepartureHoldPawns(record, "current job leaves departure hold");
+            }
+        }
+
+        private static bool ValidateActiveServiceDepartureCurrentJob(Pawn pawn, Map map, ServiceGroupRecord record)
+        {
+            if (pawn == null ||
+                record == null ||
+                !record.hospitalityDeparturePrepared ||
+                record.state == "departureHold" ||
+                !UsesHospitalityDepartureHandling(record) ||
+                ServicePawnUtility.IsPlayerOwnedPawn(pawn))
+            {
+                return false;
+            }
+            if (record.state != "departing" && record.state != "pickupInbound" && record.state != "boardingPickup")
+            {
+                return false;
+            }
+            Job current = pawn.CurJob;
+            if (current == null || IsServiceMovementJob(current))
+            {
+                return false;
+            }
+            MaintainPreparedHospitalityDeparture(record, "active service departure job validation");
+            pawn.jobs.EndCurrentJob(JobCondition.InterruptForced);
+            if (record.state == "boardingPickup")
+            {
+                GuideBoardingPawnsToShuttle(record);
+            }
+            else
+            {
+                GuideDepartingPawnsToPad(record);
+            }
+            string jobName = current.def == null ? "unknown" : current.def.defName;
+            ServiceDebugUtility.LogAudit("Interrupted non-service job during active service departure pawn=" + ServiceDebugUtility.PawnAuditSummary(pawn) + " job=" + jobName + " record=" + RecordAudit(record));
+            return true;
+        }
+
+        private static void ValidateActiveHospitalPatientCurrentJob(Pawn pawn, Map map, ServiceGroupRecord record)
+        {
+            if (pawn == null || record == null || record.serviceKind != "hospital" || record.state != "arrived" || pawn.Faction == Faction.OfPlayer)
+            {
+                return;
+            }
+            map = map ?? pawn.Map;
+            if (map == null || !HospitalPatchHandlers.IsActiveHospitalPatient(pawn))
+            {
+                return;
+            }
+            Job current = pawn.CurJob;
+            if (current == null || IsServiceMovementJob(current))
+            {
+                return;
+            }
+            bool unsafeNow = !ServiceEnvironmentUtility.IsSafeForPawn(pawn, map, pawn.Position);
+            bool unsafeDestination = JobTargetsUnsafeVacuum(current, pawn, map);
+            if (!unsafeNow && !unsafeDestination)
+            {
+                return;
+            }
+            IntVec3 safeCell = FindHospitalPatientSafeCell(map, record, pawn);
+            if (!safeCell.IsValid)
+            {
+                if (unsafeDestination && !unsafeNow)
+                {
+                    pawn.jobs.EndCurrentJob(JobCondition.Incompletable);
+                }
+                ServiceDebugUtility.LogThrottled(ServiceLogIntegration.Hospital, "hospital-patient-unsafe-job-no-cell-" + pawn.thingIDNumber, "Could not find a safe cell for active Hospital patient job guard: " + ServiceDebugUtility.PawnAuditSummary(pawn), GenDate.TicksPerHour);
+                return;
+            }
+            if (safeCell == pawn.Position)
+            {
+                if (unsafeDestination)
+                {
+                    pawn.jobs.EndCurrentJob(JobCondition.Incompletable);
+                }
+                return;
+            }
+            if (PawnAlreadyGoingTo(pawn, safeCell))
+            {
+                return;
+            }
+            pawn.jobs.EndCurrentJob(JobCondition.Incompletable);
+            pawn.jobs.TryTakeOrderedJob(ServiceGotoJob(safeCell, false, LocomotionUrgency.Jog), JobTag.Misc);
+            ServiceDebugUtility.LogThrottled(ServiceLogIntegration.Hospital, "hospital-patient-unsafe-job-guard-" + pawn.thingIDNumber, "Redirected active Hospital patient away from unsafe job target: " + ServiceDebugUtility.PawnAuditSummary(pawn) + " -> " + safeCell, GenDate.TicksPerHour);
+        }
+
+        private static IntVec3 FindHospitalPatientSafeCell(Map map, ServiceGroupRecord record, Pawn pawn)
+        {
+            if (map == null || pawn == null)
+            {
+                return IntVec3.Invalid;
+            }
+            Building_Bed bed = RestUtility.FindBedFor(pawn, pawn, false, false, (GuestStatus?)null);
+            if (HospitalPatientSafeCell(bed, map, pawn, out IntVec3 bedCell))
+            {
+                return bedCell;
+            }
+            Thing pad = record == null ? null : record.reservedPad ?? record.arrivalPad;
+            return FindHospitalitySafeCell(map, pad, pawn, true, false);
+        }
+
+        private static bool HospitalPatientSafeCell(Building_Bed bed, Map map, Pawn pawn, out IntVec3 cell)
+        {
+            cell = IntVec3.Invalid;
+            if (bed == null || map == null || pawn == null || !bed.Spawned || bed.Map != map)
+            {
+                return false;
+            }
+            cell = bed.Position;
+            return cell.IsValid &&
+                cell.InBounds(map) &&
+                ServiceEnvironmentUtility.IsSafeForPawn(pawn, map, cell) &&
+                pawn.CanReach(cell, PathEndMode.OnCell, Danger.Some);
+        }
+
+        private static bool IsServiceMovementJob(Job job)
+        {
+            return job != null &&
+                (job.def == ServiceJobDefUtility.ServiceGoto ||
+                    job.def == ServiceJobDefUtility.ServiceDepartureHold ||
+                    job.def == ServiceJobDefUtility.BoardServiceShuttle);
         }
 
         public static bool MarkPawnDirty(Pawn pawn, string reason)
@@ -263,12 +666,25 @@ namespace SpaceServices
             {
                 return;
             }
-            // Event hooks zero the throttles so the next lifecycle pass revalidates immediately.
-            // Stable records still fall back to slower watchdog checks if no hook fires.
+            // Event hooks zero the cheap validation throttles so the next lifecycle pass revalidates immediately.
+            // Departure pad reservation retry is intentionally preserved; pad events and releases wake it explicitly.
             record.nextActivePawnValidationTick = 0;
             record.nextHospitalityBedlessCheckTick = 0;
             record.nextLeaveStateCheckTick = 0;
             map.GetComponent<SpaceServicesMapComponent>()?.RequestLifecycleTickSoon(reason);
+        }
+
+        private static void CooldownDeferredHospitalityDepartureChecks(ServiceGroupRecord record)
+        {
+            if (record == null || Find.TickManager == null)
+            {
+                return;
+            }
+            int now = Find.TickManager.TicksGame;
+            record.nextActivePawnValidationTick = Math.Max(record.nextActivePawnValidationTick, now + StableActivePawnValidationTicks);
+            record.nextHospitalityBedlessCheckTick = Math.Max(record.nextHospitalityBedlessCheckTick, now + StableBedlessCheckTicks);
+            record.nextLeaveStateCheckTick = Math.Max(record.nextLeaveStateCheckTick, now + StableLeaveStateCheckTicks);
+            record.timeoutTick = Math.Max(record.timeoutTick, now + GenDate.TicksPerHour);
         }
 
         public static bool TryFindRecordForPawn(Pawn pawn, out Map map, out ServiceGroupRecord record)
@@ -312,7 +728,6 @@ namespace SpaceServices
                 return false;
             }
             if (record == null ||
-                record.serviceKind != "hospitality" ||
                 !HospitalityVacuumProtectionActive(record) ||
                 ServicePawnUtility.IsPlayerOwnedPawn(pawn) ||
                 ServicePawnUtility.IsTerminalPawn(pawn) ||
@@ -324,7 +739,7 @@ namespace SpaceServices
             bool pawnIsExposed = pawn.Spawned && ServiceEnvironmentUtility.GetVacuum(pawn.Position, map) > 0.001f;
             bool jobTargetsVacuum = JobTargetsUnsafeVacuum(candidateJob, pawn, map);
             bool transitWindow = HospitalityArrivalTransitGuardActive(record);
-            bool departureWindow = record.state == "departing" || record.state == "pickupInbound" || record.state == "boardingPickup";
+            bool departureWindow = IsActiveDepartureState(record);
             if (!pawnIsExposed && !jobTargetsVacuum && !transitWindow && !departureWindow)
             {
                 return false;
@@ -415,6 +830,7 @@ namespace SpaceServices
                 ServiceGroupRecord record = records[i];
                 if (record == null || record.state == "completed")
                 {
+                    ServiceDelayLodgerUtility.CleanupRecord(record, QuestEndOutcome.Unknown);
                     records.RemoveAt(i);
                     continue;
                 }
@@ -443,6 +859,7 @@ namespace SpaceServices
                 if (record.pawns.Count == 0)
                 {
                     ServiceDebugUtility.Log("Service group " + record.id + " has no active pawns; releasing reservation. Previously tracked: " + PawnSummary(previouslyTrackedPawns));
+                    ServiceDelayLodgerUtility.CleanupRecord(record, QuestEndOutcome.Unknown);
                     ReleaseRecord(record);
                     records.RemoveAt(i);
                     continue;
@@ -492,13 +909,17 @@ namespace SpaceServices
                 if (record.state == "pickupInbound")
                 {
                     EnsureHospitalityDeparturePrepared(record);
+                    if (DeparturePickupBlocked(record, out _))
+                    {
+                        continue;
+                    }
                     if (PickupTimedOut(map, record))
                     {
                         continue;
                     }
                     if (Find.TickManager.TicksGame >= record.pickupShuttleTouchdownTick)
                     {
-                        if (!ReservedPadCanServe(record, record.serviceKind == "hospitality" ? ServiceUse.Guest : ServiceUse.Patient, out string blockedReason))
+                        if (!ReservedPadCanServe(record, DepartureUse(record), out string blockedReason))
                         {
                             if (ShouldLogBlockedDeparture())
                             {
@@ -524,12 +945,16 @@ namespace SpaceServices
                 if (record.state == "boardingPickup")
                 {
                     EnsureHospitalityDeparturePrepared(record);
+                    if (DeparturePickupBlocked(record, out _))
+                    {
+                        continue;
+                    }
                     BoardReadyPawns(map, record);
                     if (PickupTimedOut(map, record))
                     {
                         continue;
                     }
-                    if (!ReservedPadCanServe(record, record.serviceKind == "hospitality" ? ServiceUse.Guest : ServiceUse.Patient, out string blockedReason))
+                    if (!ReservedPadCanServe(record, DepartureUse(record), out string blockedReason))
                     {
                         if (ShouldLogBlockedDeparture())
                         {
@@ -552,9 +977,46 @@ namespace SpaceServices
                     }
                     continue;
                 }
+                if (record.state == "departureHold")
+                {
+                    if (TryDeferNativeHospitalityDeparture(record, map, "recovering native Hospitality departure hold"))
+                    {
+                        continue;
+                    }
+                    ServiceUse use = DepartureUse(record);
+                    bool questLodgerHold = record.departureHoldQuestLodgerHandoffDone;
+                    bool hospitalityHandoffHold = record.departureHoldHospitalityHandoffDone;
+                    if (hospitalityHandoffHold)
+                    {
+                        MaintainHospitalityDepartureHoldGuests(record, "externally managed departure hold");
+                    }
+                    if (!EnsureReservedDeparturePad(map, record, use))
+                    {
+                        if (questLodgerHold)
+                        {
+                            ServiceDelayLodgerUtility.EnforceDelayLodgers(record, map);
+                        }
+                        else if (!hospitalityHandoffHold)
+                        {
+                            GuideDepartureHoldPawns(record, "waiting for free departure pad");
+                        }
+                        continue;
+                    }
+                    if (DeparturePickupBlocked(record, out _))
+                    {
+                        if (questLodgerHold)
+                        {
+                            ServiceDelayLodgerUtility.EnforceDelayLodgers(record, map);
+                        }
+                        continue;
+                    }
+                    record.state = "departing";
+                    record.departureRequestedTick = Find.TickManager.TicksGame;
+                    MarkRecordDirty(map, record, "departure hold cleared");
+                    continue;
+                }
                 if (record.state == "departing")
                 {
-                    EnsureHospitalityDeparturePrepared(record);
                     if (record.serviceKind == "hospital")
                     {
                         BeginHospitalDeparture(map, record, "waiting for free departure pad");
@@ -564,12 +1026,18 @@ namespace SpaceServices
                     {
                         continue;
                     }
+                    if (record.serviceKind == "hospitality" && DeparturePickupBlocked(record, out string blockedReason))
+                    {
+                        TryDeferNativeHospitalityDeparture(record, map, blockedReason);
+                        continue;
+                    }
+                    EnsureHospitalityDeparturePrepared(record);
                     if (ReadyForExtraction(record))
                     {
                         if (record.serviceKind == "hospitality" && ServiceDangerUtility.HospitalityTrafficBlocked(map, out string dangerReason))
                         {
                             ServiceDebugUtility.LogThrottled("hospitality-pickup-danger-" + record.id, "Hospitality pickup delayed for service group " + record.id + ": " + dangerReason, GenDate.TicksPerHour);
-                            GuideDepartingPawnsToPad(record);
+                            EnterDepartureHold(record, dangerReason);
                             continue;
                         }
                         BeginPickupShuttle(record, "service pawns waiting outside departure pad");
@@ -582,7 +1050,9 @@ namespace SpaceServices
                         }
                         else
                         {
-                            DepartureUtility.CompleteDeparture(map, record, "hospitality departure timeout fallback");
+                            record.departureRequestedTick = Find.TickManager.TicksGame;
+                            GuideDepartingPawnsToPad(record);
+                            ServiceDebugUtility.LogThrottled(ServiceLogIntegration.Hospitality, "hospitality-departure-timeout-wait-" + record.id, "Hospitality departure timeout extended while service pawns reach pickup staging: " + RecordAudit(record), GenDate.TicksPerHour);
                         }
                     }
                     else
@@ -723,7 +1193,7 @@ namespace SpaceServices
 
         private static bool HospitalityVacuumProtectionActive(ServiceGroupRecord record)
         {
-            if (record == null || record.serviceKind != "hospitality")
+            if (!HospitalityVacuumProtectionRecord(record))
             {
                 return false;
             }
@@ -731,11 +1201,19 @@ namespace SpaceServices
             {
                 return false;
             }
-            if (HospitalityArrivalVacuumProtectionActive(record) || HospitalityArrivalTransitGuardActive(record))
+            if (record.serviceKind == "hospitality" &&
+                (HospitalityArrivalVacuumProtectionActive(record) || HospitalityArrivalTransitGuardActive(record)))
             {
                 return true;
             }
-            return record.state == "departing" || record.state == "pickupInbound" || record.state == "boardingPickup";
+            return IsActiveDepartureState(record);
+        }
+
+        private static bool HospitalityVacuumProtectionRecord(ServiceGroupRecord record)
+        {
+            return record != null &&
+                (record.serviceKind == "hospitality" ||
+                    (record.serviceKind == "hospital" && record.departureHoldHospitalityHandoffDone));
         }
 
         private static bool HospitalityVacuumProtectionAllowed(ServiceGroupRecord record)
@@ -748,7 +1226,7 @@ namespace SpaceServices
 
         private static void EnsureHospitalityVacuumProtection(Map map, ServiceGroupRecord record, string reason)
         {
-            if (record == null || record.serviceKind != "hospitality" || record.pawns == null)
+            if (!HospitalityVacuumProtectionRecord(record) || record.pawns == null)
             {
                 return;
             }
@@ -881,19 +1359,26 @@ namespace SpaceServices
             {
                 return false;
             }
-            if (record.state == "departing" || record.state == "pickupInbound" || record.state == "boardingPickup")
+            if (IsActiveDepartureState(record))
             {
-                return true;
+                Thing departurePad = record.reservedPad ?? record.arrivalPad;
+                if ((pawn.Spawned && VacSuitUtility.ShouldAutoSuitForVacuum(pawn.Map, pawn.Position)) ||
+                    VacSuitUtility.ShouldAutoSuitForVacuum(departurePad))
+                {
+                    return true;
+                }
+                if (map != null && SpaceServiceMapDetector.IsServiceEligible(map))
+                {
+                    ServiceUse use = DepartureUse(record);
+                    return ServicePadUtility.AllDeparturePads(map, use).Any(VacSuitUtility.ShouldAutoSuitForVacuum);
+                }
+                return false;
             }
             if (map == null)
             {
                 return false;
             }
-            if (pawn.Position.IsValid && ServiceEnvironmentUtility.GetVacuum(pawn.Position, map) > VacuumEpsilon)
-            {
-                return true;
-            }
-            if (PawnCurrentJobTargetsUnsafeVacuum(pawn, map))
+            if (pawn.Position.IsValid && VacSuitUtility.ShouldAutoSuitForVacuum(map, pawn.Position))
             {
                 return true;
             }
@@ -902,7 +1387,7 @@ namespace SpaceServices
                 pad.Spawned &&
                 pad.Map == map &&
                 pawn.Position.DistanceToSquared(pad.Position) <= 144 &&
-                ServiceEnvironmentUtility.GetMaxVacuum(pad) > VacuumEpsilon;
+                VacSuitUtility.ShouldAutoSuitForVacuum(pad);
         }
 
         private static void GuardHospitalityGuestsFromVacuum(Map map, ServiceGroupRecord record)
@@ -1439,8 +1924,17 @@ namespace SpaceServices
                 ServiceDebugUtility.LogAudit("BeginDeparture skipped terminal record " + RecordAudit(record) + " reason=" + (reason ?? "none"));
                 return;
             }
+            bool alreadyDeparting = IsActiveDepartureState(record);
             ServiceDebugUtility.LogAudit("BeginDeparture enter " + RecordAudit(record) + " reason=" + (reason ?? "none") + " pawns=" + PawnSummary(record.pawns));
-            MarkRecordDirty(map, record, "departure started");
+            if (TryDeferNativeHospitalityDeparture(record, map, reason))
+            {
+                return;
+            }
+            if (!alreadyDeparting)
+            {
+                record.nextDeparturePadReservationTick = 0;
+                MarkRecordDirty(map, record, "departure started");
+            }
             if (record.serviceKind == "hospital")
             {
                 BeginHospitalDeparture(map, record, reason);
@@ -1448,18 +1942,16 @@ namespace SpaceServices
             }
             if (record.reservedPad == null)
             {
-                record.reservedPad = TryReserveBestDeparturePad(map, ServiceUse.Guest, record);
-                if (record.reservedPad == null)
+                if (!EnsureReservedDeparturePad(map, record, ServiceUse.Guest))
                 {
                     ServiceDebugUtility.LogAudit("BeginDeparture no hospitality departure pad " + RecordAudit(record));
-                    if (record.state != "departing")
-                    {
-                        record.state = "departing";
-                        record.departureRequestedTick = Find.TickManager.TicksGame;
-                        ServiceDebugUtility.Log("Hospitality visitors waiting for free departure pad: " + reason);
-                    }
+                    WaitForDeparturePad(map, record, "waiting for free departure pad: " + (reason ?? "departure requested"));
                     return;
                 }
+            }
+            if (DeparturePickupBlocked(record, out _))
+            {
+                return;
             }
             if (record.state != "departing")
             {
@@ -1477,10 +1969,193 @@ namespace SpaceServices
             GuideDepartingPawnsToPad(record);
         }
 
+        private static bool TryDeferNativeHospitalityDeparture(ServiceGroupRecord record, Map map, string reason)
+        {
+            if (!CanDeferNativeHospitalityDeparture(record))
+            {
+                return false;
+            }
+            map = map ?? RecordMap(record);
+            if (map == null || !ShouldDelayServicePickup(map, record, out string delayReason))
+            {
+                return false;
+            }
+
+            record.state = "arrived";
+            record.departureRequestedTick = 0;
+            record.pickupShuttleTouchdownTick = 0;
+            record.pickupShuttleThingDefName = null;
+            record.pickupShuttleVisualDefName = null;
+            RestoreNativeHospitalityVisitState(record, reason ?? delayReason);
+            ClearDeferredNativeDepartureJobs(record, map, reason ?? delayReason);
+            CooldownDeferredHospitalityDepartureChecks(record);
+            ServiceDebugUtility.LogThrottled(
+                ServiceLogIntegration.Hospitality,
+                "hospitality-departure-deferred-" + record.id,
+                "Hospitality departure deferred until Space Services pickup is available for group " + record.id + ": " + (delayReason ?? reason ?? "pickup blocked"),
+                GenDate.TicksPerHour);
+            return true;
+        }
+
+        private static bool CanDeferNativeHospitalityDeparture(ServiceGroupRecord record)
+        {
+            return record != null &&
+                record.serviceKind == "hospitality" &&
+                !record.hospitalityDeparturePrepared &&
+                record.pawns != null &&
+                record.pawns.Any(pawn => pawn != null && !ServicePawnUtility.IsTerminalPawn(pawn) && !ServicePawnUtility.IsPlayerOwnedPawn(pawn));
+        }
+
+        private static bool DepartureHoldExternallyManaged(ServiceGroupRecord record)
+        {
+            return record != null &&
+                (record.departureHoldHospitalityHandoffDone || record.departureHoldQuestLodgerHandoffDone);
+        }
+
+        private static void MaintainHospitalityDepartureHoldGuests(ServiceGroupRecord record, string reason)
+        {
+            if (record == null || !record.departureHoldHospitalityHandoffDone || record.pawns == null)
+            {
+                return;
+            }
+            foreach (Lord lord in record.pawns
+                .Select(pawn => pawn == null ? null : pawn.GetLord())
+                .Where(lord => lord != null)
+                .Distinct()
+                .ToList())
+            {
+                RestoreHospitalityVisitLord(lord, reason);
+            }
+            foreach (Pawn pawn in record.pawns)
+            {
+                ClearServiceDepartureHoldJob(pawn, record, reason);
+            }
+        }
+
+        private static void ClearServiceDepartureHoldJob(Pawn pawn, ServiceGroupRecord record, string reason)
+        {
+            if (pawn == null || pawn.jobs == null || pawn.CurJob == null)
+            {
+                return;
+            }
+            if (pawn.CurJob.def != ServiceJobDefUtility.ServiceDepartureHold)
+            {
+                return;
+            }
+            pawn.jobs.ClearQueuedJobs();
+            pawn.jobs.EndCurrentJob(JobCondition.InterruptForced);
+            ServiceDebugUtility.LogAudit("Cleared service departure hold from managed delay pawn=" + ServiceDebugUtility.PawnAuditSummary(pawn) + " reason=" + (reason ?? "none") + " record=" + RecordAudit(record));
+        }
+
+        private static Map RecordMap(ServiceGroupRecord record)
+        {
+            if (record == null)
+            {
+                return null;
+            }
+            return record.reservedPad?.Map ??
+                record.arrivalPad?.Map ??
+                record.pawns?.FirstOrDefault(pawn => pawn != null && pawn.Spawned)?.Map;
+        }
+
+        private static void RestoreNativeHospitalityVisitState(ServiceGroupRecord record, string reason)
+        {
+            if (record == null || record.pawns == null)
+            {
+                return;
+            }
+            foreach (Lord lord in record.pawns
+                .Select(pawn => pawn == null ? null : pawn.GetLord())
+                .Where(lord => lord != null)
+                .Distinct()
+                .ToList())
+            {
+                RestoreHospitalityVisitLord(lord, reason);
+            }
+            foreach (Pawn pawn in record.pawns)
+            {
+                ClearServiceDepartureHoldJob(pawn, record, reason);
+            }
+        }
+
+        private static void RestoreHospitalityVisitLord(Lord lord, string reason)
+        {
+            if (lord == null)
+            {
+                return;
+            }
+            object lordJob = lord.LordJob;
+            bool wasLeaving = false;
+            if (lordJob != null && lordJob.GetType().FullName == "Hospitality.LordJob_VisitColony")
+            {
+                object leaving = Reflect.GetMember(lordJob, "leaving");
+                wasLeaving = leaving is bool leavingFlag && leavingFlag;
+                if (wasLeaving)
+                {
+                    Reflect.SetMember(lordJob, "leaving", false);
+                }
+            }
+            StateGraph graph = Reflect.GetMember(lord, "graph") as StateGraph;
+            LordToil visitToil = graph?.lordToils?.FirstOrDefault(toil => toil != null && toil.GetType().FullName == "Hospitality.LordToil_VisitPoint");
+            if (visitToil == null)
+            {
+                ServiceDebugUtility.LogAudit("Could not restore Hospitality visit toil for delayed departure lord=" + LordLabel(lord) + " reason=" + (reason ?? "none"));
+                return;
+            }
+            if (lord.CurLordToil != visitToil)
+            {
+                lord.GotoToil(visitToil);
+            }
+            else if (!wasLeaving)
+            {
+                return;
+            }
+            else
+            {
+                visitToil.UpdateAllDuties();
+            }
+            ServiceDebugUtility.LogAudit("Restored Hospitality visit toil for delayed service departure lord=" + LordLabel(lord) + " reason=" + (reason ?? "none"));
+        }
+
+        private static void ClearDeferredNativeDepartureJobs(ServiceGroupRecord record, Map map, string reason)
+        {
+            if (record == null || record.pawns == null)
+            {
+                return;
+            }
+            map = map ?? RecordMap(record);
+            foreach (Pawn pawn in record.pawns)
+            {
+                if (pawn == null || !pawn.Spawned || pawn.jobs == null || pawn.CurJob == null || ServicePawnUtility.IsPlayerOwnedPawn(pawn))
+                {
+                    continue;
+                }
+                Map pawnMap = map ?? pawn.Map;
+                Job current = pawn.CurJob;
+                bool nativeDepartureJob =
+                    JobTargetsMapEdge(current, pawnMap) ||
+                    JobTargetsUnsafeVacuum(current, pawn, pawnMap) ||
+                    DepartureJobDef(current.def);
+                if (!nativeDepartureJob)
+                {
+                    continue;
+                }
+                pawn.jobs.ClearQueuedJobs();
+                pawn.jobs.EndCurrentJob(JobCondition.InterruptForced);
+                string jobName = current.def == null ? "unknown" : current.def.defName;
+                ServiceDebugUtility.LogAudit("Cleared native departure job after delaying Hospitality pickup pawn=" + ServiceDebugUtility.PawnAuditSummary(pawn) + " job=" + jobName + " reason=" + (reason ?? "pickup blocked") + " record=" + RecordAudit(record));
+            }
+        }
+
         private static void EnsureHospitalityDeparturePrepared(ServiceGroupRecord record)
         {
-            if (record == null || record.serviceKind != "hospitality" || record.hospitalityDeparturePrepared)
+            if (record == null || record.serviceKind != "hospitality")
             {
+                return;
+            }
+            if (record.hospitalityDeparturePrepared)
+            {
+                MaintainPreparedHospitalityDeparture(record, "active Hospitality departure");
                 return;
             }
             ServiceDebugUtility.LogAudit("EnsureHospitalityDeparturePrepared begin " + RecordAudit(record));
@@ -1490,18 +2165,93 @@ namespace SpaceServices
                 EnsureHospitalityVacuumProtection(record.reservedPad.Map, record, "departure");
             }
             record.hospitalityDeparturePrepared = true;
+            MaintainPreparedHospitalityDeparture(record, "prepared Hospitality departure");
             ServiceDebugUtility.LogAudit("EnsureHospitalityDeparturePrepared end " + RecordAudit(record) + " pawns=" + PawnSummary(record.pawns));
+        }
+
+        private static void EnsureDelayGuestDeparturePrepared(ServiceGroupRecord record)
+        {
+            if (record == null ||
+                record.serviceKind != "hospital")
+            {
+                return;
+            }
+            if (record.hospitalityDeparturePrepared)
+            {
+                MaintainPreparedHospitalityDeparture(record, "active delay guest departure");
+                return;
+            }
+            bool prepared = false;
+            ServiceDebugUtility.LogAudit("EnsureDelayGuestDeparturePrepared begin " + RecordAudit(record));
+            if (record.departureHoldHospitalityHandoffDone)
+            {
+                HospitalityBedUtility.PrepareDelayGuestsForServiceDeparture(record);
+                prepared = true;
+            }
+            if (record.departureHoldQuestLodgerHandoffDone)
+            {
+                ServiceDelayLodgerUtility.PrepareDelayLodgersForDeparture(record);
+                prepared = true;
+            }
+            if (prepared)
+            {
+                record.hospitalityDeparturePrepared = true;
+                MaintainPreparedHospitalityDeparture(record, "prepared delay guest departure");
+            }
+            ServiceDebugUtility.LogAudit("EnsureDelayGuestDeparturePrepared end " + RecordAudit(record) + " pawns=" + PawnSummary(record.pawns));
+        }
+
+        private static void MaintainPreparedHospitalityDeparture(ServiceGroupRecord record, string reason)
+        {
+            if (record == null ||
+                !record.hospitalityDeparturePrepared ||
+                record.state == "departureHold" ||
+                !UsesHospitalityDepartureHandling(record) ||
+                record.pawns == null)
+            {
+                return;
+            }
+            if (record.state != "departing" && record.state != "pickupInbound" && record.state != "boardingPickup")
+            {
+                return;
+            }
+            foreach (Pawn pawn in record.pawns)
+            {
+                if (pawn == null || pawn.Destroyed || pawn.Dead || ServicePawnUtility.IsPlayerOwnedPawn(pawn))
+                {
+                    continue;
+                }
+                HospitalityBedUtility.DetachPreparedDepartureGuest(pawn, reason);
+            }
         }
 
         private static void BeginHospitalDeparture(Map map, ServiceGroupRecord record, string reason)
         {
+            if (!HospitalPatientCanWalkToDeparture(record))
+            {
+                if (record.reservedPad != null)
+                {
+                    ServiceDebugUtility.LogAudit("BeginHospitalDeparture releasing pad while patient cannot walk " + RecordAudit(record));
+                    ReleaseRecord(record);
+                    record.reservedPad = null;
+                }
+                if (record.state != "departing")
+                {
+                    record.state = "departing";
+                    record.departureRequestedTick = Find.TickManager.TicksGame;
+                    MarkRecordDirty(map, record, "hospital patient departure waiting for mobility");
+                }
+                ServiceDebugUtility.LogAudit("BeginHospitalDeparture delayed until patient can walk " + RecordAudit(record));
+                return;
+            }
             if (record.reservedPad != null && !ReservedPadStillExists(record))
             {
                 ServiceDebugUtility.LogAudit("BeginHospitalDeparture releasing missing pad " + RecordAudit(record));
                 ReleaseRecord(record);
                 record.reservedPad = null;
             }
-            if (record.reservedPad != null && !PadCanSafelyServeDeparture(record.reservedPad, ServiceUse.Patient, record, false))
+            ServiceUse use = DepartureUse(record);
+            if (record.reservedPad != null && !PadCanSafelyServeDeparture(record.reservedPad, use, record, ShouldBypassGuestArea(record)))
             {
                 ServiceDebugUtility.LogAudit("BeginHospitalDeparture releasing unsafe pad " + RecordAudit(record) + " pad=" + ServiceDebugUtility.ThingAuditSummary(record.reservedPad));
                 ReleaseRecord(record);
@@ -1509,17 +2259,15 @@ namespace SpaceServices
             }
             if (record.reservedPad == null)
             {
-                record.reservedPad = TryReserveBestDeparturePad(map, ServiceUse.Patient, record);
-                ServiceDebugUtility.LogAudit("BeginHospitalDeparture reserved pad result " + RecordAudit(record) + " pad=" + ServiceDebugUtility.ThingAuditSummary(record.reservedPad));
+                if (EnsureReservedDeparturePad(map, record, use))
+                {
+                    ServiceDebugUtility.LogAudit("BeginHospitalDeparture reserved pad result " + RecordAudit(record) + " pad=" + ServiceDebugUtility.ThingAuditSummary(record.reservedPad));
+                }
             }
             if (record.reservedPad == null)
             {
-                if (record.state != "departing")
-                {
-                    record.state = "departing";
-                    record.departureRequestedTick = Find.TickManager.TicksGame;
-                    ServiceDebugUtility.Log("Hospital patient waiting for free departure pad: " + reason);
-                }
+                WaitForDeparturePad(map, record, "waiting for free departure pad: " + (reason ?? "hospital patient departure requested"));
+                EnterDepartureHold(record, "waiting for free departure pad: " + (reason ?? "hospital patient departure requested"));
                 return;
             }
             if (record.state != "departing")
@@ -1528,17 +2276,69 @@ namespace SpaceServices
                 record.departureRequestedTick = Find.TickManager.TicksGame;
                 ServiceDebugUtility.Log("Routing hospital patient to departure pad: " + reason);
             }
-            if (!ReservedPadCanServe(record, ServiceUse.Patient, out string blockedReason))
+            if (!ReservedPadCanServe(record, use, out string blockedReason))
             {
                 if (SpaceServicesMod.Settings != null && SpaceServicesMod.Settings.debugLogging)
                 {
                     ServiceDebugUtility.Log("Hospital patient departure waiting: " + blockedReason);
                 }
+                WaitForDeparturePad(map, record, blockedReason);
+                EnterDepartureHold(record, blockedReason);
+                return;
+            }
+            if (DeparturePickupBlocked(record, out _))
+            {
+                return;
+            }
+            EnsureDelayGuestDeparturePrepared(record);
+            if (!HospitalReadyForPickupLaunch(record))
+            {
                 GuideDepartingPawnsToPad(record);
                 return;
             }
             BeginPickupShuttle(record, reason);
             GuideDepartingPawnsToPad(record);
+        }
+
+        private static bool HospitalPatientCanWalkToDeparture(ServiceGroupRecord record)
+        {
+            if (record == null || record.serviceKind != "hospital" || record.pawns == null)
+            {
+                return true;
+            }
+            foreach (Pawn pawn in record.pawns)
+            {
+                if (pawn == null || pawn.Destroyed || pawn.Dead || !pawn.Spawned)
+                {
+                    continue;
+                }
+                if (pawn.Downed ||
+                    pawn.health == null ||
+                    pawn.health.capacities == null ||
+                    !pawn.health.capacities.CapableOf(PawnCapacityDefOf.Moving))
+                {
+                    return false;
+                }
+            }
+            return true;
+        }
+
+        private static bool HospitalReadyForPickupLaunch(ServiceGroupRecord record)
+        {
+            if (record == null || record.serviceKind != "hospital")
+            {
+                return ReadyForExtraction(record);
+            }
+            if (ReadyForExtraction(record))
+            {
+                return true;
+            }
+            if (HospitalPickupReadyForDownedFallback(record))
+            {
+                return true;
+            }
+            ServiceDebugUtility.LogAudit("Hospital pickup launch delayed until patient reaches departure staging " + RecordAudit(record));
+            return false;
         }
 
         private static bool EnsureReservedDeparturePad(Map map, ServiceGroupRecord record, ServiceUse use)
@@ -1550,7 +2350,14 @@ namespace SpaceServices
             if (record.reservedPad != null && PadCanSafelyServeDeparture(record.reservedPad, use, record, ShouldBypassGuestArea(record)))
             {
                 ServiceDebugUtility.LogAudit("EnsureReservedDeparturePad keeping existing " + RecordAudit(record) + " pad=" + ServiceDebugUtility.ThingAuditSummary(record.reservedPad));
+                record.nextDeparturePadReservationTick = 0;
                 return true;
+            }
+            if (record.reservedPad == null &&
+                Find.TickManager != null &&
+                record.nextDeparturePadReservationTick > Find.TickManager.TicksGame)
+            {
+                return false;
             }
             ServiceDebugUtility.LogAudit("EnsureReservedDeparturePad finding replacement " + RecordAudit(record) + " oldPad=" + ServiceDebugUtility.ThingAuditSummary(record.reservedPad));
             ReleaseRecord(record);
@@ -1558,12 +2365,17 @@ namespace SpaceServices
             ServiceDebugUtility.LogAudit("EnsureReservedDeparturePad result " + RecordAudit(record) + " pad=" + ServiceDebugUtility.ThingAuditSummary(record.reservedPad));
             if (record.reservedPad == null)
             {
+                if (Find.TickManager != null)
+                {
+                    record.nextDeparturePadReservationTick = Find.TickManager.TicksGame + FailedDeparturePadReservationRetryTicks;
+                }
                 if (SpaceServicesMod.Settings != null && SpaceServicesMod.Settings.debugLogging && ShouldLogBlockedDeparture())
                 {
                     ServiceDebugUtility.Log("Service group " + record.id + " waiting for a usable departure pad.");
                 }
                 return false;
             }
+            record.nextDeparturePadReservationTick = 0;
             return true;
         }
 
@@ -1577,25 +2389,16 @@ namespace SpaceServices
             {
                 return;
             }
-            if (ServiceDangerUtility.DepartureShuttleBlocked(record.reservedPad.Map, record.serviceKind, out string hazardReason))
+            if (DeparturePickupBlocked(record, out _))
             {
-                ServiceDebugUtility.LogThrottled(ServiceDebugUtility.IntegrationForServiceKind(record.serviceKind), "departure-hazard-" + record.id + "-" + hazardReason, "Pickup shuttle delayed for service group " + record.id + ": " + hazardReason, GenDate.TicksPerHour);
-                if (record.state != "departing")
-                {
-                    record.state = "departing";
-                    record.departureRequestedTick = Find.TickManager.TicksGame;
-                }
                 return;
             }
+            EnsureDelayGuestDeparturePrepared(record);
 
             if (!TryClearPadFootprintForServiceShuttle(record.reservedPad, record.serviceKind, "pickup service group " + record.id, out string clearReason))
             {
                 ServiceDebugUtility.LogThrottled(ServiceDebugUtility.IntegrationForServiceKind(record.serviceKind), "departure-pad-occupied-" + record.id, "Pickup shuttle delayed while clearing pad for service group " + record.id + ": " + clearReason, 250);
-                if (record.state != "departing")
-                {
-                    record.state = "departing";
-                    record.departureRequestedTick = Find.TickManager.TicksGame;
-                }
+                EnterDepartureHold(record, clearReason);
                 return;
             }
 
@@ -1611,7 +2414,7 @@ namespace SpaceServices
             record.pickupShuttleTouchdownTick = Find.TickManager.TicksGame + ServiceShuttleUtility.ArrivalTouchdownDelayTicks;
             record.pickupShuttleThingDefName = visual.shipThingDef.defName;
             record.pickupShuttleVisualDefName = visual.id;
-            int staleShuttles = ServiceShuttleUtility.CleanupServiceShuttlesNear(record.reservedPad.Map, record.reservedPad.Position, 8f);
+            int staleShuttles = ServiceShuttleUtility.CleanupServiceShuttlesForPad(record.reservedPad, visual);
             if (staleShuttles > 0)
             {
                 ServiceDebugUtility.LogAudit("Cleaned stale service shuttle visuals before pickup spawn count=" + staleShuttles + " record=" + RecordAudit(record));
@@ -1620,6 +2423,431 @@ namespace SpaceServices
             MarkRecordDirty(record.reservedPad.Map, record, "pickup shuttle inbound");
             ServiceDebugUtility.Log("Pickup shuttle inbound for " + record.serviceKind + " service group " + record.id + ": " + reason);
             ServiceDebugUtility.LogAudit("BeginPickupShuttle " + RecordAudit(record) + " touchdownTick=" + record.pickupShuttleTouchdownTick + " ship=" + record.pickupShuttleThingDefName + " visual=" + record.pickupShuttleVisualDefName + " reason=" + (reason ?? "none"));
+        }
+
+        private static bool DeparturePickupBlocked(ServiceGroupRecord record, out string reason)
+        {
+            reason = null;
+            if (record == null || record.reservedPad == null || !record.reservedPad.Spawned)
+            {
+                return false;
+            }
+            Map map = record.reservedPad.Map;
+            if (ServiceDangerUtility.DepartureShuttleBlocked(map, record.serviceKind, out reason))
+            {
+                ServiceDebugUtility.LogThrottled(ServiceDebugUtility.IntegrationForServiceKind(record.serviceKind), "departure-hazard-" + record.id + "-" + reason, "Pickup shuttle delayed for service group " + record.id + ": " + reason, GenDate.TicksPerHour);
+                CancelActivePickup(record, reason);
+                EnterDepartureHold(record, reason);
+                return true;
+            }
+            if (record.serviceKind == "hospitality" && ServiceDangerUtility.HospitalityTrafficBlocked(map, out reason))
+            {
+                ServiceDebugUtility.LogThrottled("hospitality-pickup-danger-" + record.id, "Hospitality pickup delayed for service group " + record.id + ": " + reason, GenDate.TicksPerHour);
+                CancelActivePickup(record, reason);
+                EnterDepartureHold(record, reason);
+                return true;
+            }
+            return false;
+        }
+
+        private static void CancelActivePickup(ServiceGroupRecord record, string reason)
+        {
+            if (record == null || record.reservedPad == null || !record.reservedPad.Spawned)
+            {
+                return;
+            }
+            if (record.state != "pickupInbound" && record.state != "boardingPickup")
+            {
+                return;
+            }
+            ShuttleVisual visual = ShuttleVisual.Resolve(record.serviceKind, record.pickupShuttleVisualDefName);
+            int removed = ServiceShuttleUtility.CleanupServiceShuttlesForPad(record.reservedPad, visual);
+            record.pickupShuttleTouchdownTick = 0;
+            record.pickupShuttleThingDefName = null;
+            ServiceDebugUtility.LogAudit("Canceled active pickup due to blocked departure removedShuttles=" + removed + " reason=" + (reason ?? "none") + " record=" + RecordAudit(record));
+        }
+
+        private static void WaitForDeparturePad(Map map, ServiceGroupRecord record, string reason)
+        {
+            if (record == null)
+            {
+                return;
+            }
+            bool changed = false;
+            if (record.state != "departing")
+            {
+                record.state = "departing";
+                record.departureRequestedTick = Find.TickManager == null ? 0 : Find.TickManager.TicksGame;
+                changed = true;
+                ServiceDebugUtility.Log("Service group " + record.id + " waiting for a usable departure pad: " + (reason ?? "departure requested"));
+            }
+            if (map == null)
+            {
+                map = record.reservedPad?.Map ??
+                    record.arrivalPad?.Map ??
+                    record.pawns?.FirstOrDefault(pawn => pawn != null && pawn.Spawned)?.Map;
+            }
+            if (changed && map != null)
+            {
+                MarkRecordDirty(map, record, "waiting for departure pad");
+            }
+        }
+
+        private static void EnterDepartureHold(ServiceGroupRecord record, string reason)
+        {
+            if (record == null)
+            {
+                return;
+            }
+            bool changed = false;
+            if (record.state != "departureHold")
+            {
+                record.state = "departureHold";
+                if (record.departureRequestedTick <= 0)
+                {
+                    record.departureRequestedTick = Find.TickManager == null ? 0 : Find.TickManager.TicksGame;
+                }
+                changed = true;
+                ServiceDebugUtility.LogAudit("EnterDepartureHold " + RecordAudit(record) + " reason=" + (reason ?? "service pickup blocked"));
+            }
+            TryPrepareDepartureHoldHospitality(record);
+            if (record.departureHoldQuestLodgerHandoffDone)
+            {
+                Map lodgerMap = record.reservedPad == null ? null : record.reservedPad.Map;
+                ServiceDelayLodgerUtility.EnforceDelayLodgers(record, lodgerMap);
+            }
+            else if (record.departureHoldHospitalityHandoffDone)
+            {
+                // Hospitality owns delay guest needs while Space Services waits for pickup conditions.
+            }
+            else
+            {
+                GuideDepartureHoldPawns(record, reason);
+            }
+            Map map = record.reservedPad == null ? null : record.reservedPad.Map;
+            if (changed && map != null)
+            {
+                MarkRecordDirty(map, record, "departure hold entered");
+            }
+        }
+
+        private static void TryPrepareDepartureHoldHospitality(ServiceGroupRecord record)
+        {
+            if (record == null ||
+                record.serviceKind != "hospital" ||
+                record.departureHoldHospitalityHandoffDone)
+            {
+                return;
+            }
+            Map map = record.reservedPad == null ? null : record.reservedPad.Map;
+            if (map == null && record.pawns != null)
+            {
+                Pawn spawned = record.pawns.FirstOrDefault(pawn => pawn != null && pawn.Spawned);
+                map = spawned == null ? null : spawned.Map;
+            }
+            string reason = "Hospitality handoff already attempted";
+            if (!record.departureHoldHospitalityHandoffAttempted)
+            {
+                record.departureHoldHospitalityHandoffAttempted = true;
+                if (HospitalityBedUtility.TryConvertHospitalPatientsToDelayGuests(record, map, out reason))
+                {
+                    ServiceDebugUtility.LogAudit("Prepared hospital departure hold with Hospitality guest handoff " + RecordAudit(record));
+                    return;
+                }
+            }
+            ServiceDebugUtility.LogThrottled(ServiceLogIntegration.Hospital, "hospital-delay-guest-handoff-skip-" + record.id, "Hospital departure hold using Space Services fallback: " + (reason ?? "Hospitality unavailable"), GenDate.TicksPerHour);
+            if (HospitalityBedUtility.DelayGuestApiAvailable())
+            {
+                record.departureHoldHospitalityHandoffAttempted = false;
+                ServiceDebugUtility.LogThrottled(ServiceLogIntegration.Hospital, "hospital-delay-guest-handoff-retry-" + record.id, "Hospital departure hold waiting for Hospitality handoff eligibility: " + (reason ?? "patient not ready"), GenDate.TicksPerHour);
+                return;
+            }
+            if (record.departureHoldQuestLodgerHandoffAttempted || record.departureHoldQuestLodgerHandoffDone)
+            {
+                return;
+            }
+            record.departureHoldQuestLodgerHandoffAttempted = true;
+            if (ServiceDelayLodgerUtility.TryConvertHospitalPatientsToQuestLodgers(record, map, out string lodgerReason))
+            {
+                ServiceDebugUtility.LogAudit("Prepared hospital departure hold with vanilla quest lodger handoff " + RecordAudit(record));
+                return;
+            }
+            ServiceDebugUtility.LogThrottled(ServiceLogIntegration.Hospital, "hospital-delay-lodger-handoff-skip-" + record.id, "Hospital departure hold could not create temporary lodgers: " + (lodgerReason ?? "unavailable"), GenDate.TicksPerHour);
+        }
+
+        private static void GuideDepartureHoldPawns(ServiceGroupRecord record, string reason)
+        {
+            if (record == null || record.pawns == null)
+            {
+                return;
+            }
+            Map map = record.reservedPad == null ? null : record.reservedPad.Map;
+            if (map == null)
+            {
+                Pawn spawned = record.pawns.FirstOrDefault(pawn => pawn != null && pawn.Spawned);
+                map = spawned == null ? null : spawned.Map;
+            }
+            if (map == null)
+            {
+                return;
+            }
+            foreach (Pawn pawn in record.pawns)
+            {
+                if (pawn == null || pawn.jobs == null || !pawn.Spawned || pawn.Downed || ServicePawnUtility.IsPlayerOwnedPawn(pawn))
+                {
+                    continue;
+                }
+                Area area = DepartureHoldArea(map, record, pawn);
+                if (!DepartureHoldNeedsIntervention(map, pawn, area))
+                {
+                    continue;
+                }
+                IntVec3 holdCell = DepartureHoldWanderCell(map, record, pawn);
+                if (!holdCell.IsValid)
+                {
+                    continue;
+                }
+                pawn.jobs.ClearQueuedJobs();
+                pawn.jobs.StartJob(ServiceDepartureHoldJob(holdCell), JobCondition.InterruptForced, tag: JobTag.Misc);
+                ServiceDebugUtility.LogAudit("GuideDepartureHoldPawns ordered holdCell=" + holdCell + " pawn=" + ServiceDebugUtility.PawnAuditSummary(pawn) + " reason=" + (reason ?? "pickup blocked") + " record=" + RecordAudit(record));
+            }
+        }
+
+        private static IntVec3 DepartureHoldWanderCell(Map map, ServiceGroupRecord record, Pawn pawn)
+        {
+            if (map == null || pawn == null || !pawn.Spawned)
+            {
+                return IntVec3.Invalid;
+            }
+            Area area = DepartureHoldArea(map, record, pawn);
+            if (area == null || area.Map != map || area.TrueCount == 0)
+            {
+                return FindHospitalitySafeCell(map, record == null ? null : record.reservedPad, pawn, true, true);
+            }
+
+            List<IntVec3> candidates = new List<IntVec3>(DepartureHoldWanderCandidateLimit);
+            foreach (IntVec3 cell in GenRadial.RadialCellsAround(pawn.Position, DepartureHoldWanderRadius, true))
+            {
+                if (DepartureHoldWanderCandidate(cell, map, pawn, area, false))
+                {
+                    candidates.Add(cell);
+                    if (candidates.Count >= DepartureHoldWanderCandidateLimit)
+                    {
+                        break;
+                    }
+                }
+            }
+            IntVec3 randomNearby = RandomReachableCell(candidates, map, pawn);
+            if (randomNearby.IsValid)
+            {
+                return randomNearby;
+            }
+
+            candidates.Clear();
+            int seen = 0;
+            foreach (IntVec3 cell in AreaCells(area.ActiveCells, area, map))
+            {
+                if (!DepartureHoldWanderCandidate(cell, map, pawn, area, false))
+                {
+                    continue;
+                }
+                seen++;
+                if (candidates.Count < DepartureHoldWanderCandidateLimit)
+                {
+                    candidates.Add(cell);
+                }
+                else if (Rand.Range(0, seen) < DepartureHoldWanderCandidateLimit)
+                {
+                    candidates[Rand.Range(0, candidates.Count)] = cell;
+                }
+            }
+            IntVec3 randomArea = RandomReachableCell(candidates, map, pawn);
+            if (randomArea.IsValid)
+            {
+                return randomArea;
+            }
+
+            if (DepartureHoldWanderCandidate(pawn.Position, map, pawn, area, true))
+            {
+                return pawn.Position;
+            }
+            return FindHospitalityGuestAreaSafeCell(map, record == null ? null : record.reservedPad, pawn, true);
+        }
+
+        private static bool DepartureHoldWanderCandidate(IntVec3 cell, Map map, Pawn pawn, Area area, bool allowCurrent)
+        {
+            if (area == null || map == null || pawn == null || !cell.IsValid || !cell.InBounds(map) || !area[cell])
+            {
+                return false;
+            }
+            if (!allowCurrent && cell.DistanceToSquared(pawn.Position) < 9)
+            {
+                return false;
+            }
+            return !cell.OnEdge(map) && IsHospitalitySafeCellCandidate(cell, map, pawn, true, 0f);
+        }
+
+        private static IntVec3 RandomReachableCell(List<IntVec3> candidates, Map map, Pawn pawn)
+        {
+            if (candidates == null || candidates.Count == 0 || map == null || pawn == null)
+            {
+                return IntVec3.Invalid;
+            }
+            while (candidates.Count > 0)
+            {
+                int index = Rand.Range(0, candidates.Count);
+                IntVec3 cell = candidates[index];
+                candidates.RemoveAt(index);
+                if (cell == pawn.Position || pawn.CanReach(cell, PathEndMode.OnCell, Danger.Deadly))
+                {
+                    return cell;
+                }
+            }
+            return IntVec3.Invalid;
+        }
+
+        private static bool DepartureHoldNeedsIntervention(Map map, Pawn pawn, Area area)
+        {
+            if (map == null || pawn == null || !pawn.Spawned)
+            {
+                return false;
+            }
+            Job job = pawn.CurJob;
+            if (job == null)
+            {
+                return !DepartureHoldSafeCell(pawn.Position, map, area);
+            }
+            if (job.def == ServiceJobDefUtility.ServiceDepartureHold)
+            {
+                return TargetMapEdge(job.targetA, map) ||
+                    TargetCellVacuum(job.targetA, map);
+            }
+            if (job.def == ServiceJobDefUtility.ServiceGoto || job.def == ServiceJobDefUtility.BoardServiceShuttle)
+            {
+                return true;
+            }
+            if (DepartureHoldFreeRoamJob(job.def))
+            {
+                return true;
+            }
+            if (IsTryingToLeave(pawn) || DepartureJobDef(job.def))
+            {
+                return true;
+            }
+            if (JobTargetsUnsafeVacuum(job, pawn, map))
+            {
+                return true;
+            }
+            if (JobTargetsOutsideDepartureHold(job, map, area))
+            {
+                return true;
+            }
+            return !DepartureHoldSafeCell(pawn.Position, map, area);
+        }
+
+        private static bool DepartureJobDef(JobDef def)
+        {
+            string defName = def == null ? "" : def.defName ?? "";
+            return ContainsAny(defName, "Exit", "Depart", "Leave");
+        }
+
+        private static bool DepartureHoldFreeRoamJob(JobDef def)
+        {
+            string defName = def == null ? "" : def.defName ?? "";
+            return defName == "GoForWalk" || defName == "PlayWalking";
+        }
+
+        internal static Area DepartureHoldArea(Map map, ServiceGroupRecord record, Pawn pawn)
+        {
+            if (record == null)
+            {
+                return null;
+            }
+            if (record.serviceKind == "hospitality")
+            {
+                return HospitalityGuestArea(map, pawn) ?? HospitalityDefaultGuestArea(map);
+            }
+            if (record.serviceKind == "hospital")
+            {
+                if (record.departureHoldQuestLodgerHandoffDone)
+                {
+                    return record.departureHoldFallbackArea;
+                }
+                return record.departureHoldFallbackArea ?? HospitalityDefaultGuestArea(map);
+            }
+            return null;
+        }
+
+        private static bool DepartureHoldSafeVisitorCell(IntVec3 cell, Map map, Area area)
+        {
+            return map != null &&
+                area != null &&
+                area.Map == map &&
+                cell.IsValid &&
+                cell.InBounds(map) &&
+                !cell.OnEdge(map) &&
+                area[cell] &&
+                ServiceEnvironmentUtility.GetVacuum(cell, map) <= VacuumEpsilon;
+        }
+
+        private static bool DepartureHoldSafeCell(IntVec3 cell, Map map, Area area)
+        {
+            if (area != null)
+            {
+                return DepartureHoldSafeVisitorCell(cell, map, area);
+            }
+            return map != null &&
+                cell.IsValid &&
+                cell.InBounds(map) &&
+                !cell.OnEdge(map) &&
+                ServiceEnvironmentUtility.GetVacuum(cell, map) <= VacuumEpsilon;
+        }
+
+        private static bool JobTargetsOutsideDepartureHold(Job job, Map map, Area area)
+        {
+            if (job == null || map == null)
+            {
+                return false;
+            }
+            return TargetOutsideDepartureHold(job.targetA, map, area) ||
+                TargetOutsideDepartureHold(job.targetB, map, area) ||
+                TargetOutsideDepartureHold(job.targetC, map, area);
+        }
+
+        private static bool TargetOutsideDepartureHold(LocalTargetInfo target, Map map, Area area)
+        {
+            if (!target.IsValid || !target.Cell.IsValid || !target.Cell.InBounds(map))
+            {
+                return false;
+            }
+            return !DepartureHoldSafeCell(target.Cell, map, area);
+        }
+
+        private static bool JobTargetsMapEdge(Job job, Map map)
+        {
+            if (job == null || map == null)
+            {
+                return false;
+            }
+            return TargetMapEdge(job.targetA, map) ||
+                TargetMapEdge(job.targetB, map) ||
+                TargetMapEdge(job.targetC, map);
+        }
+
+        private static bool TargetMapEdge(LocalTargetInfo target, Map map)
+        {
+            return target.IsValid &&
+                target.Cell.IsValid &&
+                target.Cell.InBounds(map) &&
+                target.Cell.OnEdge(map);
+        }
+
+        private static bool TargetCellVacuum(LocalTargetInfo target, Map map)
+        {
+            return target.IsValid &&
+                target.Cell.IsValid &&
+                target.Cell.InBounds(map) &&
+                ServiceEnvironmentUtility.GetVacuum(target.Cell, map) > VacuumEpsilon;
         }
 
         public static bool TryClearPadFootprintForServiceShuttle(Thing pad, string serviceKind, string context, out string reason)
@@ -1748,12 +2976,15 @@ namespace SpaceServices
                 .ToList();
             if (candidates.Count == 0)
             {
-                candidates = DepartureModeFallbackPads(map, use, record)
-                    .Where(pad => PadCanSafelyServeDeparture(pad, use, record, ShouldBypassGuestArea(record)))
-                    .ToList();
-                if (candidates.Count > 0)
+                if (!MatchingDepartureModePadOperationalOrReserved(map, use, record.id))
                 {
-                    ServiceDebugUtility.LogAudit("TryReserveBestDeparturePad using mode fallback record=" + record.id + " use=" + use + " pads=" + candidates.Count);
+                    candidates = DepartureModeFallbackPads(map, use, record)
+                        .Where(pad => PadCanSafelyServeDeparture(pad, use, record, ShouldBypassGuestArea(record)))
+                        .ToList();
+                    if (candidates.Count > 0)
+                    {
+                        ServiceDebugUtility.LogAudit("TryReserveBestDeparturePad using mode fallback record=" + record.id + " use=" + use + " pads=" + candidates.Count);
+                    }
                 }
             }
             foreach (Thing pad in OrderedDeparturePads(map, record, candidates, pawns, use))
@@ -1767,7 +2998,65 @@ namespace SpaceServices
                 ServiceDebugUtility.LogAudit("TryReserveBestDeparturePad candidate could not reserve record=" + record.id + " use=" + use + " pad=" + ServiceDebugUtility.ThingAuditSummary(pad));
             }
             ServiceDebugUtility.LogAudit("TryReserveBestDeparturePad no candidates record=" + record.id + " use=" + use + " pawns=" + PawnSummary(pawns));
+            LogDeparturePadRejections(map, use, record, pawns);
             return null;
+        }
+
+        private static void LogDeparturePadRejections(Map map, ServiceUse use, ServiceGroupRecord record, List<Pawn> pawns)
+        {
+            if (map == null || record == null)
+            {
+                return;
+            }
+            if (Find.TickManager != null)
+            {
+                string key = record.id + ":" + use;
+                int now = Find.TickManager.TicksGame;
+                int lastTick;
+                if (DeparturePadRejectionLogTickByRecord.TryGetValue(key, out lastTick) &&
+                    now < lastTick + FailedDeparturePadReservationRetryTicks)
+                {
+                    return;
+                }
+                DeparturePadRejectionLogTickByRecord[key] = now;
+            }
+            foreach (Thing pad in ServicePadUtility.AllServicePadBuildings(map).Where(pad => pad != null).Distinct())
+            {
+                ServiceDebugUtility.LogAudit("TryReserveBestDeparturePad rejected record=" + record.id + " use=" + use + " pad=" + ServiceDebugUtility.ThingAuditSummary(pad) + " reason=" + DeparturePadRejectionReason(pad, use, record, pawns, ShouldBypassGuestArea(record)));
+            }
+        }
+
+        private static string DeparturePadRejectionReason(Thing pad, ServiceUse use, ServiceGroupRecord record, List<Pawn> pawns, bool bypassGuestArea)
+        {
+            if (pad == null || pad.Destroyed || pad.Map == null)
+            {
+                return "pad unavailable";
+            }
+            CompSpaceServicePad comp = pad.TryGetComp<CompSpaceServicePad>();
+            if (comp == null)
+            {
+                return "not a service pad";
+            }
+            if (!string.IsNullOrEmpty(comp.reservedForGroup) && (record == null || comp.reservedForGroup != record.id))
+            {
+                return "reserved for " + comp.reservedForGroup;
+            }
+            string padReason;
+            bool modeFallback = AllowsDepartureModeFallback(record, pad, use);
+            bool requirementsMet = modeFallback ? comp.MeetsOperationalRequirements(out padReason) : comp.MeetsDepartureRequirements(use, out padReason);
+            if (!requirementsMet)
+            {
+                return padReason ?? "pad mode or operational requirements blocked";
+            }
+            if (!ServiceEnvironmentUtility.IsPadSafeForPawnsAtTarget(pad, pawns, DepartureVacuumSuitTarget(), out string safetyReason))
+            {
+                return safetyReason ?? "pad is unsafe for one or more pawns";
+            }
+            if (!PadReachableForPawns(pad, pawns, false, bypassGuestArea, out string reachReason))
+            {
+                return reachReason ?? "no reachable staging cell";
+            }
+            return "candidate passed filters but was not selected";
         }
 
         private static IEnumerable<Thing> OrderedDeparturePads(Map map, ServiceGroupRecord record, List<Thing> candidates, List<Pawn> pawns, ServiceUse use)
@@ -1883,6 +3172,14 @@ namespace SpaceServices
             public List<IntVec3> cells = new List<IntVec3>();
         }
 
+        private sealed class CachedHospitalityLeaveDelay
+        {
+            public bool delay;
+            public string reason;
+            public int createdTick;
+            public int expiresTick;
+        }
+
         private static bool PadCanSafelyServe(Thing pad, ServiceUse use, IEnumerable<Pawn> pawns, string groupId, bool bypassGuestArea)
         {
             if (pad == null || pad.Destroyed || pad.Map == null)
@@ -1948,6 +3245,28 @@ namespace SpaceServices
             return pads.Where(pad => AllowsDepartureModeFallback(record, pad, use)).ToList();
         }
 
+        private static bool MatchingDepartureModePadOperationalOrReserved(Map map, ServiceUse use, string groupId)
+        {
+            foreach (Thing pad in ServicePadUtility.AllServicePadBuildings(map))
+            {
+                CompSpaceServicePad comp = pad == null ? null : pad.TryGetComp<CompSpaceServicePad>();
+                if (comp == null || !comp.AllowsDepartureUse(use))
+                {
+                    continue;
+                }
+                string reason;
+                if (!string.IsNullOrEmpty(comp.reservedForGroup) && comp.reservedForGroup != groupId)
+                {
+                    return true;
+                }
+                if (comp.MeetsOperationalRequirements(out reason))
+                {
+                    return true;
+                }
+            }
+            return false;
+        }
+
         private static bool AllowsDepartureModeFallback(ServiceGroupRecord record, Thing pad, ServiceUse use)
         {
             if (record == null || pad == null || pad.Destroyed)
@@ -1979,7 +3298,7 @@ namespace SpaceServices
             {
                 return record.serviceKind != "hospital";
             }
-            if (!ReservedPadCanServe(record, record.serviceKind == "hospitality" ? ServiceUse.Guest : ServiceUse.Patient, out string blockedReason))
+            if (!ReservedPadCanServe(record, DepartureUse(record), out string blockedReason))
             {
                 return false;
             }
@@ -2045,6 +3364,10 @@ namespace SpaceServices
             {
                 return SameRoomAsPad(record.reservedPad, pawn.Position);
             }
+            if (record != null && record.serviceKind == "hospital" && PawnAtDepartureWaitCell(pawn, record))
+            {
+                return true;
+            }
             return PawnSafelyStagedForPickup(pawn, record == null ? null : record.reservedPad);
         }
 
@@ -2079,7 +3402,21 @@ namespace SpaceServices
             {
                 return false;
             }
-            DepartureUtility.CompleteDeparture(map, record, "hospitality pickup timeout fallback");
+            if (record.state != "boardingPickup")
+            {
+                record.pickupShuttleTouchdownTick = Find.TickManager.TicksGame;
+                GuideDepartingPawnsToPad(record);
+                ServiceDebugUtility.LogThrottled(ServiceLogIntegration.Hospitality, "hospitality-pickup-timeout-staging-" + record.id, "Hospitality pickup timeout extended while service pawns finish staging: " + RecordAudit(record), GenDate.TicksPerHour);
+                return true;
+            }
+            if (ReadyForBoardingCompletion(record))
+            {
+                DepartureUtility.CompleteDeparture(map, record, "hospitality pickup timeout fallback after boarding");
+                return true;
+            }
+            record.pickupShuttleTouchdownTick = Find.TickManager.TicksGame;
+            GuideBoardingPawnsToShuttle(record);
+            ServiceDebugUtility.LogThrottled(ServiceLogIntegration.Hospitality, "hospitality-pickup-timeout-wait-" + record.id, "Hospitality pickup timeout extended while service pawns finish boarding: " + RecordAudit(record), GenDate.TicksPerHour);
             return true;
         }
 
@@ -2096,7 +3433,26 @@ namespace SpaceServices
             {
                 return false;
             }
-            DepartureUtility.CompleteDeparture(map, record, "hospital pickup timeout fallback");
+            if (record.state != "boardingPickup")
+            {
+                record.pickupShuttleTouchdownTick = Find.TickManager.TicksGame;
+                GuideDepartingPawnsToPad(record);
+                ServiceDebugUtility.LogThrottled(ServiceLogIntegration.Hospital, "hospital-pickup-timeout-staging-" + record.id, "Hospital pickup timeout extended while service pawns finish staging: " + RecordAudit(record), GenDate.TicksPerHour);
+                return true;
+            }
+            if (ReadyForBoardingCompletion(record))
+            {
+                DepartureUtility.CompleteDeparture(map, record, "hospital pickup timeout fallback after boarding");
+                return true;
+            }
+            if (HospitalPickupReadyForDownedFallback(record))
+            {
+                DepartureUtility.CompleteDeparture(map, record, "hospital downed patient at pickup shuttle timeout fallback");
+                return true;
+            }
+            record.pickupShuttleTouchdownTick = Find.TickManager.TicksGame;
+            GuideBoardingPawnsToShuttle(record);
+            ServiceDebugUtility.LogThrottled(ServiceLogIntegration.Hospital, "hospital-pickup-timeout-wait-" + record.id, "Hospital pickup timeout extended while service pawns finish boarding: " + RecordAudit(record), GenDate.TicksPerHour);
             return true;
         }
 
@@ -2145,7 +3501,10 @@ namespace SpaceServices
                 return false;
             }
             List<Pawn> active = record.pawns
-                .Where(pawn => pawn != null && !pawn.Destroyed && !ServicePawnUtility.IsPlayerOwnedPawn(pawn) && pawn.Spawned)
+                .Where(pawn => pawn != null &&
+                    !pawn.Destroyed &&
+                    (!ServicePawnUtility.IsPlayerOwnedPawn(pawn) || ServiceDelayLodgerUtility.IsDelayLodger(record, pawn)) &&
+                    pawn.Spawned)
                 .ToList();
             if (active.Count == 0)
             {
@@ -2185,7 +3544,7 @@ namespace SpaceServices
             foreach (Pawn pawn in boarding)
             {
                 ServiceDebugUtility.LogAudit("BoardReadyPawns extracting pawn=" + ServiceDebugUtility.PawnAuditSummary(pawn) + " record=" + RecordAudit(record));
-                DepartureUtility.TryAutoExtract(map ?? pawn.MapHeld, new[] { pawn }, "service pawn boarded pickup shuttle");
+                DepartureUtility.TryAutoExtractForRecord(map ?? pawn.MapHeld, new[] { pawn }, "service pawn boarded pickup shuttle", record);
             }
             if (boarding.Count > 0 && ReadyForBoardingCompletion(record))
             {
@@ -2223,14 +3582,14 @@ namespace SpaceServices
                 ServiceDebugUtility.LogAudit("BoardServiceShuttle reached target outside boarding footprint pawn=" + ServiceDebugUtility.PawnAuditSummary(pawn) + " record=" + RecordAudit(record));
                 return false;
             }
-            if (!ReservedPadCanServe(record, record.serviceKind == "hospitality" ? ServiceUse.Guest : ServiceUse.Patient, out string blockedReason))
+            if (!ReservedPadCanServe(record, DepartureUse(record), out string blockedReason))
             {
                 ServiceDebugUtility.Log("Service pickup boarding job waiting: " + blockedReason);
                 return false;
             }
             Map extractionMap = map ?? pawn.MapHeld ?? record.reservedPad.Map;
             ServiceDebugUtility.LogAudit("BoardServiceShuttle extracting pawn=" + ServiceDebugUtility.PawnAuditSummary(pawn) + " record=" + RecordAudit(record));
-            bool extracted = DepartureUtility.TryAutoExtract(extractionMap, new[] { pawn }, "service pawn boarded pickup shuttle");
+            bool extracted = DepartureUtility.TryAutoExtractForRecord(extractionMap, new[] { pawn }, "service pawn boarded pickup shuttle", record);
             if (extracted && ReadyForBoardingCompletion(record))
             {
                 DepartureUtility.CompleteDeparture(extractionMap, record, "service pawns boarded pickup shuttle");
@@ -2263,7 +3622,7 @@ namespace SpaceServices
             {
                 return;
             }
-            if (!ReservedPadCanServe(record, record.serviceKind == "hospitality" ? ServiceUse.Guest : ServiceUse.Patient, out string blockedReason))
+            if (!ReservedPadCanServe(record, DepartureUse(record), out string blockedReason))
             {
                 return;
             }
@@ -2283,7 +3642,7 @@ namespace SpaceServices
                     HoldDepartingPawnNearPad(record, pawn);
                     continue;
                 }
-                if (PawnSafelyStagedForPickup(pawn, record.reservedPad))
+                if (PawnReadyForPickupCall(pawn, record))
                 {
                     continue;
                 }
@@ -2390,6 +3749,16 @@ namespace SpaceServices
             return SameRoomAsPad(pad, pawn.Position);
         }
 
+        private static bool PawnAtDepartureWaitCell(Pawn pawn, ServiceGroupRecord record)
+        {
+            if (pawn == null || !pawn.Spawned || record == null || record.reservedPad == null)
+            {
+                return false;
+            }
+            IntVec3 waitCell = DepartureWaitCell(record.reservedPad, pawn, ShouldBypassGuestArea(record));
+            return waitCell.IsValid && pawn.Position == waitCell && SameRoomAsPad(record.reservedPad, pawn.Position);
+        }
+
         private static bool PawnNearDeparturePad(Pawn pawn, Thing pad)
         {
             if (pawn == null || !pawn.Spawned || pad == null || pad.Map == null)
@@ -2467,7 +3836,7 @@ namespace SpaceServices
             {
                 return IntVec3.Invalid;
             }
-            return BestReachableBoardingCell(PickupBoardingRect(pad), pad, pawn);
+            return BestReachableBoardingCell(PickupBoardingRect(pad), pad, pawn, bypassGuestArea);
         }
 
         private static CellRect PickupBoardingRect(Thing pad)
@@ -2483,7 +3852,57 @@ namespace SpaceServices
             {
                 return IntVec3.Invalid;
             }
-            return BestReachableCell(pad.OccupiedRect().ExpandedBy(2), pad, pawn, bypassGuestArea, true);
+            IntVec3 cell = BestReachableCell(pad.OccupiedRect().ExpandedBy(2), pad, pawn, bypassGuestArea, true);
+            if (cell.IsValid)
+            {
+                return cell;
+            }
+            return BestReachableStagingFallback(pad, pawn, bypassGuestArea);
+        }
+
+        private static IntVec3 BestReachableStagingFallback(Thing pad, Pawn pawn, bool bypassGuestArea)
+        {
+            Map map = pad == null ? null : pad.Map;
+            if (map == null || pawn == null)
+            {
+                return IntVec3.Invalid;
+            }
+            CellRect padRect = pad.OccupiedRect();
+            CellRect searchRect = padRect.ExpandedBy(2);
+            IntVec3 bestReachable = IntVec3.Invalid;
+            IntVec3 bestFallback = IntVec3.Invalid;
+            int bestReachablePawnDist = int.MaxValue;
+            int bestReachablePadDist = int.MaxValue;
+            int bestFallbackPawnDist = int.MaxValue;
+            int bestFallbackPadDist = int.MaxValue;
+
+            foreach (IntVec3 cell in searchRect.Cells)
+            {
+                if (padRect.Contains(cell) ||
+                    !cell.InBounds(map) ||
+                    !cell.Standable(map) ||
+                    !SameRoomAsPad(pad, cell) ||
+                    (cell.GetFirstPawn(map) != null && cell != pawn.Position))
+                {
+                    continue;
+                }
+                int pawnDist = cell.DistanceToSquared(pawn.Position);
+                int padDist = cell.DistanceToSquared(pad.Position);
+                if (BetterCell(pawnDist, padDist, bestFallbackPawnDist, bestFallbackPadDist))
+                {
+                    bestFallback = cell;
+                    bestFallbackPawnDist = pawnDist;
+                    bestFallbackPadDist = padDist;
+                }
+                if (pawn.CanReach(cell, PathEndMode.OnCell, Danger.Deadly) && BetterCell(pawnDist, padDist, bestReachablePawnDist, bestReachablePadDist))
+                {
+                    bestReachable = cell;
+                    bestReachablePawnDist = pawnDist;
+                    bestReachablePadDist = padDist;
+                }
+            }
+
+            return bestReachable.IsValid || !bypassGuestArea ? bestReachable : bestFallback;
         }
 
         private static IntVec3 BestReachableCell(CellRect searchRect, Thing pad, Pawn pawn, bool bypassGuestArea, bool stagingRing)
@@ -2530,38 +3949,47 @@ namespace SpaceServices
             return bestReachable.IsValid || !bypassGuestArea ? bestReachable : bestFallback;
         }
 
-        private static IntVec3 BestReachableBoardingCell(CellRect searchRect, Thing pad, Pawn pawn)
+        private static IntVec3 BestReachableBoardingCell(CellRect searchRect, Thing pad, Pawn pawn, bool bypassGuestArea)
         {
             Map map = pad == null ? null : pad.Map;
             if (map == null || pawn == null)
             {
                 return IntVec3.Invalid;
             }
-            IntVec3 best = IntVec3.Invalid;
-            int bestPadDist = int.MaxValue;
-            int bestPawnDist = int.MaxValue;
+            IntVec3 bestReachable = IntVec3.Invalid;
+            IntVec3 bestFallback = IntVec3.Invalid;
+            int bestReachablePadDist = int.MaxValue;
+            int bestReachablePawnDist = int.MaxValue;
+            int bestFallbackPadDist = int.MaxValue;
+            int bestFallbackPawnDist = int.MaxValue;
 
             foreach (IntVec3 cell in searchRect.Cells)
             {
                 if (!cell.InBounds(map) ||
                     !cell.Standable(map) ||
                     !SameRoomAsPad(pad, cell) ||
-                    (cell.GetFirstPawn(map) != null && cell != pawn.Position) ||
-                    !pawn.CanReach(cell, PathEndMode.OnCell, Danger.Deadly))
+                    (cell.GetFirstPawn(map) != null && cell != pawn.Position))
                 {
                     continue;
                 }
                 int padDist = cell.DistanceToSquared(pad.Position);
                 int pawnDist = cell.DistanceToSquared(pawn.Position);
-                if (padDist < bestPadDist || (padDist == bestPadDist && pawnDist < bestPawnDist))
+                if (padDist < bestFallbackPadDist || (padDist == bestFallbackPadDist && pawnDist < bestFallbackPawnDist))
                 {
-                    best = cell;
-                    bestPadDist = padDist;
-                    bestPawnDist = pawnDist;
+                    bestFallback = cell;
+                    bestFallbackPadDist = padDist;
+                    bestFallbackPawnDist = pawnDist;
+                }
+                if (pawn.CanReach(cell, PathEndMode.OnCell, Danger.Deadly) &&
+                    (padDist < bestReachablePadDist || (padDist == bestReachablePadDist && pawnDist < bestReachablePawnDist)))
+                {
+                    bestReachable = cell;
+                    bestReachablePadDist = padDist;
+                    bestReachablePawnDist = pawnDist;
                 }
             }
 
-            return best;
+            return bestReachable.IsValid || !bypassGuestArea ? bestReachable : bestFallback;
         }
 
         private static bool BetterCell(int pawnDist, int padDist, int bestPawnDist, int bestPadDist)
@@ -2575,6 +4003,7 @@ namespace SpaceServices
             return job != null &&
                 (job.def == JobDefOf.Goto ||
                     job.def == ServiceJobDefUtility.ServiceGoto ||
+                    job.def == ServiceJobDefUtility.ServiceDepartureHold ||
                     job.def == ServiceJobDefUtility.BoardServiceShuttle) &&
                 job.targetA.IsValid &&
                 job.targetA.Cell == cell;
@@ -2608,7 +4037,7 @@ namespace SpaceServices
                     {
                         continue;
                     }
-                    ServiceUse use = record.serviceKind == "hospitality" ? ServiceUse.Guest : ServiceUse.Patient;
+                    ServiceUse use = DepartureUse(record);
                     if (ServiceDangerUtility.DepartureShuttleBlocked(map, record.serviceKind, out string hazardReason))
                     {
                         blocks.Add(new ServiceDepartureBlock
@@ -2660,7 +4089,7 @@ namespace SpaceServices
             {
                 return false;
             }
-            if (record.state == "departing" || record.state == "pickupInbound" || record.state == "boardingPickup")
+            if (IsActiveDepartureState(record))
             {
                 return true;
             }
@@ -2923,9 +4352,31 @@ namespace SpaceServices
                 " reservedPad=" + ServiceDebugUtility.ThingAuditSummary(record.reservedPad);
         }
 
+        private static string LordLabel(Lord lord)
+        {
+            if (lord == null)
+            {
+                return "null";
+            }
+            string job = lord.LordJob == null ? "nullJob" : lord.LordJob.GetType().Name;
+            string toil = lord.CurLordToil == null ? "nullToil" : lord.CurLordToil.GetType().Name;
+            return lord.loadID + "/" + job + "/" + toil + "/pawns=" + (lord.ownedPawns == null ? 0 : lord.ownedPawns.Count);
+        }
+
         private static bool ShouldBypassGuestArea(ServiceGroupRecord record)
         {
-            return record != null && record.serviceKind == "hospitality";
+            return UsesHospitalityDepartureHandling(record);
+        }
+
+        private static bool UsesHospitalityDepartureHandling(ServiceGroupRecord record)
+        {
+            return record != null &&
+                (record.serviceKind == "hospitality" || record.departureHoldHospitalityHandoffDone);
+        }
+
+        private static ServiceUse DepartureUse(ServiceGroupRecord record)
+        {
+            return UsesHospitalityDepartureHandling(record) ? ServiceUse.Guest : ServiceUse.Patient;
         }
 
         private static Job ServiceGotoJob(IntVec3 cell, bool bypassGuestArea, LocomotionUrgency urgency)
@@ -2933,6 +4384,19 @@ namespace SpaceServices
             JobDef serviceGotoDef = ServiceJobDefUtility.ServiceGoto;
             Job job = JobMaker.MakeJob(serviceGotoDef ?? JobDefOf.Goto, cell);
             job.locomotionUrgency = urgency;
+            if (bypassGuestArea)
+            {
+                job.playerForced = true;
+                job.ignoreForbidden = true;
+            }
+            return job;
+        }
+
+        private static Job ServiceDepartureHoldJob(IntVec3 cell)
+        {
+            JobDef holdJobDef = ServiceJobDefUtility.ServiceDepartureHold;
+            Job job = JobMaker.MakeJob(holdJobDef ?? JobDefOf.Goto, cell);
+            job.locomotionUrgency = LocomotionUrgency.Walk;
             return job;
         }
 
@@ -2941,6 +4405,8 @@ namespace SpaceServices
             JobDef boardJobDef = ServiceJobDefUtility.BoardServiceShuttle;
             Job job = JobMaker.MakeJob(boardJobDef ?? JobDefOf.Goto, cell);
             job.locomotionUrgency = LocomotionUrgency.Jog;
+            job.playerForced = true;
+            job.ignoreForbidden = true;
             return job;
         }
 

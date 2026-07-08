@@ -49,6 +49,7 @@ namespace SpaceServices
         public override void FinalizeInit()
         {
             base.FinalizeInit();
+            ServiceLifecycleUtility.ClearTransientCaches();
             RunStaleReferenceCleanup();
             ReleaseTransientArrivalReservations();
         }
@@ -253,8 +254,36 @@ namespace SpaceServices
             }
             // Transition hooks call this when Hospital or Hospitality already told us something changed.
             // The periodic lifecycle tick remains as a watchdog for states we do not patch directly.
+            if (ShouldResetDeparturePadReservationRetries(reason))
+            {
+                for (int i = 0; i < serviceGroups.Count; i++)
+                {
+                    if (serviceGroups[i] != null)
+                    {
+                        serviceGroups[i].nextDeparturePadReservationTick = 0;
+                    }
+                }
+            }
             nextLifecycleTick = Math.Min(nextLifecycleTick, Find.TickManager.TicksGame);
             ServiceDebugUtility.LogVerbose(ServiceLogIntegration.Core, "Lifecycle tick requested: " + (reason ?? "unspecified"));
+        }
+
+        private static bool ShouldResetDeparturePadReservationRetries(string reason)
+        {
+            if (string.IsNullOrEmpty(reason))
+            {
+                return false;
+            }
+            return reason.IndexOf("reservation released", StringComparison.OrdinalIgnoreCase) >= 0 ||
+                reason.IndexOf("reservation force released", StringComparison.OrdinalIgnoreCase) >= 0 ||
+                reason.IndexOf("service pad spawned", StringComparison.OrdinalIgnoreCase) >= 0 ||
+                reason.IndexOf("service pad despawned", StringComparison.OrdinalIgnoreCase) >= 0 ||
+                reason.IndexOf("service pad unavailable", StringComparison.OrdinalIgnoreCase) >= 0 ||
+                reason.IndexOf("service pad power", StringComparison.OrdinalIgnoreCase) >= 0 ||
+                reason.IndexOf("service pad roof", StringComparison.OrdinalIgnoreCase) >= 0 ||
+                reason.IndexOf("service pad mode", StringComparison.OrdinalIgnoreCase) >= 0 ||
+                reason.IndexOf("debug cleared", StringComparison.OrdinalIgnoreCase) >= 0 ||
+                reason.IndexOf("debug reset", StringComparison.OrdinalIgnoreCase) >= 0;
         }
 
         private void RunStaleReferenceCleanup()
@@ -344,7 +373,9 @@ namespace SpaceServices
             DirtyServicePadCache();
             int recordsReset = ResetRecordsForUnavailablePad(pad, oldPosition, reason);
             int pendingCanceled = CancelPendingHospitalityIncidentsForPad(pad, oldPosition, reason);
-            int shuttlesRemoved = oldPosition.IsValid ? ServiceShuttleUtility.CleanupServiceShuttlesNear(map, oldPosition, 10f) : 0;
+            int shuttlesRemoved = oldPosition.IsValid
+                ? ServiceShuttleUtility.CleanupServiceShuttlesForPadFootprint(map, oldPosition, pad.def == null ? new IntVec2(7, 7) : pad.def.size, null)
+                : ServiceShuttleUtility.CleanupServiceShuttlesForPad(pad, null);
             RequestLifecycleTickSoon(reason ?? "service pad unavailable");
             ServiceDebugUtility.LogAudit("Service pad unavailable recovery reason=" + (reason ?? "none") + " records=" + recordsReset + " pending=" + pendingCanceled + " shuttles=" + shuttlesRemoved + " pad=" + ServiceDebugUtility.ThingAuditSummary(pad));
         }
@@ -380,7 +411,7 @@ namespace SpaceServices
             }
             pendingHospitalityIncidents.Clear();
             RequestLifecycleTickSoon(reason ?? "debug cleared all service reservations");
-            Messages.Message("Space Services: cleared " + cleared + " pad reservations", MessageTypeDefOf.NeutralEvent, false);
+            Messages.Message("Space Services: Cleared " + cleared + " Pad Reservations", MessageTypeDefOf.NeutralEvent, false);
         }
 
         private IEnumerable<Thing> AllServicePadBuildingsIncludingInactive()
@@ -418,7 +449,7 @@ namespace SpaceServices
                 record.pickupShuttleThingDefName = null;
             }
             RequestLifecycleTickSoon(reason ?? "debug reset service traffic");
-            Messages.Message("Space Services: reset service traffic and removed " + shuttlesRemoved + " service shuttles", MessageTypeDefOf.NeutralEvent, false);
+            Messages.Message("Space Services: Reset Service Traffic and Removed " + shuttlesRemoved + " Service Shuttles", MessageTypeDefOf.NeutralEvent, false);
         }
 
         private int ResetRecordsForUnavailablePad(Thing pad, IntVec3 oldPosition, string reason)
@@ -488,7 +519,7 @@ namespace SpaceServices
             }
         }
 
-        public void ScheduleShuttleArrival(IntVec3 cell, string shuttleThingDefName, string shuttleVisualDefName, List<Thing> things, bool showDeparture)
+        public void ScheduleShuttleArrival(IntVec3 cell, string shuttleThingDefName, string shuttleVisualDefName, List<Thing> things, bool showDeparture, string serviceKind = null)
         {
             if (!cell.IsValid)
             {
@@ -504,7 +535,8 @@ namespace SpaceServices
                 touchdownTick = Find.TickManager.TicksGame + ServiceShuttleUtility.ArrivalTouchdownDelayTicks,
                 shuttleThingDefName = shuttleThingDefName,
                 shuttleVisualDefName = shuttleVisualDefName,
-                showDeparture = showDeparture
+                showDeparture = showDeparture,
+                serviceKind = serviceKind
             };
             foreach (Thing thing in things ?? Enumerable.Empty<Thing>())
             {
@@ -623,7 +655,7 @@ namespace SpaceServices
                 {
                     string invalidReason = "scheduled visitor data became invalid";
                     ServiceDebugUtility.LogAudit("TickPendingHospitalityIncidents dropping invalid pending incident reservation=" + incident.reservationId + " reason=" + invalidReason + " pad=" + ServiceDebugUtility.ThingAuditSummary(incident.pad) + " worker=" + (incident.worker != null) + " parms=" + (incident.parms != null));
-                    Messages.Message("Space Services: visitor arrival waved off, " + invalidReason, incident.pad, MessageTypeDefOf.RejectInput, false);
+                    Messages.Message("Space Services: Visitor Arrival Waved Off: " + invalidReason, incident.pad, MessageTypeDefOf.RejectInput, false);
                     ReleaseArrivalReservation(incident);
                     continue;
                 }
@@ -632,7 +664,7 @@ namespace SpaceServices
                 {
                     string reason = !HospitalityStillEnabledForMap(map) ? "hospitality disabled or map is not enabled" : padReason ?? "landing pad is no longer usable";
                     ServiceDebugUtility.LogAudit("TickPendingHospitalityIncidents canceled unusable pad reservation=" + incident.reservationId + " reason=" + reason + " pad=" + ServiceDebugUtility.ThingAuditSummary(incident.pad));
-                    Messages.Message("Space Services: visitor arrival canceled, " + reason, incident.pad, MessageTypeDefOf.RejectInput, false);
+                    Messages.Message("Space Services: Visitor Arrival Canceled: " + reason, incident.pad, MessageTypeDefOf.RejectInput, false);
                     ServiceShuttleUtility.CleanupTouchdownShuttle(map, incident.pad.Position, incident.shuttleThingDefName);
                     ServiceShuttleUtility.SpawnDeparture(map, incident.pad.Position, "hospitality", incident.shuttleVisualDefName);
                     ReleaseArrivalReservation(incident);
@@ -641,7 +673,7 @@ namespace SpaceServices
                 if (ServiceDangerUtility.HospitalityTrafficBlocked(map, out string dangerReason))
                 {
                     ServiceDebugUtility.LogAudit("TickPendingHospitalityIncidents waved off danger reservation=" + incident.reservationId + " reason=" + dangerReason + " pad=" + ServiceDebugUtility.ThingAuditSummary(incident.pad));
-                    Messages.Message("Space Services: visitor arrival waved off, " + dangerReason, incident.pad, MessageTypeDefOf.NegativeEvent, false);
+                    Messages.Message("Space Services: Visitor Arrival Waved Off: " + dangerReason, incident.pad, MessageTypeDefOf.NegativeEvent, false);
                     ServiceShuttleUtility.CleanupTouchdownShuttle(map, incident.pad.Position, incident.shuttleThingDefName);
                     ServiceShuttleUtility.SpawnDeparture(map, incident.pad.Position, "hospitality", incident.shuttleVisualDefName);
                     ReleaseArrivalReservation(incident);
@@ -650,7 +682,7 @@ namespace SpaceServices
                 if (ServiceDangerUtility.ArrivalTrafficBlocked(map, "hospitality", out string trafficReason))
                 {
                     ServiceDebugUtility.LogAudit("TickPendingHospitalityIncidents waved off traffic hazard reservation=" + incident.reservationId + " reason=" + trafficReason + " pad=" + ServiceDebugUtility.ThingAuditSummary(incident.pad));
-                    Messages.Message("Space Services: visitor arrival waved off, " + trafficReason, incident.pad, MessageTypeDefOf.NegativeEvent, false);
+                    Messages.Message("Space Services: Visitor Arrival Waved Off: " + trafficReason, incident.pad, MessageTypeDefOf.NegativeEvent, false);
                     ServiceShuttleUtility.CleanupTouchdownShuttle(map, incident.pad.Position, incident.shuttleThingDefName);
                     ServiceShuttleUtility.SpawnDeparture(map, incident.pad.Position, "hospitality", incident.shuttleVisualDefName);
                     ReleaseArrivalReservation(incident);
@@ -660,7 +692,7 @@ namespace SpaceServices
                 int expectedBedDemand = Math.Max(1, incident.expectedBedDemand);
                 if (HospitalityIncidentGate.RequiresGuestBedCapacity() && beds.freeBeds < expectedBedDemand)
                 {
-                    Messages.Message("Space Services: visitor arrival canceled, need " + expectedBedDemand + " free guest beds (" + beds.ToSummary() + ")", incident.pad, MessageTypeDefOf.RejectInput, false);
+                    Messages.Message("Space Services: Visitor Arrival Canceled: need " + expectedBedDemand + " free guest beds (" + beds.ToSummary() + ")", incident.pad, MessageTypeDefOf.RejectInput, false);
                     ServiceDebugUtility.LogAudit("TickPendingHospitalityIncidents canceled beds reservation=" + incident.reservationId + " need=" + expectedBedDemand + " " + beds.ToSummary());
                     ServiceDebugUtility.LogThrottled("hospitality-touchdown-beds-" + (incident.incidentDefName ?? ""), "Hospitality visitor arrival canceled at touchdown: need " + expectedBedDemand + ", " + beds.ToSummary(), GenDate.TicksPerHour);
                     ServiceShuttleUtility.CleanupTouchdownShuttle(map, incident.pad.Position, incident.shuttleThingDefName);
@@ -674,7 +706,7 @@ namespace SpaceServices
                     if (Find.TickManager.TicksGame - incident.lastTouchdownDelayMessageTick >= GenDate.TicksPerHour)
                     {
                         incident.lastTouchdownDelayMessageTick = Find.TickManager.TicksGame;
-                        Messages.Message("Space Services: visitor shuttle waiting, " + clearReason, incident.pad, MessageTypeDefOf.RejectInput, false);
+                        Messages.Message("Space Services: Visitor Shuttle Waiting: " + clearReason, incident.pad, MessageTypeDefOf.RejectInput, false);
                     }
                     pendingHospitalityIncidents.Add(incident);
                     ServiceDebugUtility.LogThrottled(ServiceLogIntegration.Hospitality, "hospitality-touchdown-pad-occupied-" + incident.reservationId, "Hospitality visitor touchdown delayed because the service pad could not be cleared: " + clearReason, 250);
@@ -726,7 +758,7 @@ namespace SpaceServices
                 }
                 if (!executed)
                 {
-                    Messages.Message("Space Services: visitor arrival waved off, " + (executionFailureReason ?? "unknown Hospitality rejection"), incident.pad, MessageTypeDefOf.RejectInput, false);
+                    Messages.Message("Space Services: Visitor Arrival Waved Off: " + (executionFailureReason ?? "unknown Hospitality rejection"), incident.pad, MessageTypeDefOf.RejectInput, false);
                 }
                 ServiceShuttleUtility.SpawnDeparture(map, incident.pad.Position, "hospitality", incident.shuttleVisualDefName);
             }
@@ -834,7 +866,7 @@ namespace SpaceServices
             }
 
             ServiceShuttleUtility.SpawnArrival(map, pad.Position, visual);
-            Messages.Message("Space Services: visitors inbound", pad, MessageTypeDefOf.SilentInput, false);
+            Messages.Message("Space Services: Visitors Inbound", pad, MessageTypeDefOf.SilentInput, false);
             ServiceDebugUtility.Log("Queued service hospitality visitors from " + faction.Name + " at " + pad.Position);
             return true;
         }
@@ -1000,6 +1032,7 @@ namespace SpaceServices
         public int touchdownTick;
         public string shuttleThingDefName;
         public string shuttleVisualDefName;
+        public string serviceKind;
         public ThingOwner<Thing> things;
         public bool showDeparture = true;
         public IThingHolder ParentHolder => null;
@@ -1015,6 +1048,7 @@ namespace SpaceServices
             Scribe_Values.Look(ref touchdownTick, "touchdownTick", 0);
             Scribe_Values.Look(ref shuttleThingDefName, "shuttleThingDefName");
             Scribe_Values.Look(ref shuttleVisualDefName, "shuttleVisualDefName");
+            Scribe_Values.Look(ref serviceKind, "serviceKind");
             Scribe_Values.Look(ref showDeparture, "showDeparture", true);
             Scribe_Deep.Look(ref things, "things", this);
             if (things == null)

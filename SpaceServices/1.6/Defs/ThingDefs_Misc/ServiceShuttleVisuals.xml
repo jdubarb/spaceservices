@@ -35,7 +35,7 @@
       <anticipationSound>Shuttle_Landing</anticipationSound>
       <anticipationSoundTicks>250</anticipationSoundTicks>
       <ticksToImpactRange>200~250</ticksToImpactRange>
-      <minimalRoofDestruction>true</minimalRoofDestruction>
+      <hitRoof>false</hitRoof>
       <shadowSize>(3.5,5.5)</shadowSize>
       <angleCurve>
         <points>
@@ -84,6 +84,7 @@
       <anticipationSound>Shuttle_Leaving</anticipationSound>
       <anticipationSoundTicks>-10</anticipationSoundTicks>
       <ticksToImpactRange>-40~-15</ticksToImpactRange>
+      <hitRoof>false</hitRoof>
       <moteSpawnTime>0.05</moteSpawnTime>
       <shadow>Things/Skyfaller/SkyfallerShadowRectangle</shadow>
       <shadowSize>(3.5,5.5)</shadowSize>

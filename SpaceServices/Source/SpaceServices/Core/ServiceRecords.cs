@@ -28,13 +28,24 @@ namespace SpaceServices
         public int nextActivePawnValidationTick;
         public int nextHospitalityBedlessCheckTick;
         public int nextLeaveStateCheckTick;
+        public int nextDeparturePadReservationTick;
         public int lastHospitalityTransitTick;
         public string pickupShuttleThingDefName;
         public string pickupShuttleVisualDefName;
         public bool hospitalityDeparturePrepared;
+        public bool departureHoldHospitalityHandoffAttempted;
+        public bool departureHoldHospitalityHandoffDone;
+        public bool departureHoldQuestLodgerHandoffAttempted;
+        public bool departureHoldQuestLodgerHandoffDone;
+        public bool departureHoldFallbackAreaCreated;
         public Thing arrivalPad;
         public Thing reservedPad;
+        public Quest departureHoldQuest;
+        public Area departureHoldFallbackArea;
         public List<Pawn> pawns = new List<Pawn>();
+        public List<Pawn> departureHoldQuestLodgerPawns = new List<Pawn>();
+        public List<Faction> departureHoldQuestLodgerOriginalFactions = new List<Faction>();
+        public List<Area> departureHoldQuestLodgerOriginalAreas = new List<Area>();
 
         public void ExposeData()
         {
@@ -49,12 +60,30 @@ namespace SpaceServices
             Scribe_Values.Look(ref nextActivePawnValidationTick, "nextActivePawnValidationTick", 0);
             Scribe_Values.Look(ref nextHospitalityBedlessCheckTick, "nextHospitalityBedlessCheckTick", 0);
             Scribe_Values.Look(ref nextLeaveStateCheckTick, "nextLeaveStateCheckTick", 0);
+            Scribe_Values.Look(ref nextDeparturePadReservationTick, "nextDeparturePadReservationTick", 0);
             Scribe_Values.Look(ref pickupShuttleThingDefName, "pickupShuttleThingDefName");
             Scribe_Values.Look(ref pickupShuttleVisualDefName, "pickupShuttleVisualDefName");
             Scribe_Values.Look(ref hospitalityDeparturePrepared, "hospitalityDeparturePrepared", false);
+            Scribe_Values.Look(ref departureHoldHospitalityHandoffAttempted, "departureHoldHospitalityHandoffAttempted", false);
+            Scribe_Values.Look(ref departureHoldHospitalityHandoffDone, "departureHoldHospitalityHandoffDone", false);
+            Scribe_Values.Look(ref departureHoldQuestLodgerHandoffAttempted, "departureHoldQuestLodgerHandoffAttempted", false);
+            Scribe_Values.Look(ref departureHoldQuestLodgerHandoffDone, "departureHoldQuestLodgerHandoffDone", false);
+            Scribe_Values.Look(ref departureHoldFallbackAreaCreated, "departureHoldFallbackAreaCreated", false);
             Scribe_References.Look(ref arrivalPad, "arrivalPad");
             Scribe_References.Look(ref reservedPad, "reservedPad");
+            Scribe_References.Look(ref departureHoldQuest, "departureHoldQuest");
+            Scribe_References.Look(ref departureHoldFallbackArea, "departureHoldFallbackArea");
             Scribe_Collections.Look(ref pawns, "pawns", LookMode.Reference);
+            Scribe_Collections.Look(ref departureHoldQuestLodgerPawns, "departureHoldQuestLodgerPawns", LookMode.Reference);
+            Scribe_Collections.Look(ref departureHoldQuestLodgerOriginalFactions, "departureHoldQuestLodgerOriginalFactions", LookMode.Reference);
+            Scribe_Collections.Look(ref departureHoldQuestLodgerOriginalAreas, "departureHoldQuestLodgerOriginalAreas", LookMode.Reference);
+            if (Scribe.mode == LoadSaveMode.PostLoadInit)
+            {
+                pawns = pawns ?? new List<Pawn>();
+                departureHoldQuestLodgerPawns = departureHoldQuestLodgerPawns ?? new List<Pawn>();
+                departureHoldQuestLodgerOriginalFactions = departureHoldQuestLodgerOriginalFactions ?? new List<Faction>();
+                departureHoldQuestLodgerOriginalAreas = departureHoldQuestLodgerOriginalAreas ?? new List<Area>();
+            }
         }
     }
 

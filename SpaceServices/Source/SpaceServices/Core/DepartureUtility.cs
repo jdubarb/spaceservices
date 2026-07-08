@@ -21,6 +21,11 @@ namespace SpaceServices
             {
                 return false;
             }
+            if (record.state == "completed")
+            {
+                ServiceDebugUtility.LogAudit("CompleteDeparture ignored already-completed record id=" + record.id + " reason=" + (reason ?? "none"));
+                return true;
+            }
 
             bool shouldPlayDepartureVisual = record.reservedPad != null &&
                 record.reservedPad.Spawned &&
@@ -32,6 +37,7 @@ namespace SpaceServices
             Map padMap = record.reservedPad == null ? null : record.reservedPad.Map;
             IntVec3 padCell = record.reservedPad == null ? IntVec3.Invalid : record.reservedPad.Position;
             ServiceShuttleUtility.CleanupTouchdownShuttle(padMap, padCell, record.pickupShuttleThingDefName);
+            ServiceDelayLodgerUtility.PrepareDelayLodgersForDeparture(record);
 
             List<Pawn> departingPawns = record.pawns.Where(pawn => !ServicePawnUtility.IsTerminalPawn(pawn) && !ServicePawnUtility.IsPlayerOwnedPawn(pawn)).ToList();
             if (departingPawns.Count == 0)
@@ -42,10 +48,11 @@ namespace SpaceServices
                 }
                 record.state = "completed";
                 ReleaseReservation(record);
+                ServiceDelayLodgerUtility.CleanupRecord(record, QuestEndOutcome.Success);
                 ServiceDebugUtility.LogAudit("CompleteDeparture finished without extractable pawns id=" + record.id + " pawns=" + PawnListAudit(record.pawns));
                 return true;
             }
-            bool completed = TryAutoExtract(map, departingPawns, reason);
+            bool completed = TryAutoExtractForRecord(map, departingPawns, reason, record);
             ServiceDebugUtility.LogAudit("CompleteDeparture extraction result id=" + record.id + " completed=" + completed + " pawns=" + PawnListAudit(record.pawns));
             if (completed)
             {
@@ -59,19 +66,25 @@ namespace SpaceServices
                     NotifyHospitalPatientsLeft(map, departingPawns);
                 }
                 ReleaseReservation(record);
+                ServiceDelayLodgerUtility.CleanupRecord(record, QuestEndOutcome.Success);
                 ServiceDebugUtility.LogAudit("CompleteDeparture finished id=" + record.id + " state=" + record.state);
-                MessageTypeDef departureMessageType = record.serviceKind == "hospitality" ? MessageTypeDefOf.SilentInput : MessageTypeDefOf.NeutralEvent;
-                Messages.Message("Space Services: service group departed", departureMessageType, false);
+                Messages.Message("Space Services: Service Group Departed", MessageTypeDefOf.SilentInput, false);
             }
             return completed;
         }
 
         public static bool TryAutoExtract(Map map, IEnumerable<Pawn> pawns, string reason)
         {
+            return TryAutoExtractForRecord(map, pawns, reason, null);
+        }
+
+        public static bool TryAutoExtractForRecord(Map map, IEnumerable<Pawn> pawns, string reason, ServiceGroupRecord record)
+        {
             if (SpaceServicesMod.Settings != null && !SpaceServicesMod.Settings.autoExtractFallback)
             {
                 return false;
             }
+            ServiceDelayLodgerUtility.PrepareDelayLodgersForDeparture(record);
             bool any = false;
             foreach (Pawn pawn in pawns ?? Enumerable.Empty<Pawn>())
             {
@@ -220,7 +233,7 @@ namespace SpaceServices
                     }
                 }
             }
-            MethodInfo clear = queue == null ? null : AccessTools.Method(queue.GetType(), "Clear");
+            MethodInfo clear = queue == null ? null : AccessTools.Method(queue.GetType(), "Clear", Type.EmptyTypes);
             if (clear != null)
             {
                 clear.Invoke(queue, null);

@@ -23,8 +23,14 @@
   <JDB_SpaceServices_Settings_HospitalCareModeDesc>Default on. Keeps active Hospital patients on bed rest, tending, and feeding while Space Services is delaying departure for whitelisted diseases or blood loss. Turning this off can let long-term patients wander, recreate, or trigger discharge edge cases.</JDB_SpaceServices_Settings_HospitalCareModeDesc>
   <JDB_SpaceServices_Settings_Hospitality>Hospitality support</JDB_SpaceServices_Settings_Hospitality>
   <JDB_SpaceServices_Settings_HospitalityDesc>Enable space-map handling for Hospitality guest arrivals and departures. Disabling passes native Hospitality behavior through immediately; enabling after startup may require a restart.</JDB_SpaceServices_Settings_HospitalityDesc>
+  <JDB_SpaceServices_Settings_ShowSpaceServicesTab>Show Space Services tab</JDB_SpaceServices_Settings_ShowSpaceServicesTab>
+  <JDB_SpaceServices_Settings_ShowSpaceServicesTabDesc>Show the Space Services bottom tab while replacing the native Hospital/Hospitality tabs. Disabling only hides the tab button; pads, arrivals, departures, alerts, and integration behavior continue to run.</JDB_SpaceServices_Settings_ShowSpaceServicesTabDesc>
   <JDB_SpaceServices_Settings_ReplaceExternalTabs>Replace Hospital/Hospitality tabs</JDB_SpaceServices_Settings_ReplaceExternalTabs>
-  <JDB_SpaceServices_Settings_ReplaceExternalTabsDesc>Hide the native Hospital and Hospitality bottom tabs and use the Space Services tab as the combined entry point. Disable this to show all three tabs.</JDB_SpaceServices_Settings_ReplaceExternalTabsDesc>
+  <JDB_SpaceServices_Settings_ReplaceExternalTabsDesc>Hide the native Hospital and Hospitality bottom tabs and use the Space Services tab as the combined entry point. Disable this to show native tabs instead.</JDB_SpaceServices_Settings_ReplaceExternalTabsDesc>
+  <JDB_SpaceServices_Settings_ShowHospitalFallbackPadOverlay>Show medical pad overlay without Hospitality</JDB_SpaceServices_Settings_ShowHospitalFallbackPadOverlay>
+  <JDB_SpaceServices_Settings_ShowHospitalFallbackPadOverlayDesc>Draw the medical cross on service pads that fall back to Hospital-only mode because Hospitality is unavailable.</JDB_SpaceServices_Settings_ShowHospitalFallbackPadOverlayDesc>
+  <JDB_SpaceServices_Settings_ShowHospitalityFallbackPadOverlay>Show Hospitality pad overlay without Hospital</JDB_SpaceServices_Settings_ShowHospitalityFallbackPadOverlay>
+  <JDB_SpaceServices_Settings_ShowHospitalityFallbackPadOverlayDesc>Draw the guest overlay on service pads that fall back to Hospitality-only mode because Hospital is unavailable. Default off.</JDB_SpaceServices_Settings_ShowHospitalityFallbackPadOverlayDesc>
   <JDB_SpaceServices_Settings_HospitalityRequireBeds>Require free guest beds for Hospitality arrivals</JDB_SpaceServices_Settings_HospitalityRequireBeds>
   <JDB_SpaceServices_Settings_HospitalityRequireBedsDesc>Block new Hospitality guest groups unless enough free guest beds are available.</JDB_SpaceServices_Settings_HospitalityRequireBedsDesc>
   <JDB_SpaceServices_Settings_HospitalityAutoDepartBedless>Auto-depart Hospitality guests without beds</JDB_SpaceServices_Settings_HospitalityAutoDepartBedless>
@@ -50,6 +56,10 @@
   <JDB_SpaceServices_Settings_ModdedShuttleVisualsDesc>Include shuttle visuals from optional non-Ludeon mods in the random service shuttle pool. Disable this to use only built-in vanilla/Odyssey-style visuals.</JDB_SpaceServices_Settings_ModdedShuttleVisualsDesc>
   <JDB_SpaceServices_Settings_DisablePatientGamblingAddictions>Disable patients' gambling addictions</JDB_SpaceServices_Settings_DisablePatientGamblingAddictions>
   <JDB_SpaceServices_Settings_DisablePatientGamblingAddictionsDesc>Stops patients from gambling while bedridden. This may reduce immersion for colonies with advanced libertarian healthcare.</JDB_SpaceServices_Settings_DisablePatientGamblingAddictionsDesc>
+  <JDB_SpaceServices_Settings_BlockHospitalSurgeryScaria>Block scaria on Hospital surgery patients</JDB_SpaceServices_Settings_BlockHospitalSurgeryScaria>
+  <JDB_SpaceServices_Settings_BlockHospitalSurgeryScariaDesc>Default on. Removes scaria from Space Services-routed Hospital surgery patients so Hospital does not create amputation cases that leave the patient berserk and difficult to treat.</JDB_SpaceServices_Settings_BlockHospitalSurgeryScariaDesc>
+  <JDB_SpaceServices_Settings_HoldFailedSurgeryAftercare>Hold failed surgery patients for aftercare</JDB_SpaceServices_Settings_HoldFailedSurgeryAftercare>
+  <JDB_SpaceServices_Settings_HoldFailedSurgeryAftercareDesc>Default on. If Hospital drops a spawned Space Services surgery patient after a failed operation while they still need urgent care, keep them as a Hospital patient instead of immediately routing them to departure.</JDB_SpaceServices_Settings_HoldFailedSurgeryAftercareDesc>
   <JDB_SpaceServices_Settings_BlockVGEAsteroidShower>Block VGE asteroid shower on service maps</JDB_SpaceServices_Settings_BlockVGEAsteroidShower>
   <JDB_SpaceServices_Settings_BlockVGEAsteroidShowerDesc>Prevents Vanilla Gravship Expanded - Chapter 1's asteroid shower incident from firing on eligible stationary Space Services maps. The event can destroy static bases and has no practical counter for that use case.</JDB_SpaceServices_Settings_BlockVGEAsteroidShowerDesc>
   <JDB_SpaceServices_Settings_GroundsideServicePads>Groundside service pads</JDB_SpaceServices_Settings_GroundsideServicePads>
@@ -79,6 +89,8 @@
   <JDB_SpaceServices_Gizmo_ReportMapDesc>Write the current map's Space Services eligibility reasons to the log.</JDB_SpaceServices_Gizmo_ReportMapDesc>
   <JDB_SpaceServices_Gizmo_ClearPadReservation>DEV: Clear pad reservation</JDB_SpaceServices_Gizmo_ClearPadReservation>
   <JDB_SpaceServices_Gizmo_ClearPadReservationDesc>Clear only this selected pad's current Space Services reservation.</JDB_SpaceServices_Gizmo_ClearPadReservationDesc>
+  <JDB_SpaceServices_Gizmo_DebugForceSurgeryFailure>DEV: Force surgery failure</JDB_SpaceServices_Gizmo_DebugForceSurgeryFailure>
+  <JDB_SpaceServices_Gizmo_DebugForceSurgeryFailureDesc>Simulate Hospital dropping this tracked surgery patient after a failed operation, while leaving the pawn spawned for Space Services departure testing.</JDB_SpaceServices_Gizmo_DebugForceSurgeryFailureDesc>
 
   <JDB_SpaceServices_Panel_Title>Space Services</JDB_SpaceServices_Panel_Title>
   <JDB_SpaceServices_Panel_NoMap>No current map.</JDB_SpaceServices_Panel_NoMap>

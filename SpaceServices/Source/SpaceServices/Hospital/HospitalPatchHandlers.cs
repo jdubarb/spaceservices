@@ -5,6 +5,7 @@ using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
+using System.Reflection.Emit;
 using System.Text;
 using UnityEngine;
 using Verse;
@@ -15,8 +16,19 @@ namespace SpaceServices
 {
     public static class HospitalPatchHandlers
     {
+        private const int MinimumSurgeryMedicine = 5;
         private static bool HospitalSupportEnabled => SpaceServicesMod.Settings == null || SpaceServicesMod.Settings.enableHospital;
         private static bool HospitalPatientCareModeEnabled => SpaceServicesMod.Settings == null || SpaceServicesMod.Settings.hospitalPatientCareMode;
+        private static bool BlockHospitalSurgeryScariaEnabled => SpaceServicesMod.Settings == null || SpaceServicesMod.Settings.blockHospitalSurgeryScaria;
+        private static bool HoldFailedSurgeryAftercareEnabled => SpaceServicesMod.Settings == null || SpaceServicesMod.Settings.holdFailedSurgeryAftercare;
+        private static readonly Stack<SurgeryAcceptanceOverride> SurgeryAcceptanceOverrides = new Stack<SurgeryAcceptanceOverride>();
+
+        private struct SurgeryAcceptanceOverride
+        {
+            public Map map;
+            public object hospital;
+            public bool acceptSurgery;
+        }
         private const int OngoingTreatmentBedJobRetryTicks = GenDate.TicksPerHour;
         private const int OngoingTreatmentDecisionCacheTicks = 250;
         private static readonly Dictionary<int, int> LastOngoingTreatmentBedJobTickByPawn = new Dictionary<int, int>();
@@ -47,7 +59,8 @@ namespace SpaceServices
             {
                 return;
             }
-            __result = ServiceIncidentUtility.ShouldForceAllow("PatientArrives", map);
+            string incidentDefName = HospitalArrivalIncidentContext.IsMassCasualty(map) ? "MassCasualtyEvent" : "PatientArrives";
+            __result = ServiceIncidentUtility.ShouldForceAllow(incidentDefName, map);
         }
 
         public static bool HospitalPatientArrivesTryExecutePrefix(object __instance, IncidentParms parms, ref bool __result)
@@ -63,7 +76,7 @@ namespace SpaceServices
             }
             IncidentDef incident = Reflect.GetMember(__instance, "def") as IncidentDef;
             string incidentDefName = incident == null ? (IsMassCasualtyIncident(__instance, null) ? "MassCasualtyEvent" : "PatientArrives") : incident.defName;
-            if (HospitalIncidentGate.CanAcceptHospitalIncident(incidentDefName, map, false))
+            if (HospitalIncidentGate.CanAcceptHospitalIncident(incidentDefName, map, false, parms))
             {
                 if (!ServiceIncidentUtility.TrafficRateAllows(incidentDefName, map))
                 {
@@ -75,6 +88,13 @@ namespace SpaceServices
                     __result = false;
                     return false;
                 }
+                if (incidentDefName == "MassCasualtyEvent" && !HospitalIncidentGate.TryPrepareMassCasualtyPawnCount(map, parms, out string massCasualtyReason))
+                {
+                    ServiceDebugUtility.LogThrottled("hospital-mass-casualty-size-block-" + massCasualtyReason, "Hospital mass casualty blocked: " + massCasualtyReason, GenDate.TicksPerHour);
+                    __result = false;
+                    return false;
+                }
+                MaybeSuppressSurgeryForLowMedicine(map, incidentDefName);
                 HospitalArrivalIncidentContext.Push(map, IsMassCasualtyIncident(__instance, incidentDefName));
                 return true;
             }
@@ -148,6 +168,8 @@ namespace SpaceServices
                     ClearOngoingTreatmentCache(pawn);
                     IntVec3 cell = hasArrivalCell ? arrivalCell : pawn != null && pawn.Spawned ? pawn.Position : IntVec3.Invalid;
                     VacSuitUtility.SuitPawnForEnvironment(pawn, map, cell);
+                    EnsureSurgeryPatientMedicineCare(pawn, map);
+                    RemoveBlockedScariaFromSurgeryPatient(pawn, map, true, "after Hospital patient spawn");
                 }
                 if (map != null && pawns.Count > 0 && SpaceServiceMapDetector.IsServiceActive(map))
                 {
@@ -211,8 +233,8 @@ namespace SpaceServices
             if (ServiceDangerUtility.ArrivalTrafficBlocked(map, "hospital", out string trafficReason))
             {
                 // Late safety check for hazards that start after the incident was accepted but before the visual shuttle is swapped in.
-                ServiceDebugUtility.LogThrottled(ServiceLogIntegration.Hospital, "hospital-shuttle-late-hazard-" + trafficReason, "Hospital arrival shuttle suppressed by traffic hazard: " + trafficReason, GenDate.TicksPerHour);
-                return true;
+                ServiceDebugUtility.LogThrottled(ServiceLogIntegration.Hospital, "hospital-shuttle-late-hazard-" + trafficReason, "Hospital arrival delayed by traffic hazard: " + trafficReason, GenDate.TicksPerHour);
+                return !ServiceShuttleUtility.TryReplaceDropPodWithArrivalShuttle(c, map, info, faction, false, true, "hospital");
             }
             HospitalArrivalIncidentContext.ArrivalVisualFlags(map, out bool showArrival, out bool showDeparture);
             if (HospitalLandingRedirectContext.TryGetActiveCell(map, out IntVec3 activeCell) && activeCell.IsValid && ServiceShuttleUtility.TryReplaceDropPodWithArrivalShuttle(c, map, info, faction, showArrival, showDeparture))
@@ -352,6 +374,11 @@ namespace SpaceServices
             if (hediffs == null)
             {
                 return false;
+            }
+            if (HoldFailedSurgeryAftercareEnabled && IsSurgeryPatient(pawn, pawn.MapHeld ?? pawn.Map) && PawnNeedsFailedSurgeryAftercare(pawn))
+            {
+                reason = "failed surgery aftercare";
+                return true;
             }
             for (int i = 0; i < hediffs.Count; i++)
             {
@@ -557,14 +584,114 @@ namespace SpaceServices
                 text.IndexOf(value, StringComparison.OrdinalIgnoreCase) >= 0;
         }
 
-        public static void HospitalPatientGonePostfix(Pawn pawn)
+        public static bool HospitalPatientGonePrefix(Pawn pawn, ref bool __state)
+        {
+            __state = false;
+            if (!HospitalSupportEnabled)
+            {
+                return true;
+            }
+            if (!ShouldHoldFailedSurgeryAftercare(pawn))
+            {
+                return true;
+            }
+            __state = true;
+            ClearOngoingTreatmentCache(pawn);
+            ServiceLifecycleUtility.MarkPawnDirty(pawn, "Hospital failed surgery aftercare held");
+            ServiceDebugUtility.LogThrottled(ServiceLogIntegration.Hospital, "hospital-failed-surgery-aftercare-" + pawn.thingIDNumber, "Holding failed surgery patient for aftercare instead of service departure: " + ServiceDebugUtility.PawnAuditSummary(pawn), GenDate.TicksPerHour);
+            return false;
+        }
+
+        public static void HospitalPatientGonePostfix(Pawn pawn, bool __state)
         {
             if (!HospitalSupportEnabled)
             {
                 return;
             }
+            if (__state)
+            {
+                return;
+            }
             ClearOngoingTreatmentCache(pawn);
+            if (ShouldRouteSpawnedHospitalPatientRemovalToServiceDeparture(pawn))
+            {
+                return;
+            }
             ServiceLifecycleUtility.ReleasePawn(pawn, "Hospital removed patient from map");
+        }
+
+        public static bool CanDebugForceTrackedSurgeryFailure(Pawn pawn)
+        {
+            if (!HospitalSupportEnabled ||
+                pawn == null ||
+                !pawn.Spawned ||
+                ServicePawnUtility.IsTerminalPawn(pawn) ||
+                ServicePawnUtility.IsPlayerOwnedPawn(pawn) ||
+                !ServiceLifecycleUtility.TryFindRecordForPawn(pawn, out Map map, out ServiceGroupRecord record) ||
+                record == null ||
+                record.serviceKind != "hospital" ||
+                record.state == "completed" ||
+                record.state == "extracting" ||
+                !SpaceServiceMapDetector.IsServiceActive(map))
+            {
+                return false;
+            }
+            return IsSurgeryPatient(pawn, map);
+        }
+
+        public static bool DebugForceTrackedSurgeryFailure(Pawn pawn, out string reason)
+        {
+            reason = null;
+            if (!CanDebugForceTrackedSurgeryFailure(pawn))
+            {
+                reason = "selected pawn is not a tracked active surgery patient";
+                return false;
+            }
+            Map map = pawn.MapHeld ?? pawn.Map;
+            object hospital = HospitalIncidentGate.FindHospitalComponent(map);
+            MethodInfo patientLeftTheMap = hospital == null ? null : AccessTools.Method(hospital.GetType(), "PatientLeftTheMap", new[] { typeof(Pawn) });
+            if (hospital == null || patientLeftTheMap == null)
+            {
+                reason = "Hospital patient cleanup method was not found";
+                return false;
+            }
+            try
+            {
+                ServiceDebugUtility.LogAudit("DEV forcing tracked surgery failure for pawn=" + ServiceDebugUtility.PawnAuditSummary(pawn));
+                patientLeftTheMap.Invoke(hospital, new object[] { pawn });
+                ServiceLifecycleUtility.MarkPawnDirty(pawn, "DEV forced surgery failure");
+                reason = "forced surgery failure";
+                return true;
+            }
+            catch (Exception ex)
+            {
+                reason = ex.GetType().Name + ": " + ex.Message;
+                Log.Warning("[Space Services] DEV force surgery failure failed: " + ex);
+                return false;
+            }
+        }
+
+        private static bool ShouldRouteSpawnedHospitalPatientRemovalToServiceDeparture(Pawn pawn)
+        {
+            if (pawn == null ||
+                !pawn.Spawned ||
+                ServicePawnUtility.IsTerminalPawn(pawn) ||
+                ServicePawnUtility.IsPlayerOwnedPawn(pawn) ||
+                !ServiceLifecycleUtility.TryFindRecordForPawn(pawn, out Map map, out ServiceGroupRecord record) ||
+                record == null ||
+                record.serviceKind != "hospital" ||
+                record.state == "extracting" ||
+                !SpaceServiceMapDetector.IsServiceActive(map))
+            {
+                return false;
+            }
+            const string reason = "Hospital removed spawned patient from map";
+            if (ServiceLifecycleUtility.IsActiveDepartureState(record))
+            {
+                ServiceLifecycleUtility.MarkPawnDirty(pawn, reason);
+                return true;
+            }
+            return ServiceLifecycleUtility.RequestDepartureForPawn(pawn, reason);
         }
 
         public static void HospitalPatientDiedPrefix(Pawn pawn, ref HospitalPatientDeathState __state)
@@ -631,6 +758,7 @@ namespace SpaceServices
             finally
             {
                 HospitalArrivalIncidentContext.Pop(parms == null ? null : parms.target as Map);
+                RestoreSuppressedSurgeryAcceptance(parms == null ? null : parms.target as Map);
             }
         }
 
@@ -643,6 +771,7 @@ namespace SpaceServices
             if (__exception != null)
             {
                 HospitalArrivalIncidentContext.Pop(parms == null ? null : parms.target as Map);
+                RestoreSuppressedSurgeryAcceptance(parms == null ? null : parms.target as Map);
             }
         }
 
@@ -653,6 +782,7 @@ namespace SpaceServices
                 return;
             }
             HospitalArrivalIncidentContext.Pop(parms == null ? null : parms.target as Map);
+            RestoreSuppressedSurgeryAcceptance(parms == null ? null : parms.target as Map);
         }
 
         public static void HospitalMassCasualtyTryExecuteFinalizer(IncidentParms parms, Exception __exception)
@@ -664,7 +794,239 @@ namespace SpaceServices
             if (__exception != null)
             {
                 HospitalArrivalIncidentContext.Pop(parms == null ? null : parms.target as Map);
+                RestoreSuppressedSurgeryAcceptance(parms == null ? null : parms.target as Map);
             }
+        }
+
+        public static IEnumerable<CodeInstruction> SurgeryMapHeldFallbackTranspiler(IEnumerable<CodeInstruction> instructions)
+        {
+            MethodInfo mapHeldGetter = AccessTools.PropertyGetter(typeof(Thing), nameof(Thing.MapHeld));
+            MethodInfo fallback = AccessTools.Method(typeof(HospitalPatchHandlers), nameof(MapHeldForHospitalSurgery));
+            foreach (CodeInstruction instruction in instructions)
+            {
+                if ((instruction.opcode == OpCodes.Call || instruction.opcode == OpCodes.Callvirt) && Equals(instruction.operand, mapHeldGetter))
+                {
+                    yield return new CodeInstruction(OpCodes.Call, fallback);
+                    continue;
+                }
+                yield return instruction;
+            }
+        }
+
+        public static Map MapHeldForHospitalSurgery(Thing thing)
+        {
+            Map map = thing == null ? null : thing.MapHeld;
+            if (map != null)
+            {
+                return map;
+            }
+            if (!HospitalLandingRedirectContext.TryGetActiveMap(out map) || !SurgeryPatientsEnabled(map))
+            {
+                return null;
+            }
+            return map;
+        }
+
+        public static void SurgeryAddRandomBillPrefix(object[] __args)
+        {
+            if (!HospitalSupportEnabled || !BlockHospitalSurgeryScariaEnabled)
+            {
+                return;
+            }
+            Map map = OptionalPatchUtility.FindMap(__args);
+            if (map == null)
+            {
+                HospitalLandingRedirectContext.TryGetActiveMap(out map);
+            }
+            if (map == null || !SpaceServiceMapDetector.IsServiceActive(map))
+            {
+                return;
+            }
+            foreach (Pawn pawn in OptionalPatchUtility.PawnsFromArgs(__args).Distinct())
+            {
+                RemoveBlockedScariaFromSurgeryPatient(pawn, map, false, "before Hospital surgery bill");
+            }
+        }
+
+        private static void MaybeSuppressSurgeryForLowMedicine(Map map, string incidentDefName)
+        {
+            if (map == null || incidentDefName != "PatientArrives")
+            {
+                return;
+            }
+            object hospital = HospitalIncidentGate.FindHospitalComponent(map);
+            if (hospital == null || !SurgeryPatientsEnabled(hospital))
+            {
+                return;
+            }
+            int medicineCount = CountSurgeryMedicine(map);
+            if (medicineCount >= MinimumSurgeryMedicine)
+            {
+                return;
+            }
+            SurgeryAcceptanceOverrides.Push(new SurgeryAcceptanceOverride
+            {
+                map = map,
+                hospital = hospital,
+                acceptSurgery = true
+            });
+            Reflect.SetMember(hospital, "AcceptSurgery", false);
+            ServiceDebugUtility.LogThrottled(ServiceLogIntegration.Hospital, "hospital-surgery-low-medicine-" + map.uniqueID, "Hospital surgery patient arrivals temporarily disabled: " + medicineCount + "/" + MinimumSurgeryMedicine + " industrial-or-better medicine available.", GenDate.TicksPerHour);
+        }
+
+        private static void RestoreSuppressedSurgeryAcceptance(Map map)
+        {
+            if (map == null || SurgeryAcceptanceOverrides.Count == 0)
+            {
+                return;
+            }
+            SurgeryAcceptanceOverride state = SurgeryAcceptanceOverrides.Peek();
+            if (state.map != map)
+            {
+                return;
+            }
+            SurgeryAcceptanceOverrides.Pop();
+            if (state.hospital != null)
+            {
+                Reflect.SetMember(state.hospital, "AcceptSurgery", state.acceptSurgery);
+            }
+        }
+
+        private static int CountSurgeryMedicine(Map map)
+        {
+            return CountAvailableMedicine(map, DefDatabase<ThingDef>.GetNamedSilentFail("MedicineIndustrial")) +
+                CountAvailableMedicine(map, DefDatabase<ThingDef>.GetNamedSilentFail("MedicineUltratech"));
+        }
+
+        private static int CountAvailableMedicine(Map map, ThingDef def)
+        {
+            if (map == null || map.listerThings == null || def == null)
+            {
+                return 0;
+            }
+            int count = 0;
+            foreach (Thing thing in map.listerThings.ThingsOfDef(def))
+            {
+                if (thing != null && !thing.Destroyed && thing.Spawned && !thing.IsForbidden(Faction.OfPlayer))
+                {
+                    count += thing.stackCount;
+                }
+            }
+            return count;
+        }
+
+        private static void EnsureSurgeryPatientMedicineCare(Pawn pawn, Map map)
+        {
+            if (pawn == null || pawn.playerSettings == null || !IsSurgeryPatient(pawn, map))
+            {
+                return;
+            }
+            if ((int)pawn.playerSettings.medCare < (int)MedicalCareCategory.NormalOrWorse)
+            {
+                pawn.playerSettings.medCare = MedicalCareCategory.NormalOrWorse;
+            }
+        }
+
+        private static bool RemoveBlockedScariaFromSurgeryPatient(Pawn pawn, Map map, bool requireSurgeryPatient, string reason)
+        {
+            if (!BlockHospitalSurgeryScariaEnabled ||
+                pawn == null ||
+                pawn.health == null ||
+                pawn.health.hediffSet == null ||
+                (requireSurgeryPatient && !IsSurgeryPatient(pawn, map)))
+            {
+                return false;
+            }
+            List<Hediff> hediffs = pawn.health.hediffSet.hediffs;
+            if (hediffs == null)
+            {
+                return false;
+            }
+            bool removed = false;
+            for (int i = hediffs.Count - 1; i >= 0; i--)
+            {
+                Hediff hediff = hediffs[i];
+                if (hediff == null || hediff.def == null || !string.Equals(hediff.def.defName, "Scaria", StringComparison.OrdinalIgnoreCase))
+                {
+                    continue;
+                }
+                pawn.health.RemoveHediff(hediff);
+                removed = true;
+            }
+            if (removed)
+            {
+                ClearOngoingTreatmentCache(pawn);
+                ServiceDebugUtility.LogThrottled(ServiceLogIntegration.Hospital, "hospital-surgery-scaria-removed-" + pawn.thingIDNumber, "Removed scaria from Space Services Hospital surgery patient " + ServiceDebugUtility.PawnAuditSummary(pawn) + " (" + (reason ?? "surgery patient") + ")", GenDate.TicksPerHour);
+            }
+            return removed;
+        }
+
+        private static bool ShouldHoldFailedSurgeryAftercare(Pawn pawn)
+        {
+            if (!HoldFailedSurgeryAftercareEnabled ||
+                pawn == null ||
+                !pawn.Spawned ||
+                ServicePawnUtility.IsTerminalPawn(pawn) ||
+                ServicePawnUtility.IsPlayerOwnedPawn(pawn) ||
+                !ServiceLifecycleUtility.TryFindRecordForPawn(pawn, out Map map, out ServiceGroupRecord record) ||
+                record == null ||
+                record.serviceKind != "hospital" ||
+                record.state == "completed" ||
+                record.state == "extracting" ||
+                ServiceLifecycleUtility.IsActiveDepartureState(record) ||
+                map == null ||
+                !SpaceServiceMapDetector.IsServiceActive(map) ||
+                !IsSurgeryPatient(pawn, map))
+            {
+                return false;
+            }
+            return PawnNeedsFailedSurgeryAftercare(pawn);
+        }
+
+        private static bool PawnNeedsFailedSurgeryAftercare(Pawn pawn)
+        {
+            if (pawn == null || pawn.health == null || pawn.health.hediffSet == null)
+            {
+                return false;
+            }
+            if (pawn.Downed || pawn.health.hediffSet.BleedRateTotal > 0.001f)
+            {
+                return true;
+            }
+            List<Hediff> hediffs = pawn.health.hediffSet.hediffs;
+            if (hediffs == null)
+            {
+                return false;
+            }
+            for (int i = 0; i < hediffs.Count; i++)
+            {
+                Hediff hediff = hediffs[i];
+                if (hediff is Hediff_Injury && hediff.TendableNow(false))
+                {
+                    return true;
+                }
+            }
+            return false;
+        }
+
+        private static bool IsSurgeryPatient(Pawn pawn, Map map)
+        {
+            object hospital = HospitalIncidentGate.FindHospitalComponent(map ?? pawn?.MapHeld ?? pawn?.Map);
+            IDictionary patients = hospital == null ? null : Reflect.GetMember(hospital, "Patients") as IDictionary;
+            object patientData = patients == null || pawn == null || !patients.Contains(pawn) ? null : patients[pawn];
+            object type = patientData == null ? null : Reflect.GetMember(patientData, "Type");
+            return type != null && string.Equals(type.ToString(), "Surgery", StringComparison.OrdinalIgnoreCase);
+        }
+
+        private static bool SurgeryPatientsEnabled(Map map)
+        {
+            object hospital = HospitalIncidentGate.FindHospitalComponent(map);
+            return SurgeryPatientsEnabled(hospital);
+        }
+
+        private static bool SurgeryPatientsEnabled(object hospital)
+        {
+            return hospital != null && Reflect.BoolMember(hospital, "AcceptSurgery");
         }
 
         private static bool IsMassCasualtyIncident(object worker, string incidentDefName)

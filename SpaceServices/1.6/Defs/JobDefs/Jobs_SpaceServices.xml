@@ -13,4 +13,11 @@
     <reportString>moving to service destination.</reportString>
     <casualInterruptible>false</casualInterruptible>
   </JobDef>
+
+  <JobDef>
+    <defName>JDB_ServiceDepartureHold</defName>
+    <driverClass>SpaceServices.JobDriver_ServiceDepartureHold</driverClass>
+    <reportString>waiting for service pickup.</reportString>
+    <casualInterruptible>true</casualInterruptible>
+  </JobDef>
 </Defs>

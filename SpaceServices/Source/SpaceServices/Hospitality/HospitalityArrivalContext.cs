@@ -109,7 +109,8 @@ namespace SpaceServices
                     visual.shipThingDef == null ? null : visual.shipThingDef.defName,
                     visual.id,
                     new List<Thing>(),
-                    true);
+                    true,
+                    "hospitality");
             }
         }
 
