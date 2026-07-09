@@ -2,7 +2,7 @@
 <ModMetaData>
   <name>Space Services</name>
   <author>j'mangus dubarb D.D.S</author>
-  <modVersion>1.0.9</modVersion>
+  <modVersion>1.1.0</modVersion>
   <packageId>jdubarb.spaceservices</packageId>
   <modIconPath IgnoreIfNoMatchingField="True">UI/Buttons/MainButtons/SpaceServices</modIconPath>
   <supportedVersions>

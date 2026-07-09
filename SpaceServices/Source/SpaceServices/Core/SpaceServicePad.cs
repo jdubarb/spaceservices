@@ -31,10 +31,24 @@ namespace SpaceServices
             GetComp<CompSpaceServicePad>()?.DestroyCornerGlowers();
             Map oldMap = Map;
             IntVec3 oldPosition = Position;
+            NotifyDestroyedByExternalCause(oldMap, oldPosition, mode);
             oldMap?.GetComponent<SpaceServicesMapComponent>()?.NotifyServicePadUnavailable(this, oldPosition, "service pad despawned");
             base.DeSpawn(mode);
             oldMap?.GetComponent<SpaceServicesMapComponent>()?.DirtyServicePadCache();
             ServicePadUtility.RequestLifecycleTickSoon(oldMap, "service pad despawned");
+        }
+
+        private void NotifyDestroyedByExternalCause(Map oldMap, IntVec3 oldPosition, DestroyMode mode)
+        {
+            if (oldMap == null || mode == DestroyMode.Deconstruct || !oldPosition.IsValid)
+            {
+                return;
+            }
+            Find.LetterStack.ReceiveLetter(
+                "JDB_SpaceServices_Letter_ServicePadDestroyed_Label".Translate(),
+                "JDB_SpaceServices_Letter_ServicePadDestroyed_Text".Translate(),
+                LetterDefOf.NegativeEvent,
+                new TargetInfo(oldPosition, oldMap));
         }
 
         protected override void DrawAt(Vector3 drawLoc, bool flip = false)

@@ -70,6 +70,42 @@ namespace SpaceServices
         }
     }
 
+    [HarmonyPatch(typeof(Pawn_GuestTracker), "Notify_PawnUndowned")]
+    public static class ServiceHospitalPatientRescueeJoinPatch
+    {
+        private static readonly FieldInfo PawnField = AccessTools.Field(typeof(Pawn_GuestTracker), "pawn");
+
+        public static bool Prefix(Pawn_GuestTracker __instance)
+        {
+            Pawn pawn = __instance == null || PawnField == null ? null : PawnField.GetValue(__instance) as Pawn;
+            if (!ShouldBlockRescueeJoin(pawn))
+            {
+                return true;
+            }
+
+            __instance.getRescuedThoughtOnUndownedBecauseOfPlayer = false;
+            __instance.leftAfterRescue = true;
+            ServiceLifecycleUtility.MarkPawnDirty(pawn, "blocked vanilla rescuee join for tracked hospital patient");
+            ServiceDebugUtility.LogThrottled(ServiceLogIntegration.Hospital, "hospital-rescuee-join-blocked-" + pawn.thingIDNumber, "Blocked vanilla rescuee join for active Space Services Hospital patient " + ServiceDebugUtility.PawnAuditSummary(pawn), GenDate.TicksPerHour);
+            return false;
+        }
+
+        private static bool ShouldBlockRescueeJoin(Pawn pawn)
+        {
+            if (pawn == null || ServicePawnUtility.IsPlayerOwnedPawn(pawn) || ServicePawnUtility.IsTerminalPawn(pawn))
+            {
+                return false;
+            }
+            if (!ServiceLifecycleUtility.TryFindRecordForPawn(pawn, out _, out ServiceGroupRecord record) || record == null)
+            {
+                return false;
+            }
+            return string.Equals(record.serviceKind, "hospital", StringComparison.OrdinalIgnoreCase) &&
+                record.state != "completed" &&
+                record.state != "extracting";
+        }
+    }
+
     [HarmonyPatch(typeof(Lord), nameof(Lord.Notify_PawnLost))]
     public static class ServiceLordPawnLostPatch
     {
