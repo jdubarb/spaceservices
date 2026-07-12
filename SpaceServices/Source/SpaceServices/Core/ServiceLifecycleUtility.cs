@@ -531,9 +531,7 @@ namespace SpaceServices
         {
             if (pawn == null ||
                 record == null ||
-                !record.hospitalityDeparturePrepared ||
                 record.state == "departureHold" ||
-                !UsesHospitalityDepartureHandling(record) ||
                 ServicePawnUtility.IsPlayerOwnedPawn(pawn))
             {
                 return false;
@@ -547,7 +545,23 @@ namespace SpaceServices
             {
                 return false;
             }
-            MaintainPreparedHospitalityDeparture(record, "active service departure job validation");
+            bool hospitalityDeparture = record.hospitalityDeparturePrepared && UsesHospitalityDepartureHandling(record);
+            if (hospitalityDeparture)
+            {
+                MaintainPreparedHospitalityDeparture(record, "active service departure job validation");
+            }
+            else
+            {
+                map = map ?? pawn.Map;
+                if (map == null ||
+                    record.reservedPad == null ||
+                    !record.reservedPad.Spawned ||
+                    SpaceServiceMapDetector.IsGroundsideServiceActive(map) ||
+                    !ActiveServiceDepartureJobTargetsMapEdge(pawn, current, map))
+                {
+                    return false;
+                }
+            }
             pawn.jobs.EndCurrentJob(JobCondition.InterruptForced);
             if (record.state == "boardingPickup")
             {
@@ -560,6 +574,15 @@ namespace SpaceServices
             string jobName = current.def == null ? "unknown" : current.def.defName;
             ServiceDebugUtility.LogAudit("Interrupted non-service job during active service departure pawn=" + ServiceDebugUtility.PawnAuditSummary(pawn) + " job=" + jobName + " record=" + RecordAudit(record));
             return true;
+        }
+
+        private static bool ActiveServiceDepartureJobTargetsMapEdge(Pawn pawn, Job job, Map map)
+        {
+            if (pawn == null || job == null || map == null || !job.targetA.IsValid || !TargetMapEdge(job.targetA, map))
+            {
+                return false;
+            }
+            return IsTryingToLeave(pawn) || DepartureJobDef(job.def);
         }
 
         private static void ValidateActiveHospitalPatientCurrentJob(Pawn pawn, Map map, ServiceGroupRecord record)
