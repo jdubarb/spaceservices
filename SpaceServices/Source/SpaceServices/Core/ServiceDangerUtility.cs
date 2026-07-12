@@ -57,6 +57,12 @@ namespace SpaceServices
                 return cached.blocked;
             }
 
+            if (WeatherBlocksService(map, serviceKind, arrival, out reason))
+            {
+                TrafficCache[cacheKey] = new TrafficBlockResult { blocked = true, reason = reason };
+                return true;
+            }
+
             foreach (GameCondition condition in ActiveConditions(map))
             {
                 if (ConditionBlocksService(condition, serviceKind, arrival, out reason))
@@ -68,6 +74,27 @@ namespace SpaceServices
             reason = null;
             TrafficCache[cacheKey] = new TrafficBlockResult { blocked = false, reason = null };
             return false;
+        }
+
+        private static bool WeatherBlocksService(Map map, string serviceKind, bool arrival, out string reason)
+        {
+            reason = null;
+            object weather = map == null || map.weatherManager == null ? null : Reflect.GetMember(map.weatherManager, "curWeather");
+            if (weather == null ||
+                (!Reflect.BoolMember(weather, "preventShuttleLaunch") && !Reflect.BoolMember(weather, "preventsShuttleLaunch")))
+            {
+                return false;
+            }
+
+            if (arrival && !IsShuttleArrivalService(serviceKind))
+            {
+                return false;
+            }
+
+            Def weatherDef = weather as Def;
+            string label = weatherDef == null ? "current weather" : weatherDef.LabelCap.ToString();
+            reason = label + " prevents shuttle launch";
+            return true;
         }
 
         private static bool ConditionBlocksService(GameCondition condition, string serviceKind, bool arrival, out string reason)
