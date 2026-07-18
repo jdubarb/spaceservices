@@ -234,7 +234,10 @@
       <li>SpaceServices.ServiceEnvironmentUtility:IsPadSafeForPawnsAtTarget</li>
       <li>SpaceServices.ServiceDangerUtility:ArrivalTrafficBlocked</li>
       <li>SpaceServices.ServiceDangerUtility:DepartureShuttleBlocked</li>
+      <li>SpaceServices.ServiceDangerUtility:HospitalityEvacuationRequired</li>
       <li>SpaceServices.ServiceDangerUtility:ServiceTrafficBlocked</li>
+      <li>SpaceServices.ServiceDangerUtility:VeeClimateTrafficPaused</li>
+      <li>SpaceServices.ServiceDangerUtility:TryGetActiveVeeStage</li>
       <li>SpaceServices.ServiceDangerUtility:ConditionBlocksService</li>
       <li>SpaceServices.CompSpaceServicePad:DrawCornerBeaconOverlays</li>
       <li>SpaceServices.CompSpaceServicePad:DrawCornerBeacon</li>

@@ -67,6 +67,24 @@ namespace SpaceServices
                         Log.Warning("[Space Services] Could not patch Hospital surgery map fallback: " + ex.Message);
                     }
                 }
+
+                // Hospital Tweak replaces Hospital's surgery method with a prefix that repeats
+                // the same MapHeld assumption. While an incoming patient is still in its pod,
+                // use the active service-map context just as we do for Hospital's own method.
+                Type hospitalTweakSurgeryPatch = AccessTools.TypeByName("HospitalTweak.AddRandomSurgeryBill_Prefix");
+                MethodInfo hospitalTweakPrefix = hospitalTweakSurgeryPatch == null ? null : AccessTools.Method(hospitalTweakSurgeryPatch, "Prefix");
+                if (hospitalTweakPrefix != null)
+                {
+                    try
+                    {
+                        harmony.Patch(hospitalTweakPrefix,
+                            transpiler: new HarmonyMethod(typeof(HospitalPatchHandlers), nameof(HospitalPatchHandlers.SurgeryMapHeldFallbackTranspiler)));
+                    }
+                    catch (Exception ex)
+                    {
+                        Log.Warning("[Space Services] Could not patch Hospital Tweak surgery map fallback: " + ex.Message);
+                    }
+                }
             }
             Type incidentHelper = AccessTools.TypeByName("Hospital.IncidentHelper");
             if (incidentHelper != null)

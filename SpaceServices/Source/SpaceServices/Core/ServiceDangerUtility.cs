@@ -12,7 +12,16 @@ namespace SpaceServices
         private static readonly Dictionary<string, TrafficBlockResult> TrafficCache = new Dictionary<string, TrafficBlockResult>();
         private static readonly Dictionary<GameConditionDef, HazardConditionInfo> ConditionInfoCache = new Dictionary<GameConditionDef, HazardConditionInfo>();
         private static readonly Dictionary<string, List<SpaceServiceHazardRuleDef>> RulesByConditionDefName = new Dictionary<string, List<SpaceServiceHazardRuleDef>>(StringComparer.OrdinalIgnoreCase);
+        private static readonly List<string> VeePackageIds = new List<string> { "VanillaExpanded.VEE" };
+        private const string VeeScorchDefName = "VEE_Scorch";
+        private const string VeeWhiteoutDefName = "VEE_Whiteout";
         private static bool rulesIndexed;
+        private static bool veeAvailabilityKnown;
+        private static bool veeAvailable;
+        private static GameConditionDef veeScorchDef;
+        private static bool veeScorchDefResolved;
+        private static GameConditionDef veeWhiteoutDef;
+        private static bool veeWhiteoutDefResolved;
         private static int trafficCacheTick = -1;
 
         public static bool HasActiveHostileThreat(Map map)
@@ -41,6 +50,18 @@ namespace SpaceServices
             return ServiceTrafficBlocked(map, serviceKind, arrival: false, out reason);
         }
 
+        public static bool HospitalityEvacuationRequired(Map map, out string reason)
+        {
+            string conditionLabel;
+            if (!VeeClimateTrafficPaused(map, out conditionLabel))
+            {
+                reason = null;
+                return false;
+            }
+            reason = conditionLabel + " is escalating; Hospitality guests are evacuating";
+            return true;
+        }
+
         private static bool ServiceTrafficBlocked(Map map, string serviceKind, bool arrival, out string reason)
         {
             int tick = Find.TickManager == null ? 0 : Find.TickManager.TicksGame;
@@ -59,6 +80,13 @@ namespace SpaceServices
 
             if (WeatherBlocksService(map, serviceKind, arrival, out reason))
             {
+                TrafficCache[cacheKey] = new TrafficBlockResult { blocked = true, reason = reason };
+                return true;
+            }
+
+            if (arrival && IsShuttleArrivalService(serviceKind) && VeeClimateTrafficPaused(map, out string veeReason))
+            {
+                reason = veeReason + " pauses new service traffic";
                 TrafficCache[cacheKey] = new TrafficBlockResult { blocked = true, reason = reason };
                 return true;
             }
@@ -251,6 +279,96 @@ namespace SpaceServices
         private static bool IsGravshipLaunchOnlyCondition(GameConditionDef def)
         {
             return def != null && string.Equals(def.defName, "VGE_GravitationalAnomaly", StringComparison.OrdinalIgnoreCase);
+        }
+
+        private static bool VeeClimateTrafficPaused(Map map, out string conditionLabel)
+        {
+            conditionLabel = null;
+            if (map == null || !VeeAvailable())
+            {
+                return false;
+            }
+
+            int stageIndex;
+            if (TryGetActiveVeeStage(map, VeeWhiteoutDefName, out stageIndex) && stageIndex >= 1 && stageIndex <= 2)
+            {
+                conditionLabel = VeeStageLabel(VeeWhiteoutDefName, stageIndex, "whiteout");
+                return true;
+            }
+            if (TryGetActiveVeeStage(map, VeeScorchDefName, out stageIndex) && stageIndex >= 1 && stageIndex <= 2)
+            {
+                conditionLabel = VeeStageLabel(VeeScorchDefName, stageIndex, "scorch");
+                return true;
+            }
+            return false;
+        }
+
+        private static bool VeeAvailable()
+        {
+            if (!veeAvailabilityKnown)
+            {
+                veeAvailable = SpaceServiceDefFilters.RequiredPackagesLoaded(VeePackageIds);
+                veeAvailabilityKnown = true;
+            }
+            return veeAvailable;
+        }
+
+        private static bool TryGetActiveVeeStage(Map map, string defName, out int stageIndex)
+        {
+            stageIndex = -1;
+            GameConditionDef def = VeeDefForName(defName);
+            if (def == null)
+            {
+                return false;
+            }
+
+            GameCondition condition = Find.World?.GameConditionManager?.GetActiveCondition(def) ??
+                map.gameConditionManager?.GetActiveCondition(def);
+            if (condition == null)
+            {
+                return false;
+            }
+
+            object value = Reflect.GetMember(condition, "currentStageIndex");
+            if (!(value is int))
+            {
+                return false;
+            }
+            stageIndex = (int)value;
+            return true;
+        }
+
+        private static GameConditionDef VeeDefForName(string defName)
+        {
+            if (defName == VeeScorchDefName)
+            {
+                if (!veeScorchDefResolved)
+                {
+                    veeScorchDef = DefDatabase<GameConditionDef>.GetNamedSilentFail(defName);
+                    veeScorchDefResolved = true;
+                }
+                return veeScorchDef;
+            }
+
+            if (!veeWhiteoutDefResolved)
+            {
+                veeWhiteoutDef = DefDatabase<GameConditionDef>.GetNamedSilentFail(defName);
+                veeWhiteoutDefResolved = true;
+            }
+            return veeWhiteoutDef;
+        }
+
+        private static string VeeStageLabel(string defName, int stageIndex, string fallback)
+        {
+            if (defName == VeeWhiteoutDefName)
+            {
+                return stageIndex == 1 ? "deep freeze" : "whiteout";
+            }
+            if (defName == VeeScorchDefName)
+            {
+                return stageIndex == 1 ? "scorch" : "inferno";
+            }
+            return fallback;
         }
 
         private sealed class TrafficBlockResult

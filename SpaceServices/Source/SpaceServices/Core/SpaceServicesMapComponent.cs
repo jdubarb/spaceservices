@@ -645,7 +645,26 @@ namespace SpaceServices
             for (int i = pendingHospitalityIncidents.Count - 1; i >= 0; i--)
             {
                 ScheduledHospitalityIncident incident = pendingHospitalityIncidents[i];
-                if (incident == null || Find.TickManager.TicksGame < incident.touchdownTick)
+                if (incident == null)
+                {
+                    continue;
+                }
+                if (Find.TickManager.TicksGame < incident.touchdownTick &&
+                    ServiceDangerUtility.HospitalityEvacuationRequired(map, out string evacuationReason))
+                {
+                    pendingHospitalityIncidents.RemoveAt(i);
+                    incident.EnsureRuntime(map);
+                    ServiceDebugUtility.LogAudit("TickPendingHospitalityIncidents waved off inbound visitor shuttle for climate evacuation reservation=" + incident.reservationId + " reason=" + evacuationReason + " pad=" + ServiceDebugUtility.ThingAuditSummary(incident.pad));
+                    Messages.Message("Space Services: Visitor Arrival Waved Off: " + evacuationReason, incident.pad, MessageTypeDefOf.NegativeEvent, false);
+                    if (incident.pad != null && !incident.pad.Destroyed && incident.pad.Spawned)
+                    {
+                        ServiceShuttleUtility.CleanupTouchdownShuttle(map, incident.pad.Position, incident.shuttleThingDefName);
+                        ServiceShuttleUtility.SpawnDeparture(map, incident.pad.Position, "hospitality", incident.shuttleVisualDefName);
+                    }
+                    ReleaseArrivalReservation(incident);
+                    continue;
+                }
+                if (Find.TickManager.TicksGame < incident.touchdownTick)
                 {
                     continue;
                 }

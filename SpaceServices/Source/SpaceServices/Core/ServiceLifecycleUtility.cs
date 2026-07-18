@@ -929,6 +929,12 @@ namespace SpaceServices
                         record.nextHospitalityBedlessCheckTick = Find.TickManager.TicksGame + StableBedlessCheckTicks;
                     }
                 }
+                if (record.serviceKind == "hospitality" && record.state == "arrived" &&
+                    ServiceDangerUtility.HospitalityEvacuationRequired(map, out string evacuationReason))
+                {
+                    BeginDeparture(map, record, evacuationReason);
+                    continue;
+                }
                 if (record.state == "pickupInbound")
                 {
                     EnsureHospitalityDeparturePrepared(record);
