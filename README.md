@@ -92,6 +92,3 @@ Space Services is licensed under GNU GPLv3. See [LICENSE](LICENSE) and [SpaceSer
 
 Forks, continuations, translations, compatibility patches, and ports are welcome under GPLv3 terms. Please keep attribution and link back to the original project where practical.
 
-## Repository Note
-
-Forgejo is the primary development repository. This GitHub repository is a publishable/staging view rooted at the `mods/` directory.
