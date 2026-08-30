@@ -227,6 +227,16 @@
       <li>SpaceServices.ServiceWearJobReservationPatch:Prefix</li>
       <li>SpaceServices.ServiceApparelRemovePatch:Prefix</li>
       <li>SpaceServices.ServiceApparelTryDropPatch:Prefix</li>
+      <li>SpaceServices.CasinoPatchHandlers:TryGiveSlotJobPrefix</li>
+      <li>SpaceServices.CasinoPatchHandlers:TryGiveSlotJoyJobPrefix</li>
+      <li>SpaceServices.CasinoPatchHandlers:TryReserveCasinoJobPrefix</li>
+      <li>SpaceServices.CasinoPatchHandlers:ShouldSuppressGambling</li>
+      <li>SpaceServices.RoomServicePatchHandlers:TryHospitalHandoffPrefix</li>
+      <li>SpaceServices.RoomServicePatchHandlers:TryStartMedicalGuestEventPrefix</li>
+      <li>SpaceServices.RoomServicePatchHandlers:WhyCannotSolicitPostfix</li>
+      <li>SpaceServices.RoomServicePatchHandlers:ShouldSuppressMedicalLifecycle</li>
+      <li>SpaceServices.RoomServicePatchHandlers:TryGetTrackedHospitalityRecord</li>
+      <li>SpaceServices.SpaceServiceMapDetector:IsSpaceOrAtmosphericIsland</li>
       <li>SpaceServices.ServiceEnvironmentUtility:GetVacuum</li>
       <li>SpaceServices.ServiceEnvironmentUtility:GetMaxVacuum</li>
       <li>SpaceServices.ServiceEnvironmentUtility:IsRoofAccessible</li>

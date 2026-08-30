@@ -25,7 +25,7 @@ namespace SpaceServices
             }
 
             Map map = parms.target as Map;
-            if (map == null || !SpaceServiceMapDetector.IsServiceEligible(map))
+            if (map == null)
             {
                 return;
             }
@@ -38,6 +38,11 @@ namespace SpaceServices
             if (__result && ServiceIncidentUtility.ShouldBlockIncident(incidentDefName, map))
             {
                 __result = false;
+                return;
+            }
+
+            if (!SpaceServiceMapDetector.IsServiceEligible(map))
+            {
                 return;
             }
 
@@ -54,6 +59,7 @@ namespace SpaceServices
     {
         private const int SharedServiceArrivalCadenceTicks = 2500;
         private const string VgeAsteroidShowerIncident = "VGE_AsteroidShower";
+        private const string CasinoVisitorGroupIncident = "CasinoVisitorGroup";
 
         private static readonly HashSet<string> HospitalIncidents = new HashSet<string>
         {
@@ -105,6 +111,16 @@ namespace SpaceServices
             }
 
             SpaceServicesSettings settings = SpaceServicesMod.Settings;
+            if (settings != null &&
+                settings.blockCasinoVisitorsOnSpaceAndSkyIslands &&
+                string.Equals(incidentDefName, CasinoVisitorGroupIncident, StringComparison.OrdinalIgnoreCase) &&
+                CasinoPatches.IsAvailable() &&
+                SpaceServiceMapDetector.IsSpaceOrAtmosphericIsland(map))
+            {
+                ServiceDebugUtility.LogThrottled(ServiceLogIntegration.Core, "casino-visitor-group-block-" + map.uniqueID, "Blocked Hospitality: Casino's independent map-edge visitor group on a space or atmospheric-island map.", GenDate.TicksPerHour);
+                return true;
+            }
+
             if (settings != null &&
                 settings.blockVgeAsteroidShower &&
                 string.Equals(incidentDefName, VgeAsteroidShowerIncident, StringComparison.OrdinalIgnoreCase))

@@ -27,6 +27,8 @@ Soft integrations:
 - Simply More Roofs
 - Vanilla Events Expanded
 - VE Events Space maps Compatibility Patch
+- Hospitality: Casino
+- Hospitality: Room Service, initial experimental support
 - Better Architect Menu
 - MedPod, experimental and disabled by default
 

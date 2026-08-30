@@ -21,6 +21,7 @@ namespace SpaceServices
             HospitalityPatches.Install(harmony);
             MedPodPatches.Install(harmony);
             CasinoPatches.Install(harmony);
+            RoomServicePatches.Install(harmony);
             VgeEscapePodPatches.Install(harmony);
         }
 

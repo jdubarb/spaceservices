@@ -15,7 +15,7 @@ namespace SpaceServices
 {
     public class SpaceServicesMod : Mod
     {
-        private const float SettingsViewHeight = 1000f;
+        private const float SettingsViewHeight = 1050f;
         private static Vector2 settingsScrollPosition;
 
         public static SpaceServicesSettings Settings;
@@ -82,6 +82,7 @@ namespace SpaceServices
             Checkbox(listing, "JDB_SpaceServices_Settings_DisablePatientGamblingAddictions", ref Settings.disablePatientGamblingAddictions);
             Checkbox(listing, "JDB_SpaceServices_Settings_BlockHospitalSurgeryScaria", ref Settings.blockHospitalSurgeryScaria);
             Checkbox(listing, "JDB_SpaceServices_Settings_HoldFailedSurgeryAftercare", ref Settings.holdFailedSurgeryAftercare);
+            Checkbox(listing, "JDB_SpaceServices_Settings_BlockCasinoVisitors", ref Settings.blockCasinoVisitorsOnSpaceAndSkyIslands);
             Checkbox(listing, "JDB_SpaceServices_Settings_BlockVGEAsteroidShower", ref Settings.blockVgeAsteroidShower);
 
             Section(listing, "JDB_SpaceServices_Settings_SectionExperimental");
@@ -91,6 +92,7 @@ namespace SpaceServices
                 Settings.groundsideHospitalityShuttleShare = PercentSlider(listing, "JDB_SpaceServices_Settings_GroundsideHospitalityShuttleShare", Settings.groundsideHospitalityShuttleShare);
             }
             Checkbox(listing, "JDB_SpaceServices_Settings_MedPodBridge", ref Settings.medPodServiceBridge);
+            Checkbox(listing, "JDB_SpaceServices_Settings_RoomServiceExperimentalSupport", ref Settings.enableRoomServiceExperimentalSupport);
             Checkbox(listing, "JDB_SpaceServices_Settings_SuppressMassCasualtyPreDropEffects", ref Settings.suppressMassCasualtyPreDropEffects);
             listing.End();
             Widgets.EndScrollView();
@@ -166,10 +168,12 @@ namespace SpaceServices
         public bool disablePatientGamblingAddictions = true;
         public bool blockHospitalSurgeryScaria = true;
         public bool holdFailedSurgeryAftercare = true;
+        public bool blockCasinoVisitorsOnSpaceAndSkyIslands = true;
         public bool blockVgeAsteroidShower = true;
         public bool enableGroundsideServicePads = false;
         public float groundsideHospitalityShuttleShare = 1f;
         public bool medPodServiceBridge = false;
+        public bool enableRoomServiceExperimentalSupport = true;
         public bool suppressMassCasualtyPreDropEffects = false;
 
         public override void ExposeData()
@@ -213,11 +217,13 @@ namespace SpaceServices
             Scribe_Values.Look(ref disablePatientGamblingAddictions, "disablePatientGamblingAddictions", true);
             Scribe_Values.Look(ref blockHospitalSurgeryScaria, "blockHospitalSurgeryScaria", true);
             Scribe_Values.Look(ref holdFailedSurgeryAftercare, "holdFailedSurgeryAftercare", true);
+            Scribe_Values.Look(ref blockCasinoVisitorsOnSpaceAndSkyIslands, "blockCasinoVisitorsOnSpaceAndSkyIslands", true);
             Scribe_Values.Look(ref blockVgeAsteroidShower, "blockVgeAsteroidShower", true);
             Scribe_Values.Look(ref enableGroundsideServicePads, "enableGroundsideServicePads", false);
             Scribe_Values.Look(ref groundsideHospitalityShuttleShare, "groundsideHospitalityShuttleShare", 1f);
             groundsideHospitalityShuttleShare = QuantizeRate(groundsideHospitalityShuttleShare);
             Scribe_Values.Look(ref medPodServiceBridge, "medPodServiceBridge", false);
+            Scribe_Values.Look(ref enableRoomServiceExperimentalSupport, "enableRoomServiceExperimentalSupport", true);
             Scribe_Values.Look(ref suppressMassCasualtyPreDropEffects, "suppressMassCasualtyPreDropEffects", false);
         }
 

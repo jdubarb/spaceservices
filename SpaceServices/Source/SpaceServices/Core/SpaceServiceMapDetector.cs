@@ -114,6 +114,17 @@ namespace SpaceServices
             return map != null && CachedOrEvaluate(map).allowed;
         }
 
+        public static bool IsSpaceOrAtmosphericIsland(Map map)
+        {
+            if (map == null)
+            {
+                return false;
+            }
+            SpaceServiceEligibility eligibility = CachedOrEvaluate(map);
+            return eligibility.allowReasons.Count > 0 ||
+                eligibility.blockReasons.Contains("non-vacuum atmospheric or sky layer");
+        }
+
         public static bool IsServiceActive(Map map)
         {
             if (map == null)
@@ -154,6 +165,14 @@ namespace SpaceServices
 
         private static SpaceServiceEligibility CachedOrEvaluate(Map map)
         {
+            // The static cache must not survive game loads: saved map uniqueIDs collide across
+            // sessions in one RimWorld process, which served stale verdicts from a previous colony.
+            Game currentGame = Current.Game;
+            if (!ReferenceEquals(cacheGame, currentGame))
+            {
+                EligibilityByMapId.Clear();
+                cacheGame = currentGame;
+            }
             int tick = Find.TickManager == null ? 0 : Find.TickManager.TicksGame;
             CachedEligibility cached;
             if (EligibilityByMapId.TryGetValue(map.uniqueID, out cached) && tick < cached.tick + EligibilityCacheTicks)
@@ -164,6 +183,8 @@ namespace SpaceServices
             EligibilityByMapId[map.uniqueID] = new CachedEligibility { tick = tick, eligibility = evaluated };
             return evaluated;
         }
+
+        private static Game cacheGame;
 
         private static SpaceServiceEligibility Clone(SpaceServiceEligibility source)
         {

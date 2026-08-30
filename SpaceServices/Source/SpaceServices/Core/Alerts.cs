@@ -136,4 +136,79 @@ namespace SpaceServices
             return culprits.Count == 0 ? AlertReport.Inactive : AlertReport.CulpritsAre(culprits);
         }
     }
+
+    public class Alert_SpaceServicesPadRoofBlocked : Alert
+    {
+        private const string PadDefName = "JDB_ServiceLandingPad";
+        private static readonly string[] TrackedDefNames =
+        {
+            PadDefName,
+            "Frame_" + PadDefName,
+            "Blueprint_" + PadDefName
+        };
+
+        public Alert_SpaceServicesPadRoofBlocked()
+        {
+            defaultLabel = "Space Services: Service pad roof blocked";
+        }
+
+        public override TaggedString GetExplanation()
+        {
+            StringBuilder builder = new StringBuilder();
+            builder.AppendLine("Service shuttles cannot reach these pads, so no arrivals or departures will use them.");
+            builder.AppendLine();
+            List<Thing> pads = BlockedPads();
+            foreach (Thing pad in pads.Take(8))
+            {
+                string reason = ServiceEnvironmentUtility.RoofAccessReport(pad);
+                builder.AppendLine("- " + pad.LabelCap + " at " + pad.Position + ": " + reason);
+            }
+            if (pads.Count > 8)
+            {
+                builder.AppendLine("- " + (pads.Count - 8) + " more.");
+            }
+            builder.AppendLine();
+            builder.Append("Shuttles need open sky or a fly-through roof over the whole pad. Deconstruct the roof or rebuild the pad elsewhere. Overhead mountain and cave rock cannot be removed by colonists.");
+            return builder.ToString();
+        }
+
+        public override AlertReport GetReport()
+        {
+            List<Thing> pads = BlockedPads();
+            return pads.Count == 0 ? AlertReport.Inactive : AlertReport.CulpritsAre(pads);
+        }
+
+        private static List<Thing> BlockedPads()
+        {
+            List<Thing> blocked = new List<Thing>();
+            if (Current.ProgramState != ProgramState.Playing || Current.Game == null || Current.Game.Maps == null)
+            {
+                return blocked;
+            }
+            foreach (Map map in Current.Game.Maps)
+            {
+                foreach (string defName in TrackedDefNames)
+                {
+                    ThingDef def = DefDatabase<ThingDef>.GetNamedSilentFail(defName);
+                    if (def == null)
+                    {
+                        continue;
+                    }
+                    foreach (Thing thing in map.listerThings.ThingsOfDef(def))
+                    {
+                        if (thing == null || thing.Destroyed || !thing.Spawned)
+                        {
+                            continue;
+                        }
+                        string reason;
+                        if (!ServiceEnvironmentUtility.IsRoofAccessible(thing, out reason))
+                        {
+                            blocked.Add(thing);
+                        }
+                    }
+                }
+            }
+            return blocked;
+        }
+    }
 }
