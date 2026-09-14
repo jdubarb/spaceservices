@@ -40,7 +40,8 @@ namespace SpaceServices
             }
             catch (Exception ex)
             {
-                Log.Warning("[Space Services] Could not patch " + method.FullDescription() + ": " + ex.Message);
+                Log.Warning("[Space Services] Could not patch " + method.FullDescription() + ": " + ex.Message +
+                    " Note: another mod may have requested this patch through the Space Services API; the failure is contained and Space Services continues without it.");
             }
         }
     }
