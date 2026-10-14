@@ -420,6 +420,22 @@ namespace SpaceServices
         {
             if (!SpaceServiceMapDetector.IsServiceActive(parent.Map))
             {
+                SpaceServiceEligibility eligibility =
+                    SpaceServiceMapDetector.Evaluate(parent.Map);
+                if (eligibility.blockReasons.Count > 0)
+                {
+                    reason = "map is not enabled for Space Services: " +
+                        string.Join(", ", eligibility.blockReasons.ToArray());
+                    return false;
+                }
+                if (eligibility.allowReasons.Count == 0 &&
+                    (SpaceServicesMod.Settings == null ||
+                        !SpaceServicesMod.Settings.enableGroundsideServicePads))
+                {
+                    reason = "planet map: enable 'Groundside service pads' in " +
+                        "mod settings to use pads here";
+                    return false;
+                }
                 reason = "map is not enabled for Space Services";
                 return false;
             }
