@@ -44,6 +44,15 @@ namespace SpaceServices
             {
                 Type driverType = AccessTools.TypeByName(CasinoGamblingDriverTypes[i]);
                 MethodInfo reservationMethod = driverType == null ? null : AccessTools.Method(driverType, "TryMakePreToilReservations");
+#if RIMWORLD_1_7
+                // Poker and roulette inherit this implementation. Harmony needs the
+                // declaring type's MethodInfo, also allowing the shared guard to deduplicate.
+                if (reservationMethod != null)
+                {
+                    reservationMethod = AccessTools.DeclaredMethod(reservationMethod.DeclaringType,
+                        reservationMethod.Name, new[] { typeof(bool) });
+                }
+#endif
                 if (reservationMethod != null && patchedReservationMethods.Add(reservationMethod))
                 {
                     OptionalModPatches.PatchIfExists(harmony, reservationMethod, typeof(CasinoPatchHandlers), prefix: nameof(CasinoPatchHandlers.TryReserveCasinoJobPrefix));

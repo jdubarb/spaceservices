@@ -1,0 +1,58 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Patch>
+  <Operation Class="PatchOperationFindMod">
+    <mods>
+      <li>Hospital</li>
+    </mods>
+    <match Class="PatchOperationSequence">
+      <operations>
+        <li Class="PatchOperationConditional">
+          <xpath>Defs/IncidentDef[defName="PatientArrives" and not(canOccurOnAllPlanetLayers)]</xpath>
+          <match Class="PatchOperationAdd">
+            <xpath>Defs/IncidentDef[defName="PatientArrives" and not(canOccurOnAllPlanetLayers)]</xpath>
+            <value>
+              <canOccurOnAllPlanetLayers>true</canOccurOnAllPlanetLayers>
+            </value>
+          </match>
+        </li>
+        <li Class="PatchOperationConditional">
+          <xpath>Defs/IncidentDef[defName="MassCasualtyEvent" and not(canOccurOnAllPlanetLayers)]</xpath>
+          <match Class="PatchOperationAdd">
+            <xpath>Defs/IncidentDef[defName="MassCasualtyEvent" and not(canOccurOnAllPlanetLayers)]</xpath>
+            <value>
+              <canOccurOnAllPlanetLayers>true</canOccurOnAllPlanetLayers>
+            </value>
+          </match>
+        </li>
+      </operations>
+    </match>
+  </Operation>
+
+  <Operation Class="PatchOperationFindMod">
+    <mods>
+      <li>Hospitality (Continued)</li>
+    </mods>
+    <match Class="PatchOperationSequence">
+      <operations>
+        <li Class="PatchOperationConditional">
+          <xpath>Defs/IncidentDef[defName="VisitorGroupSpacerCruise" and not(canOccurOnAllPlanetLayers)]</xpath>
+          <match Class="PatchOperationAdd">
+            <xpath>Defs/IncidentDef[defName="VisitorGroupSpacerCruise" and not(canOccurOnAllPlanetLayers)]</xpath>
+            <value>
+              <canOccurOnAllPlanetLayers>true</canOccurOnAllPlanetLayers>
+            </value>
+          </match>
+        </li>
+        <li Class="PatchOperationConditional">
+          <xpath>Defs/IncidentDef[defName="VisitorGroupSpacerLuxury" and not(canOccurOnAllPlanetLayers)]</xpath>
+          <match Class="PatchOperationAdd">
+            <xpath>Defs/IncidentDef[defName="VisitorGroupSpacerLuxury" and not(canOccurOnAllPlanetLayers)]</xpath>
+            <value>
+              <canOccurOnAllPlanetLayers>true</canOccurOnAllPlanetLayers>
+            </value>
+          </match>
+        </li>
+      </operations>
+    </match>
+  </Operation>
+</Patch>

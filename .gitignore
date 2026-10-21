@@ -2,6 +2,9 @@
 .DS_Store
 .directory
 *~
+**/Source/**/bin/
+**/Source/**/obj/
+*.pdb
 
 # Keep RimWorld assemblies and textures tracked; this repo is a publishable mod staging tree.
 

@@ -1,0 +1,123 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LanguageData>
+  <JDB_SpaceServices_Settings_SectionGeneral>General</JDB_SpaceServices_Settings_SectionGeneral>
+  <JDB_SpaceServices_Settings_SectionVerbose>Logging</JDB_SpaceServices_Settings_SectionVerbose>
+  <JDB_SpaceServices_Settings_SectionHospitality>Hospitality</JDB_SpaceServices_Settings_SectionHospitality>
+  <JDB_SpaceServices_Settings_SectionTraffic>Traffic rates</JDB_SpaceServices_Settings_SectionTraffic>
+  <JDB_SpaceServices_Settings_SectionCompatibility>Compatibility</JDB_SpaceServices_Settings_SectionCompatibility>
+  <JDB_SpaceServices_Settings_SectionExperimental>Experimental</JDB_SpaceServices_Settings_SectionExperimental>
+
+  <JDB_SpaceServices_Settings_DebugLogging>Debug logging</JDB_SpaceServices_Settings_DebugLogging>
+  <JDB_SpaceServices_Settings_DebugLoggingDesc>Write normal Space Services diagnostics to the RimWorld log. Warnings and errors are always logged.</JDB_SpaceServices_Settings_DebugLoggingDesc>
+  <JDB_SpaceServices_Settings_VerboseCoreLogging>Core lifecycle verbose logging</JDB_SpaceServices_Settings_VerboseCoreLogging>
+  <JDB_SpaceServices_Settings_VerboseCoreLoggingDesc>Write extra shared lifecycle, shuttle, cleanup, and service pawn diagnostics. Does not enable Hospital or Hospitality logs.</JDB_SpaceServices_Settings_VerboseCoreLoggingDesc>
+  <JDB_SpaceServices_Settings_VerboseHospitalLogging>Hospital verbose logging</JDB_SpaceServices_Settings_VerboseHospitalLogging>
+  <JDB_SpaceServices_Settings_VerboseHospitalLoggingDesc>Write extra Hospital patient arrival, departure, and cleanup diagnostics.</JDB_SpaceServices_Settings_VerboseHospitalLoggingDesc>
+  <JDB_SpaceServices_Settings_VerboseHospitalityLogging>Hospitality verbose logging</JDB_SpaceServices_Settings_VerboseHospitalityLogging>
+  <JDB_SpaceServices_Settings_VerboseHospitalityLoggingDesc>Write extra Hospitality guest arrival, bed, lord, and departure diagnostics.</JDB_SpaceServices_Settings_VerboseHospitalityLoggingDesc>
+  <JDB_SpaceServices_Settings_AutoExtract>Auto-extract fallback</JDB_SpaceServices_Settings_AutoExtract>
+  <JDB_SpaceServices_Settings_AutoExtractDesc>Let Space Services recover service visitors that are ready to leave but get stuck outside the normal departure path.</JDB_SpaceServices_Settings_AutoExtractDesc>
+  <JDB_SpaceServices_Settings_Hospital>Hospital support</JDB_SpaceServices_Settings_Hospital>
+  <JDB_SpaceServices_Settings_HospitalDesc>Enable space-map handling for Hospital patient arrivals and departures. Disabling passes native Hospital behavior through immediately; enabling after startup may require a restart.</JDB_SpaceServices_Settings_HospitalDesc>
+  <JDB_SpaceServices_Settings_HospitalCareMode>Restrict Hospital patients to care</JDB_SpaceServices_Settings_HospitalCareMode>
+  <JDB_SpaceServices_Settings_HospitalCareModeDesc>Default on. Keeps active Hospital patients on bed rest, tending, and feeding while Space Services is delaying departure for whitelisted diseases or blood loss. Turning this off can let long-term patients wander, recreate, or trigger discharge edge cases.</JDB_SpaceServices_Settings_HospitalCareModeDesc>
+  <JDB_SpaceServices_Settings_Hospitality>Hospitality support</JDB_SpaceServices_Settings_Hospitality>
+  <JDB_SpaceServices_Settings_HospitalityDesc>Enable space-map handling for Hospitality guest arrivals and departures. Disabling passes native Hospitality behavior through immediately; enabling after startup may require a restart.</JDB_SpaceServices_Settings_HospitalityDesc>
+  <JDB_SpaceServices_Settings_ShowSpaceServicesTab>Show Space Services tab</JDB_SpaceServices_Settings_ShowSpaceServicesTab>
+  <JDB_SpaceServices_Settings_ShowSpaceServicesTabDesc>Show the Space Services bottom tab while replacing the native Hospital/Hospitality tabs. Disabling only hides the tab button; pads, arrivals, departures, alerts, and integration behavior continue to run.</JDB_SpaceServices_Settings_ShowSpaceServicesTabDesc>
+  <JDB_SpaceServices_Settings_ReplaceExternalTabs>Replace Hospital/Hospitality tabs</JDB_SpaceServices_Settings_ReplaceExternalTabs>
+  <JDB_SpaceServices_Settings_ReplaceExternalTabsDesc>Hide the native Hospital and Hospitality bottom tabs and use the Space Services tab as the combined entry point. Disable this to show native tabs instead.</JDB_SpaceServices_Settings_ReplaceExternalTabsDesc>
+  <JDB_SpaceServices_Settings_ShowHospitalFallbackPadOverlay>Show medical pad overlay without Hospitality</JDB_SpaceServices_Settings_ShowHospitalFallbackPadOverlay>
+  <JDB_SpaceServices_Settings_ShowHospitalFallbackPadOverlayDesc>Draw the medical cross on service pads that fall back to Hospital-only mode because Hospitality is unavailable.</JDB_SpaceServices_Settings_ShowHospitalFallbackPadOverlayDesc>
+  <JDB_SpaceServices_Settings_ShowHospitalityFallbackPadOverlay>Show Hospitality pad overlay without Hospital</JDB_SpaceServices_Settings_ShowHospitalityFallbackPadOverlay>
+  <JDB_SpaceServices_Settings_ShowHospitalityFallbackPadOverlayDesc>Draw the guest overlay on service pads that fall back to Hospitality-only mode because Hospital is unavailable. Default off.</JDB_SpaceServices_Settings_ShowHospitalityFallbackPadOverlayDesc>
+  <JDB_SpaceServices_Settings_HospitalityRequireBeds>Require free guest beds for Hospitality arrivals</JDB_SpaceServices_Settings_HospitalityRequireBeds>
+  <JDB_SpaceServices_Settings_HospitalityRequireBedsDesc>Block new Hospitality guest groups unless enough free guest beds are available.</JDB_SpaceServices_Settings_HospitalityRequireBedsDesc>
+  <JDB_SpaceServices_Settings_HospitalityAutoDepartBedless>Auto-depart Hospitality guests without beds</JDB_SpaceServices_Settings_HospitalityAutoDepartBedless>
+  <JDB_SpaceServices_Settings_HospitalityAutoDepartBedlessDesc>After a grace period, send away Hospitality guests who cannot find usable guest beds.</JDB_SpaceServices_Settings_HospitalityAutoDepartBedlessDesc>
+  <JDB_SpaceServices_Settings_HospitalityVacuumGuard>Hospitality vacuum guard (fallback, tick-based)</JDB_SpaceServices_Settings_HospitalityVacuumGuard>
+  <JDB_SpaceServices_Settings_HospitalityVacuumGuardDesc>Fallback safety net for interrupting Hospitality guests who try to walk through unsafe vacuum during their stay. Recommended off for normal play; use Hospitality guest areas to keep guests inside safe rooms instead. Arrival and departure transfers still get short Space Services safety handling when this is off.</JDB_SpaceServices_Settings_HospitalityVacuumGuardDesc>
+  <JDB_SpaceServices_Settings_HospitalityFallbackScheduler>Space Hospitality fallback visits (use if Hospitality is not spawning guests)</JDB_SpaceServices_Settings_HospitalityFallbackScheduler>
+  <JDB_SpaceServices_Settings_HospitalityFallbackSchedulerDesc>Schedule Space Services visitor groups directly when Hospitality's normal space-map incident flow is not producing guests.</JDB_SpaceServices_Settings_HospitalityFallbackSchedulerDesc>
+  <JDB_SpaceServices_Settings_HospitalityFallbackInterval>Fallback visit interval: {0} days</JDB_SpaceServices_Settings_HospitalityFallbackInterval>
+  <JDB_SpaceServices_Settings_HospitalityFallbackIntervalDesc>Base interval for fallback Hospitality visits when traffic-rate override is disabled. Snaps to 0.25 day steps.</JDB_SpaceServices_Settings_HospitalityFallbackIntervalDesc>
+  <JDB_SpaceServices_Settings_TrafficRateOverride>Override service traffic rates</JDB_SpaceServices_Settings_TrafficRateOverride>
+  <JDB_SpaceServices_Settings_TrafficRateOverrideDesc>Use deterministic service-rate limits instead of the raw incident cadence. For example, at 0.25x, every fourth eligible attempt is allowed. Hospital and Hospitality also share a one-hour arrival spacing.</JDB_SpaceServices_Settings_TrafficRateOverrideDesc>
+  <JDB_SpaceServices_Settings_HospitalPatientTrafficRate>Hospital patient traffic: {0}x</JDB_SpaceServices_Settings_HospitalPatientTrafficRate>
+  <JDB_SpaceServices_Settings_HospitalPatientTrafficRateDesc>Deterministic rate for normal Hospital patient arrivals. 0.00 blocks new arrivals; existing patients can still leave.</JDB_SpaceServices_Settings_HospitalPatientTrafficRateDesc>
+  <JDB_SpaceServices_Settings_HospitalMassCasualtyTrafficRate>Hospital mass casualty traffic: {0}x</JDB_SpaceServices_Settings_HospitalMassCasualtyTrafficRate>
+  <JDB_SpaceServices_Settings_HospitalMassCasualtyTrafficRateDesc>Deterministic rate for Hospital mass casualty arrivals. 0.00 blocks new mass casualties.</JDB_SpaceServices_Settings_HospitalMassCasualtyTrafficRateDesc>
+  <JDB_SpaceServices_Settings_HospitalityVisitorTrafficRate>Hospitality visitor traffic: {0}x</JDB_SpaceServices_Settings_HospitalityVisitorTrafficRate>
+  <JDB_SpaceServices_Settings_HospitalityVisitorTrafficRateDesc>Deterministic rate for native Hospitality visitor incidents, and interval scaler for fallback visits.</JDB_SpaceServices_Settings_HospitalityVisitorTrafficRateDesc>
+  <JDB_SpaceServices_Settings_HospitalityFallbackRateNote>Hospitality fallback interval is scaled by visitor traffic rate while override is enabled.</JDB_SpaceServices_Settings_HospitalityFallbackRateNote>
+  <JDB_SpaceServices_Settings_SealedNoSuit>Allow sealed non-vacsuit arrivals</JDB_SpaceServices_Settings_SealedNoSuit>
+  <JDB_SpaceServices_Settings_SealedNoSuitDesc>Allow arrivals without forced vacsuits when the selected service pad is in a safe sealed environment. Most sealed arrivals will have Space Services-added or plain Odyssey vacsuits removed; some suited traffic is still kept for variety.</JDB_SpaceServices_Settings_SealedNoSuitDesc>
+  <JDB_SpaceServices_Settings_ModdedShuttleVisuals>Allow modded shuttle visuals</JDB_SpaceServices_Settings_ModdedShuttleVisuals>
+  <JDB_SpaceServices_Settings_ModdedShuttleVisualsDesc>Include shuttle visuals from optional non-Ludeon mods in the random service shuttle pool. Disable this to use only built-in vanilla/Odyssey-style visuals.</JDB_SpaceServices_Settings_ModdedShuttleVisualsDesc>
+  <JDB_SpaceServices_Settings_DisablePatientGamblingAddictions>Disable patients' gambling addictions</JDB_SpaceServices_Settings_DisablePatientGamblingAddictions>
+  <JDB_SpaceServices_Settings_DisablePatientGamblingAddictionsDesc>Stops patients from gambling while bedridden. This may reduce immersion for colonies with advanced libertarian healthcare.</JDB_SpaceServices_Settings_DisablePatientGamblingAddictionsDesc>
+  <JDB_SpaceServices_Settings_BlockHospitalSurgeryScaria>Block scaria on Hospital surgery patients</JDB_SpaceServices_Settings_BlockHospitalSurgeryScaria>
+  <JDB_SpaceServices_Settings_BlockHospitalSurgeryScariaDesc>Default on. Removes scaria from Space Services-routed Hospital surgery patients so Hospital does not create amputation cases that leave the patient berserk and difficult to treat.</JDB_SpaceServices_Settings_BlockHospitalSurgeryScariaDesc>
+  <JDB_SpaceServices_Settings_HoldFailedSurgeryAftercare>Hold failed surgery patients for aftercare</JDB_SpaceServices_Settings_HoldFailedSurgeryAftercare>
+  <JDB_SpaceServices_Settings_HoldFailedSurgeryAftercareDesc>Default on. If Hospital drops a spawned Space Services surgery patient after a failed operation while they still need urgent care, keep them as a Hospital patient instead of immediately routing them to departure.</JDB_SpaceServices_Settings_HoldFailedSurgeryAftercareDesc>
+  <JDB_SpaceServices_Settings_BlockCasinoVisitors>Block Casino visitors on space and sky islands</JDB_SpaceServices_Settings_BlockCasinoVisitors>
+  <JDB_SpaceServices_Settings_BlockCasinoVisitorsDesc>Default on. Prevents Hospitality: Casino's independent map-edge visitor group from spawning on space and atmospheric or sky-island maps. These visitors do not use Hospitality or Space Services shuttles.</JDB_SpaceServices_Settings_BlockCasinoVisitorsDesc>
+  <JDB_SpaceServices_Settings_BlockVGEAsteroidShower>Block VGE asteroid shower on service maps</JDB_SpaceServices_Settings_BlockVGEAsteroidShower>
+  <JDB_SpaceServices_Settings_BlockVGEAsteroidShowerDesc>Prevents Vanilla Gravship Expanded - Chapter 1's asteroid shower incident from firing on eligible stationary Space Services maps. The event can destroy static bases and has no practical counter for that use case.</JDB_SpaceServices_Settings_BlockVGEAsteroidShowerDesc>
+  <JDB_SpaceServices_Settings_GroundsideServicePads>Groundside service pads</JDB_SpaceServices_Settings_GroundsideServicePads>
+  <JDB_SpaceServices_Settings_GroundsideServicePadsDesc>Experimental. Allows normal planet maps with service landing pads to use the same pad pipeline for Hospital and Hospitality traffic. Does not make the map a space map, and does not enable vacuum gear, space hazards, or space-layer handling. Some modlists may still expect normal map-edge arrivals and departures, so use at your own risk.</JDB_SpaceServices_Settings_GroundsideServicePadsDesc>
+  <JDB_SpaceServices_Settings_GroundsideHospitalityShuttleShare>Groundside Hospitality shuttle share: {0}%</JDB_SpaceServices_Settings_GroundsideHospitalityShuttleShare>
+  <JDB_SpaceServices_Settings_GroundsideHospitalityShuttleShareDesc>Chance for a groundside Hospitality visitor group to use Space Services pad arrival and departure instead of normal Hospitality map-edge behavior. Native-selected visitors are not managed by Space Services.</JDB_SpaceServices_Settings_GroundsideHospitalityShuttleShareDesc>
+  <JDB_SpaceServices_Settings_MedPodBridge>MedPod service-pawn bridge</JDB_SpaceServices_Settings_MedPodBridge>
+  <JDB_SpaceServices_Settings_MedPodBridgeDesc>Experimental and TPS-heavy. Lets MedPod accept active Hospital patients and Hospitality guests on service maps even when their hidden medical-care level is below MedPod's normal threshold. Occupied MedPods can heavily reduce TPS; this is not recommended for normal colony or service use unless you accept that cost.</JDB_SpaceServices_Settings_MedPodBridgeDesc>
+  <JDB_SpaceServices_Settings_RoomServiceExperimentalSupport>Hospitality: Room Service integration</JDB_SpaceServices_Settings_RoomServiceExperimentalSupport>
+  <JDB_SpaceServices_Settings_RoomServiceExperimentalSupportDesc>Initial experimental support, default on. For Space Services-tracked Hospitality guests only, suppresses Room Service's guest-to-Hospital conversion and special surgery offers because their patient lifecycle is not yet safe for service shuttles. Also stops new companionship solicitation once shuttle departure begins. Ordinary untracked Hospitality guests are unaffected.</JDB_SpaceServices_Settings_RoomServiceExperimentalSupportDesc>
+  <JDB_SpaceServices_RoomService_DepartingGuest>Guest is staging for service-shuttle departure.</JDB_SpaceServices_RoomService_DepartingGuest>
+  <JDB_SpaceServices_Settings_SuppressMassCasualtyPreDropEffects>Suppress mass casualty pre-drop effects</JDB_SpaceServices_Settings_SuppressMassCasualtyPreDropEffects>
+  <JDB_SpaceServices_Settings_SuppressMassCasualtyPreDropEffectsDesc>Experimental. Hides Hospital's early wound filth and mote effects while mass-casualty pawns are being packed into drop pods, before the pods visibly land. Requires a restart to take effect.</JDB_SpaceServices_Settings_SuppressMassCasualtyPreDropEffectsDesc>
+
+  <JDB_SpaceServices_Message_HospitalityGuestAreaTip>Space Services: for Hospitality guests in space, set Hospitality's map settings accommodation/visitor area to a sealed, safe guest area near your service pad.</JDB_SpaceServices_Message_HospitalityGuestAreaTip>
+  <JDB_SpaceServices_Letter_ServicePadDestroyed_Label>Space Services pad destroyed</JDB_SpaceServices_Letter_ServicePadDestroyed_Label>
+  <JDB_SpaceServices_Letter_ServicePadDestroyed_Text>A service landing pad was destroyed. Service patients or guests may be unable to arrive or depart until another eligible pad is available.</JDB_SpaceServices_Letter_ServicePadDestroyed_Text>
+
+  <JDB_SpaceServices_Gizmo_ModeHospitalOnly>Hospital only</JDB_SpaceServices_Gizmo_ModeHospitalOnly>
+  <JDB_SpaceServices_Gizmo_ModeHospitalOnlyDesc>Use this pad only for Hospital patient arrivals and departures.</JDB_SpaceServices_Gizmo_ModeHospitalOnlyDesc>
+  <JDB_SpaceServices_Gizmo_ModeHospitalityOnly>Hospitality only</JDB_SpaceServices_Gizmo_ModeHospitalityOnly>
+  <JDB_SpaceServices_Gizmo_ModeHospitalityOnlyDesc>Use this pad only for Hospitality guest arrivals and departures.</JDB_SpaceServices_Gizmo_ModeHospitalityOnlyDesc>
+  <JDB_SpaceServices_Gizmo_ModeShared>Shared</JDB_SpaceServices_Gizmo_ModeShared>
+  <JDB_SpaceServices_Gizmo_ModeSharedDesc>Use this pad for Hospital and Hospitality traffic without preferring either service.</JDB_SpaceServices_Gizmo_ModeSharedDesc>
+  <JDB_SpaceServices_Gizmo_ModeHospitalPriority>Hospital priority</JDB_SpaceServices_Gizmo_ModeHospitalPriority>
+  <JDB_SpaceServices_Gizmo_ModeHospitalPriorityDesc>Use this pad for Hospital and Hospitality traffic, preferring Hospital patients.</JDB_SpaceServices_Gizmo_ModeHospitalPriorityDesc>
+  <JDB_SpaceServices_Gizmo_ModeHospitalityPriority>Hospitality priority</JDB_SpaceServices_Gizmo_ModeHospitalityPriority>
+  <JDB_SpaceServices_Gizmo_ModeHospitalityPriorityDesc>Use this pad for Hospital and Hospitality traffic, preferring Hospitality guests.</JDB_SpaceServices_Gizmo_ModeHospitalityPriorityDesc>
+  <JDB_SpaceServices_Gizmo_ModeDeparturesOnly>Departures only</JDB_SpaceServices_Gizmo_ModeDeparturesOnly>
+  <JDB_SpaceServices_Gizmo_ModeDeparturesOnlyDesc>Let existing Hospital patients and Hospitality guests leave through this pad, but block new arrivals from choosing it.</JDB_SpaceServices_Gizmo_ModeDeparturesOnlyDesc>
+  <JDB_SpaceServices_Gizmo_ReportMap>Report service map status</JDB_SpaceServices_Gizmo_ReportMap>
+  <JDB_SpaceServices_Gizmo_ReportMapDesc>Write the current map's Space Services eligibility reasons to the log.</JDB_SpaceServices_Gizmo_ReportMapDesc>
+  <JDB_SpaceServices_Gizmo_ClearPadReservation>DEV: Clear pad reservation</JDB_SpaceServices_Gizmo_ClearPadReservation>
+  <JDB_SpaceServices_Gizmo_ClearPadReservationDesc>Clear only this selected pad's current Space Services reservation.</JDB_SpaceServices_Gizmo_ClearPadReservationDesc>
+  <JDB_SpaceServices_Gizmo_DebugForceSurgeryFailure>DEV: Force surgery failure</JDB_SpaceServices_Gizmo_DebugForceSurgeryFailure>
+  <JDB_SpaceServices_Gizmo_DebugForceSurgeryFailureDesc>Simulate Hospital dropping this tracked surgery patient after a failed operation, while leaving the pawn spawned for Space Services departure testing.</JDB_SpaceServices_Gizmo_DebugForceSurgeryFailureDesc>
+
+  <JDB_SpaceServices_Panel_Title>Space Services</JDB_SpaceServices_Panel_Title>
+  <JDB_SpaceServices_Panel_NoMap>No current map.</JDB_SpaceServices_Panel_NoMap>
+  <JDB_SpaceServices_Panel_MapStatus>Map: {0}</JDB_SpaceServices_Panel_MapStatus>
+  <JDB_SpaceServices_Panel_Pads>Service pads: {0} total, {1} accepting patients, {2} accepting guests</JDB_SpaceServices_Panel_Pads>
+  <JDB_SpaceServices_Panel_HospitalSummary>Hospital: {0} tracked groups, {1} tracked patients</JDB_SpaceServices_Panel_HospitalSummary>
+  <JDB_SpaceServices_Panel_HospitalitySummary>Hospitality: {0} tracked groups, {1} tracked guests</JDB_SpaceServices_Panel_HospitalitySummary>
+  <JDB_SpaceServices_Panel_NativePanels>Native panels</JDB_SpaceServices_Panel_NativePanels>
+  <JDB_SpaceServices_Panel_OpenHospital>Open Hospital</JDB_SpaceServices_Panel_OpenHospital>
+  <JDB_SpaceServices_Panel_OpenHospitality>Open Hospitality</JDB_SpaceServices_Panel_OpenHospitality>
+  <JDB_SpaceServices_Panel_DebugLimits>Debug limits</JDB_SpaceServices_Panel_DebugLimits>
+  <JDB_SpaceServices_Panel_HospitalPatientLimit>Hospital patient limit: {0}</JDB_SpaceServices_Panel_HospitalPatientLimit>
+  <JDB_SpaceServices_Panel_HospitalPatientLimitDesc>Debug-only cap for tracked Hospital patients. Minimum blocks new patients; maximum removes the cap.</JDB_SpaceServices_Panel_HospitalPatientLimitDesc>
+  <JDB_SpaceServices_Panel_HospitalityGroupLimit>Hospitality group limit: {0}</JDB_SpaceServices_Panel_HospitalityGroupLimit>
+  <JDB_SpaceServices_Panel_HospitalityGroupLimitDesc>Debug-only cap for tracked Hospitality guest groups. Minimum blocks new groups; maximum removes the cap.</JDB_SpaceServices_Panel_HospitalityGroupLimitDesc>
+  <JDB_SpaceServices_Panel_HospitalityPawnLimit>Hospitality guest limit: {0}</JDB_SpaceServices_Panel_HospitalityPawnLimit>
+  <JDB_SpaceServices_Panel_HospitalityPawnLimitDesc>Debug-only cap for tracked Hospitality guest pawns. Minimum blocks new guests; maximum removes the cap.</JDB_SpaceServices_Panel_HospitalityPawnLimitDesc>
+  <JDB_SpaceServices_Panel_DebugActions>Debug recovery</JDB_SpaceServices_Panel_DebugActions>
+  <JDB_SpaceServices_Panel_ReportMap>Report map status</JDB_SpaceServices_Panel_ReportMap>
+  <JDB_SpaceServices_Panel_ClearReservations>Clear reservations</JDB_SpaceServices_Panel_ClearReservations>
+  <JDB_SpaceServices_Panel_RemoveShuttles>Remove shuttles</JDB_SpaceServices_Panel_RemoveShuttles>
+  <JDB_SpaceServices_Panel_ResetTraffic>Reset service traffic</JDB_SpaceServices_Panel_ResetTraffic>
+</LanguageData>

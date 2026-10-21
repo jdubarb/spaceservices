@@ -66,6 +66,22 @@ The script can discover common Steam library paths. Override paths with `RIMWORL
 
 ## Gameplay Notes
 
+### RimWorld 1.7 unstable
+
+The separate `1.7/` content tree uses a native .NET 10 build. With the .NET 10
+SDK installed, run from this directory:
+
+```bash
+dotnet build SpaceServices/Source/SpaceServices.1.7.csproj \
+  -p:RimWorldDir=/path/to/RimWorld \
+  -p:HarmonyDll=/path/to/Harmony/1.7/Assemblies/0Harmony.dll
+```
+
+Output: `SpaceServices/1.7/Assemblies/SpaceServices.dll`. Core Hospital and
+Hospitality patient/guest lifecycles were exercised on 1.7.4984 rev1242 on
+groundside and orbital fixtures. This is unstable-build verification, not
+exhaustive verification of every optional integration. The 1.6 DLL is retained.
+
 - Keep Hospitality guest areas inside sealed, safe rooms. Include the service-adjacent paths guests are allowed to use.
 - The service landing pad appears under vanilla Architect > Odyssey. With Better Architect Menu installed, this is shown under Space > More.
 - Exposed pads should be close to pressurized rooms. Odyssey can still apply vacuum burns below `100%` vacuum resistance.
@@ -91,4 +107,3 @@ Current extension points include:
 Space Services is licensed under GNU GPLv3. See [LICENSE](LICENSE) and [SpaceServices/LICENSE.txt](SpaceServices/LICENSE.txt).
 
 Forks, continuations, translations, compatibility patches, and ports are welcome under GPLv3 terms. Please keep attribution and link back to the original project where practical.
-

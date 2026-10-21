@@ -1,0 +1,81 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Defs>
+  <ThingDef ParentName="BuildingBase">
+    <defName>JDB_ServiceLandingPad</defName>
+    <label>service landing pad</label>
+    <description>Marks a controlled arrival and departure point for patients, guests, and other service traffic on stationary space facilities.</description>
+    <thingClass>SpaceServices.Building_ServiceLandingPad</thingClass>
+    <drawerType>MapMeshAndRealTime</drawerType>
+    <graphicData>
+      <texPath>Things/Building/SpaceServices/ServiceLandingPad</texPath>
+      <graphicClass>Graphic_Single</graphicClass>
+      <drawSize>(7,7)</drawSize>
+    </graphicData>
+    <altitudeLayer>FloorEmplacement</altitudeLayer>
+    <passability>Standable</passability>
+    <size>(7,7)</size>
+    <tickerType>Rare</tickerType>
+    <rotatable>false</rotatable>
+    <scatterableOnMapGen>false</scatterableOnMapGen>
+    <terrainAffordanceNeeded>Heavy</terrainAffordanceNeeded>
+    <clearBuildingArea>true</clearBuildingArea>
+    <useHitPoints>false</useHitPoints>
+    <canOverlapZones>true</canOverlapZones>
+    <designationCategory>Odyssey</designationCategory>
+    <uiOrder>100</uiOrder>
+    <placeWorkers>
+      <li>PlaceWorker_InvalidOverSubstructure</li>
+    </placeWorkers>
+    <statBases>
+      <WorkToBuild>800</WorkToBuild>
+      <MaxHitPoints>100</MaxHitPoints>
+      <Flammability>0</Flammability>
+    </statBases>
+    <costList>
+      <Steel>250</Steel>
+      <ComponentIndustrial>5</ComponentIndustrial>
+    </costList>
+    <comps>
+      <li Class="CompProperties_Power">
+        <compClass>CompPowerTrader</compClass>
+        <basePowerConsumption>300</basePowerConsumption>
+      </li>
+      <li Class="SpaceServices.CompProperties_SpaceServicePad" />
+    </comps>
+    <building>
+      <isInert>true</isInert>
+      <canPlaceOverImpassablePlant>false</canPlaceOverImpassablePlant>
+      <wakeDormantPawnsOnConstruction>false</wakeDormantPawnsOnConstruction>
+      <artificialForMeditationPurposes>false</artificialForMeditationPurposes>
+      <ai_chillDestination>false</ai_chillDestination>
+      <ai_neverTrashThis>true</ai_neverTrashThis>
+    </building>
+    <researchPrerequisites>
+      <li>Electricity</li>
+    </researchPrerequisites>
+  </ThingDef>
+
+  <ThingDef ParentName="EtherealThingBase">
+    <defName>JDB_ServiceLandingPadCornerGlowRed</defName>
+    <label>service pad red corner glow</label>
+    <thingClass>SpaceServices.ServicePadCornerGlow</thingClass>
+    <comps>
+      <li Class="CompProperties_Glower">
+        <glowRadius>2</glowRadius>
+        <glowColor>(255, 44, 32, 0)</glowColor>
+      </li>
+    </comps>
+  </ThingDef>
+
+  <ThingDef ParentName="EtherealThingBase">
+    <defName>JDB_ServiceLandingPadCornerGlowGreen</defName>
+    <label>service pad green corner glow</label>
+    <thingClass>SpaceServices.ServicePadCornerGlow</thingClass>
+    <comps>
+      <li Class="CompProperties_Glower">
+        <glowRadius>2</glowRadius>
+        <glowColor>(164, 255, 138, 0)</glowColor>
+      </li>
+    </comps>
+  </ThingDef>
+</Defs>

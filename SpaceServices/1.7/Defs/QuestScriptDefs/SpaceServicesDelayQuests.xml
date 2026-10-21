@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Defs>
+  <QuestScriptDef>
+    <defName>JDB_SpaceServices_DelayLodgerQuest</defName>
+    <rootSelectionWeight>0</rootSelectionWeight>
+    <defaultHidden>true</defaultHidden>
+    <hideOnCleanup>true</hideOnCleanup>
+    <questNameRules>
+      <rulesStrings>
+        <li>questName->Space Services pickup delay</li>
+      </rulesStrings>
+    </questNameRules>
+    <questDescriptionRules>
+      <rulesStrings>
+        <li>questDescription->Service patients are waiting for Space Services pickup conditions to become safe.</li>
+      </rulesStrings>
+    </questDescriptionRules>
+    <root Class="SpaceServices.QuestNode_Root_ServiceDelayLodger" />
+  </QuestScriptDef>
+</Defs>
