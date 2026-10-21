@@ -21,6 +21,9 @@ namespace SpaceServices
             Type optionalHospital = AccessTools.TypeByName("HospitalityRoomService.OptionalHospital");
             Type medicalGuestUtility = AccessTools.TypeByName("HospitalityRoomService.MedicalGuestUtility");
             Type roomServiceUtility = AccessTools.TypeByName("HospitalityRoomService.RoomServiceUtility");
+#if RIMWORLD_1_7
+            RoomServiceLoadCompatibility.Install(harmony);
+#endif
             bool installed = false;
 
             if (optionalHospital != null)

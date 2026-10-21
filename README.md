@@ -82,6 +82,13 @@ Hospitality patient/guest lifecycles were exercised on 1.7.4984 rev1242 on
 groundside and orbital fixtures. This is unstable-build verification, not
 exhaustive verification of every optional integration. The 1.6 DLL is retained.
 
+1.7 compatibility fixes also keep Room Service's solicitation component off
+non-bed buildings and safely initialize absent cooldown data on old saves.
+Genuine beds retain their existing enabled/cooldown state. Temporary VGE
+Chapter 2 combat platforms are excluded from service facilities. Remade VEE's
+inert Psychic Rain no longer blocks guests; orbital ship crash debris still
+holds shuttle traffic. These changes do not alter the retained 1.6 payload.
+
 - Keep Hospitality guest areas inside sealed, safe rooms. Include the service-adjacent paths guests are allowed to use.
 - The service landing pad appears under vanilla Architect > Odyssey. With Better Architect Menu installed, this is shown under Space > More.
 - Exposed pads should be close to pressurized rooms. Odyssey can still apply vacuum burns below `100%` vacuum resistance.

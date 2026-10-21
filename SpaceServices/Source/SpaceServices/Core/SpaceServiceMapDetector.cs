@@ -57,6 +57,14 @@ namespace SpaceServices
             {
                 result.blockReasons.Add("temporary quest space map");
             }
+#if RIMWORLD_1_7
+            // Chapter 2 combat platforms inherit SpaceMapParent, but are temporary
+            // bombardment/boarding targets rather than stationary service colonies.
+            if (TypeOrBaseNameContains(parent, "VanillaGravshipExpanded2.MapParent_WarPlatform"))
+            {
+                result.blockReasons.Add("VGE Chapter 2 combat platform");
+            }
+#endif
 
             string layerDef = DefNameFromNested(map, "Tile", "LayerDef");
             if (Reflect.BoolFromNested(map, "Tile", "LayerDef", "isSpace"))
