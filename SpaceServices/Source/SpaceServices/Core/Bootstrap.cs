@@ -27,6 +27,9 @@ namespace SpaceServices
             ServiceTabVisibilityPatches.Install(Harmony);
             HospitalMassCasualtyVisualPatches.Install(Harmony);
             OptionalModPatches.Install(Harmony);
+#if RIMWORLD_1_7
+            HospitalityOwnershipCompatibility.Install(Harmony);
+#endif
             LongEventHandler.ExecuteWhenFinished(SpaceServicesMainButtonUtility.HideReplacedServiceTabs);
             ServiceDebugUtility.Log(ServiceLogIntegration.Core, "Loaded.");
         }

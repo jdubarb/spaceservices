@@ -120,4 +120,6 @@
   <JDB_SpaceServices_Panel_ClearReservations>Clear reservations</JDB_SpaceServices_Panel_ClearReservations>
   <JDB_SpaceServices_Panel_RemoveShuttles>Remove shuttles</JDB_SpaceServices_Panel_RemoveShuttles>
   <JDB_SpaceServices_Panel_ResetTraffic>Reset service traffic</JDB_SpaceServices_Panel_ResetTraffic>
+  <JDB_SpaceServices_Settings_HospitalityOwnershipWorkaround>Hospitality bed ownership workaround (experimental, exact 1.7 build only)</JDB_SpaceServices_Settings_HospitalityOwnershipWorkaround>
+  <JDB_SpaceServices_Settings_HospitalityOwnershipWorkaroundDesc>Off by default. Corrects the inspected Hospitality unclaim ordering and clears narrowly identified stale former-guest bed references before ownership PostLoadInit. Applies to ordinary Hospitality guests as well as service guests. Enable before loading an affected save; enabling during play only prevents future unclaim failures. Only the approved Hospitality and RimWorld binaries are supported. Preference is retained when incompatible; runtime stays inactive. Build validation runs once at startup: restart after any mod or game update.</JDB_SpaceServices_Settings_HospitalityOwnershipWorkaroundDesc>
 </LanguageData>

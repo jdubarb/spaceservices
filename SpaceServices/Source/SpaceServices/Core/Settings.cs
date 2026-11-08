@@ -15,7 +15,11 @@ namespace SpaceServices
 {
     public class SpaceServicesMod : Mod
     {
+#if RIMWORLD_1_7
+        private const float SettingsViewHeight = 1180f;
+#else
         private const float SettingsViewHeight = 1050f;
+#endif
         private static Vector2 settingsScrollPosition;
 
         public static SpaceServicesSettings Settings;
@@ -94,6 +98,10 @@ namespace SpaceServices
             Checkbox(listing, "JDB_SpaceServices_Settings_MedPodBridge", ref Settings.medPodServiceBridge);
             Checkbox(listing, "JDB_SpaceServices_Settings_RoomServiceExperimentalSupport", ref Settings.enableRoomServiceExperimentalSupport);
             Checkbox(listing, "JDB_SpaceServices_Settings_SuppressMassCasualtyPreDropEffects", ref Settings.suppressMassCasualtyPreDropEffects);
+#if RIMWORLD_1_7
+            Checkbox(listing, "JDB_SpaceServices_Settings_HospitalityOwnershipWorkaround", ref Settings.hospitalityOwnershipWorkaround);
+            listing.Label(HospitalityOwnershipCompatibility.Status);
+#endif
             listing.End();
             Widgets.EndScrollView();
             Settings.Write();
@@ -175,6 +183,9 @@ namespace SpaceServices
         public bool medPodServiceBridge = false;
         public bool enableRoomServiceExperimentalSupport = true;
         public bool suppressMassCasualtyPreDropEffects = false;
+#if RIMWORLD_1_7
+        public bool hospitalityOwnershipWorkaround = false;
+#endif
 
         public override void ExposeData()
         {
@@ -225,6 +236,9 @@ namespace SpaceServices
             Scribe_Values.Look(ref medPodServiceBridge, "medPodServiceBridge", false);
             Scribe_Values.Look(ref enableRoomServiceExperimentalSupport, "enableRoomServiceExperimentalSupport", true);
             Scribe_Values.Look(ref suppressMassCasualtyPreDropEffects, "suppressMassCasualtyPreDropEffects", false);
+#if RIMWORLD_1_7
+            Scribe_Values.Look(ref hospitalityOwnershipWorkaround, "hospitalityOwnershipWorkaround", false);
+#endif
         }
 
         public static float QuantizeRate(float value)

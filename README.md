@@ -1,6 +1,17 @@
 # Space Services
 
-Space Services is a RimWorld 1.6/Odyssey compatibility mod for running Hospital and Hospitality-style services on stationary space maps: asteroid bases, orbit maps, moons, and station-like facilities.
+Space Services supports RimWorld 1.6 and the 1.7 pre-release with Odyssey for running Hospital and Hospitality-style services on stationary space maps: asteroid bases, orbit maps, moons, and station-like facilities.
+
+Current release: **1.1.4** — see the [changelog](CHANGELOG-1.1.4.md).
+
+### Experimental Hospitality bed-ownership workaround
+
+The 1.7 build includes an off-by-default option under Space Services →
+Experimental for a verified Hospitality guest-bed ownership defect. Enable
+it before loading an affected save. It only runs on the inspected Hospitality
+and RimWorld builds; changed DLL hashes or unexpected method layouts leave
+it inactive, with the reason shown in settings. Restart after game or mod
+updates. This is a targeted workaround, not a general save-repair tool.
 
 Actual travelling gravships are intentionally blocked.
 
