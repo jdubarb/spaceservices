@@ -2,7 +2,7 @@
 
 Space Services supports RimWorld 1.6 and the 1.7 pre-release with Odyssey for running Hospital and Hospitality-style services on stationary space maps: asteroid bases, orbit maps, moons, and station-like facilities.
 
-Current release: **1.1.4** — see the [changelog](CHANGELOG-1.1.4.md).
+Current release: **1.1.4**.
 
 ### Experimental Hospitality bed-ownership workaround
 
